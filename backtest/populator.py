@@ -6,16 +6,17 @@ import string
 
 
 MAX_ATTEMPTS = 5
+BATCH_SIZE = 1000
 
 
 class RetryError(Exception):
     pass
 
 
-def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
+def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_size):
     for _ in range(max_retries):
         try:
-            ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since, limit)
+            ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since, batch_size)
             if ohlcv is not None:
                 return ohlcv
         except Exception:
@@ -25,22 +26,18 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
 
 
 def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
-    earliest_timestamp = exchange.milliseconds()
-    timeframe_duration_in_seconds = exchange.parse_timeframe(timeframe)
-    timeframe_duration_in_ms = timeframe_duration_in_seconds * 1000
-    time_delta = limit * timeframe_duration_in_ms
+    timeframe_seconds = exchange.parse_timeframe(timeframe)
+    timeframe_ms = timeframe_seconds * 1000
+    end = since + limit * timeframe_ms
     all_ohlcv = []
     while True:
-        fetch_since = earliest_timestamp - time_delta
+        if since >= end:
+            break
+        batch_size = max(0, min(BATCH_SIZE, (end - since) // timeframe_ms))
         ohlcv = retry_fetch_ohlcv(
-            max_retries, exchange, symbol, timeframe, fetch_since, limit)
-        # If we have reached the beginning of history.
-        if ohlcv[0][0] >= earliest_timestamp:
-            break
-        earliest_timestamp = ohlcv[0][0]
+            max_retries, exchange, symbol, timeframe, since, batch_size)
         all_ohlcv = ohlcv + all_ohlcv
-        if fetch_since < since:
-            break
+        since += batch_size * timeframe_ms
     return all_ohlcv
 
 
