@@ -1,3 +1,10 @@
 {
-  "python.linting.pylintEnabled": true
+  "editor.formatOnSave": true,
+  "files.eol": "\n",
+  "editor.rulers": [
+    100
+  ],
+  "files.trimTrailingWhitespace": true,
+  "python.linting.pylintEnabled": true,
+  "python.pythonPath": "/usr/local/bin/python3",
 }
