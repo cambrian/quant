@@ -45,7 +45,8 @@ def write_csv(filename, data):
     with open(filename, 'w+') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"',
                             quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(['timestamp', 'o', 'h', 'l', 'c', 'v'])
+        writer.writerow(['timestamp', 'open', 'high',
+                         'low', 'close', 'volume'])
         writer.writerows(data)
 
 
