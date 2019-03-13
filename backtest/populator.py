@@ -80,7 +80,7 @@ def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, tick_size, star
 
 def get_data_filename(pair, tick_size, start, num_ticks):
     return '{}-{}-{}-{}'.format(pair.replace('/', '-'),
-                                tick_size, start, str(num_ticks))
+                                tick_size, start.replace(':', '-'), str(num_ticks))
 
 
 def get_data_directory(data_dir, exchange):
