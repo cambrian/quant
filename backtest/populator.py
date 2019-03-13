@@ -35,7 +35,6 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, tick_size_ms, position_ms, 
 def scrape_ohlcv(max_retries, exchange, symbol, tick_size, start_ms, num_ticks, batch_size_max):
     tick_size_ms = tick_size_to_ms(exchange, tick_size)
     position_ms = start_ms
-    print(start_ms, num_ticks, tick_size_ms)
     end = start_ms + num_ticks * tick_size_ms
     print('Batch Size: {}'.format(batch_size_max))
     print('Total Entries: {}'.format((end - start_ms) // tick_size_ms))
@@ -109,7 +108,6 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
         os.makedirs(get_data_directory(data_dir, exchange_id), exist_ok=True)
         # Validate start time.
         start_ms = exchange.parse8601(start)
-        print(start_ms)
         now = exchange.milliseconds()
         if start_ms > now:
             raise RequestError(
