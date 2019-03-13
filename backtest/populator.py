@@ -7,19 +7,20 @@ import string
 MAX_ATTEMPTS = 5
 
 
-class RateError(Exception):
-    pass
-
-
 class RetryError(Exception):
     pass
+
+
+def timeframe_to_ms(exchange, timeframe):
+    timeframe_seconds = exchange.parse_timeframe(timeframe)
+    return timeframe_seconds * 1000
 
 
 def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_size):
     for _ in range(max_retries):
         try:
             ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since, batch_size)
-            if ohlcv is not None:
+            if ohlcv is not None and len(ohlcv) > 0:
                 return ohlcv
         except Exception:
             continue
@@ -27,48 +28,44 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_siz
                      .format(symbol, exchange, max_retries))
 
 
-def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit, batch_size_max):
-    timeframe_seconds = exchange.parse_timeframe(timeframe)
-    timeframe_ms = timeframe_seconds * 1000
-    start = since
-    end = since + limit * timeframe_ms
+def scrape_ohlcv(max_retries, exchange, symbol, timeframe, start, limit, batch_size_max):
+    timeframe_ms = timeframe_to_ms(exchange, timeframe)
+    position = start
+    end = start + limit * timeframe_ms
     print('Batch Size: {}'.format(batch_size_max))
     print('Total Entries: {}'.format((end - start) // timeframe_ms))
-    all_ohlcv = []
+    print('Note that some entries might not exist because they predate exchange history.')
     while True:
-        if since >= end:
+        if position >= end:
             break
         print('Entries Processed: {}'.format(
-            (since - start) // timeframe_ms))
-        batch_size = max(0, min(batch_size_max, (end - since) // timeframe_ms))
+            (position - start) // timeframe_ms))
+        batch_size = max(
+            0, min(batch_size_max, (end - position) // timeframe_ms))
         ohlcv = retry_fetch_ohlcv(
-            max_retries, exchange, symbol, timeframe, since, batch_size)
-        all_ohlcv = ohlcv + all_ohlcv
-        since += batch_size * timeframe_ms
-        if len(ohlcv) < batch_size and since < end:
-            raise RateError(
-                'Exchange returned fewer rows than expected. Try a smaller batch size.')
-    return all_ohlcv
+            max_retries, exchange, symbol, timeframe, position, batch_size)
+        position = ohlcv[-1][0] + timeframe_ms
+        if len(ohlcv) < batch_size and position < end:
+            print('Warning: Exchange returned fewer rows than expected.')
+        yield ohlcv
 
 
-def write_csv(filename, data):
+def write_csv(filename, generator):
     with open(filename, 'w+') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"',
                             quoting=csv.QUOTE_MINIMAL)
         writer.writerow(['timestamp', 'open', 'high',
                          'low', 'close', 'volume'])
-        writer.writerows(data)
+        for data in generator:
+            writer.writerows(data)
 
 
-def scrape_candles_to_csv(filename, max_retries, exchange, symbol, timeframe, since, limit,
-                          batch_size_max):
-    # Convert start time from string to milliseconds integer if needed.
-    if isinstance(since, str):
-        since = exchange.parse8601(since)
+def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, timeframe, start, limit,
+                        batch_size_max):
     try:
-        ohlcv = scrape_ohlcv(max_retries, exchange, symbol,
-                             timeframe, since, limit, batch_size_max)
-        write_csv(filename, ohlcv)
+        ohlcv_generator = scrape_ohlcv(max_retries, exchange, symbol,
+                                       timeframe, start, limit, batch_size_max)
+        write_csv(filename, ohlcv_generator)
         print('Scraping for {} succeeded.'.format(filename))
     except RetryError:
         print('Scraping for {} failed.'.format(filename))
@@ -91,7 +88,7 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks):
 
 
 # TODO: Eventually create a server and a database for backtest data (instead of CSVs).
-def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
+def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
     for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
             'enableRateLimit': True
@@ -101,6 +98,12 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
             print('{} does not expose OHLCV data.'.format(exchange.id))
             continue
         os.makedirs(get_data_directory(data_dir, exchange_id), exist_ok=True)
+        # Convert start time from string to milliseconds integer if needed.
+        if isinstance(start, str):
+            start_ms = exchange.parse8601(start)
+        if num_ticks is None:
+            num_ticks = (exchange.milliseconds() -
+                         start_ms) // timeframe_to_ms(exchange, tick_size)
         for pair in pairs:
             if not pair in exchange.symbols:
                 print('Exchange {} does not trade {}.'.format(exchange_id, pair))
@@ -109,5 +112,5 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
                 pair, exchange_id))
             path = get_data_path(data_dir, exchange_id, pair,
                                  tick_size, start, num_ticks)
-            scrape_candles_to_csv(path, MAX_ATTEMPTS, exchange,
-                                  pair, tick_size, start, num_ticks, batch_size_max)
+            scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
+                                pair, tick_size, start_ms, num_ticks, batch_size_max)
