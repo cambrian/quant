@@ -6,6 +6,10 @@ import string
 
 MAX_ATTEMPTS = 5
 
+# Subject to debate/change (currently top 20 highest volume coins on CMC).
+GOOD_COINS = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO',
+              'DASH', 'ZEC', 'BCH', 'ETC', 'BNB', 'XLM', 'TRX', 'ONT', 'AE', 'OMG', 'BSV']
+
 
 class RequestError(Exception):
     pass
@@ -129,3 +133,15 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
                                  tick_size, start, num_ticks)
             scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
                                 pair, tick_size, start_ms, num_ticks, batch_size_max)
+
+
+def grab_all_pairs(data_dir, exchanges, tick_size):
+    for (exchange_id, batch_size_max) in exchanges:
+        exchange = getattr(ccxt, exchange_id)({
+            'enableRateLimit': True
+        })
+        exchange.load_markets()
+        good_symbols = list(filter(lambda x: x.split(
+            '/')[0] in GOOD_COINS and x.split('/')[1] in GOOD_COINS, exchange.symbols))
+        populate(data_dir, [(exchange_id, batch_size_max)],
+                 good_symbols, tick_size, '2000-01-01T00:00:00Z')
