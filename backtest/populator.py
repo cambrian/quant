@@ -27,48 +27,48 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_siz
                      .format(symbol, exchange, max_retries))
 
 
-def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit, batch_size_max):
+def scrape_ohlcv(max_retries, exchange, symbol, timeframe, start, limit, batch_size_max):
     timeframe_seconds = exchange.parse_timeframe(timeframe)
     timeframe_ms = timeframe_seconds * 1000
-    start = since
-    end = since + limit * timeframe_ms
+    position = start
+    end = start + limit * timeframe_ms
     print('Batch Size: {}'.format(batch_size_max))
     print('Total Entries: {}'.format((end - start) // timeframe_ms))
-    all_ohlcv = []
     while True:
-        if since >= end:
+        if position >= end:
             break
         print('Entries Processed: {}'.format(
-            (since - start) // timeframe_ms))
-        batch_size = max(0, min(batch_size_max, (end - since) // timeframe_ms))
+            (position - start) // timeframe_ms))
+        batch_size = max(
+            0, min(batch_size_max, (end - position) // timeframe_ms))
         ohlcv = retry_fetch_ohlcv(
-            max_retries, exchange, symbol, timeframe, since, batch_size)
-        all_ohlcv = ohlcv + all_ohlcv
-        since += batch_size * timeframe_ms
-        if len(ohlcv) < batch_size and since < end:
+            max_retries, exchange, symbol, timeframe, position, batch_size)
+        position += batch_size * timeframe_ms
+        if len(ohlcv) < batch_size and position < end:
             raise RateError(
                 'Exchange returned fewer rows than expected. Try a smaller batch size.')
-    return all_ohlcv
+        yield ohlcv
 
 
-def write_csv(filename, data):
+def write_csv(filename, generator):
     with open(filename, 'w+') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"',
                             quoting=csv.QUOTE_MINIMAL)
         writer.writerow(['timestamp', 'open', 'high',
                          'low', 'close', 'volume'])
-        writer.writerows(data)
+        for data in generator:
+            writer.writerows(data)
 
 
-def scrape_candles_to_csv(filename, max_retries, exchange, symbol, timeframe, since, limit,
-                          batch_size_max):
+def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, timeframe, start, limit,
+                        batch_size_max):
     # Convert start time from string to milliseconds integer if needed.
-    if isinstance(since, str):
-        since = exchange.parse8601(since)
+    if isinstance(start, str):
+        start = exchange.parse8601(start)
     try:
-        ohlcv = scrape_ohlcv(max_retries, exchange, symbol,
-                             timeframe, since, limit, batch_size_max)
-        write_csv(filename, ohlcv)
+        ohlcv_generator = scrape_ohlcv(max_retries, exchange, symbol,
+                                       timeframe, start, limit, batch_size_max)
+        write_csv(filename, ohlcv_generator)
         print('Scraping for {} succeeded.'.format(filename))
     except RetryError:
         print('Scraping for {} failed.'.format(filename))
@@ -109,5 +109,5 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
                 pair, exchange_id))
             path = get_data_path(data_dir, exchange_id, pair,
                                  tick_size, start, num_ticks)
-            scrape_candles_to_csv(path, MAX_ATTEMPTS, exchange,
-                                  pair, tick_size, start, num_ticks, batch_size_max)
+            scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
+                                pair, tick_size, start, num_ticks, batch_size_max)
