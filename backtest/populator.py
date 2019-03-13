@@ -6,6 +6,8 @@ import string
 
 MAX_ATTEMPTS = 5
 
+# subject to debate/change, currently top 20 highest volume coins on CMC
+good_coins = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO', 'DASH', 'ZEC', 'BCH', 'ETC', 'BNB', 'XLM', 'TRX', 'ONT', 'AE', 'OMG', 'BSV']
 
 class RateError(Exception):
     pass
@@ -111,3 +113,13 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
                                  tick_size, start, num_ticks)
             scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
                                 pair, tick_size, start, num_ticks, batch_size_max)
+
+def grab_all_pairs(data_dir, exchanges, tick_size):
+    for (exchange_id, batch_size_max) in exchanges:
+        exchange = getattr(ccxt, exchange_id)({
+            'enableRateLimit': True
+        })
+        exchange.load_markets()
+        good_symbols = list(filter(lambda x: x.split('/')[0] in good_coins and x.split('/')[1] in good_coins, exchange.symbols))
+        populate(data_dir, (exchange_id, batch_size_max), good_symbols, tick_size, -1, -1)
+
