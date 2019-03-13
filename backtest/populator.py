@@ -4,9 +4,7 @@ import csv
 import os
 import string
 
-
 MAX_ATTEMPTS = 5
-BATCH_SIZE = 1000
 
 
 class RateError(Exception):
@@ -29,12 +27,12 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_siz
                      .format(symbol, exchange, max_retries))
 
 
-def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
+def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit, batch_size_max):
     timeframe_seconds = exchange.parse_timeframe(timeframe)
     timeframe_ms = timeframe_seconds * 1000
     start = since
     end = since + limit * timeframe_ms
-    print('Batch Size: {}'.format(BATCH_SIZE))
+    print('Batch Size: {}'.format(batch_size_max))
     print('Total Entries: {}'.format((end - start) // timeframe_ms))
     all_ohlcv = []
     while True:
@@ -42,7 +40,7 @@ def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
             break
         print('Entries Processed: {}'.format(
             (since - start) // timeframe_ms))
-        batch_size = max(0, min(BATCH_SIZE, (end - since) // timeframe_ms))
+        batch_size = max(0, min(batch_size_max, (end - since) // timeframe_ms))
         ohlcv = retry_fetch_ohlcv(
             max_retries, exchange, symbol, timeframe, since, batch_size)
         all_ohlcv = ohlcv + all_ohlcv
@@ -62,13 +60,14 @@ def write_csv(filename, data):
         writer.writerows(data)
 
 
-def scrape_candles_to_csv(filename, max_retries, exchange, symbol, timeframe, since, limit):
+def scrape_candles_to_csv(filename, max_retries, exchange, symbol, timeframe, since, limit,
+                          batch_size_max):
     # Convert start time from string to milliseconds integer if needed.
     if isinstance(since, str):
         since = exchange.parse8601(since)
     try:
         ohlcv = scrape_ohlcv(max_retries, exchange, symbol,
-                             timeframe, since, limit)
+                             timeframe, since, limit, batch_size_max)
         write_csv(filename, ohlcv)
         print('Scraping for {} succeeded.'.format(filename))
     except RetryError:
@@ -93,7 +92,7 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks):
 
 # TODO: Eventually create a server and a database for backtest data (instead of CSVs).
 def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
-    for exchange_id in exchanges:
+    for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
             'enableRateLimit': True
         })
@@ -111,4 +110,4 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks):
             path = get_data_path(data_dir, exchange_id, pair,
                                  tick_size, start, num_ticks)
             scrape_candles_to_csv(path, MAX_ATTEMPTS, exchange,
-                                  pair, tick_size, start, num_ticks)
+                                  pair, tick_size, start, num_ticks, batch_size_max)
