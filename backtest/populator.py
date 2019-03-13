@@ -9,46 +9,53 @@ MAX_ATTEMPTS = 5
 # subject to debate/change, currently top 20 highest volume coins on CMC
 good_coins = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO', 'DASH', 'ZEC', 'BCH', 'ETC', 'BNB', 'XLM', 'TRX', 'ONT', 'AE', 'OMG', 'BSV']
 
+class RequestError(Exception):
+    pass
+
+
 class RetryError(Exception):
     pass
 
 
-def timeframe_to_ms(exchange, timeframe):
-    timeframe_seconds = exchange.parse_timeframe(timeframe)
-    return timeframe_seconds * 1000
+def tick_size_to_ms(exchange, tick_size):
+    tick_size_seconds = exchange.parse_timeframe(tick_size)
+    return tick_size_seconds * 1000
 
 
-def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_size):
+def retry_fetch_ohlcv(max_retries, exchange, symbol, tick_size_ms, position_ms, batch_size):
     for _ in range(max_retries):
-        try:
-            ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since, batch_size)
-            if ohlcv is not None and len(ohlcv) > 0:
-                return ohlcv
-        except Exception:
-            continue
+        ohlcv = exchange.fetch_ohlcv(
+            symbol, tick_size_ms, position_ms, batch_size)
+        if ohlcv is not None:
+            return ohlcv
     raise RetryError('Failed to fetch {} from {} in {} attempts.'
                      .format(symbol, exchange, max_retries))
 
 
-def scrape_ohlcv(max_retries, exchange, symbol, timeframe, start, limit, batch_size_max):
-    timeframe_ms = timeframe_to_ms(exchange, timeframe)
-    position = start
-    end = start + limit * timeframe_ms
+def scrape_ohlcv(max_retries, exchange, symbol, tick_size, start_ms, num_ticks, batch_size_max):
+    tick_size_ms = tick_size_to_ms(exchange, tick_size)
+    position_ms = start_ms
+    end = start_ms + num_ticks * tick_size_ms
     print('Batch Size: {}'.format(batch_size_max))
-    print('Total Entries: {}'.format((end - start) // timeframe_ms))
-    print('Note that some entries might not exist because they predate exchange history.')
+    print('Total Entries: {}'.format((end - start_ms) // tick_size_ms))
+    print('Note: Entries will not exist if they predate exchange history.')
     while True:
-        if position >= end:
+        if position_ms >= end:
             break
-        print('Entries Processed: {}'.format(
-            (position - start) // timeframe_ms))
         batch_size = max(
-            0, min(batch_size_max, (end - position) // timeframe_ms))
-        ohlcv = retry_fetch_ohlcv(
-            max_retries, exchange, symbol, timeframe, position, batch_size)
-        position = ohlcv[-1][0] + timeframe_ms
-        if len(ohlcv) < batch_size and position < end:
-            print('Warning: Exchange returned fewer rows than expected.')
+            0, min(batch_size_max, (end - position_ms) // tick_size_ms))
+        ohlcv = [row for row in retry_fetch_ohlcv(
+            max_retries, exchange, symbol, tick_size, position_ms, batch_size) if row[0] < end]
+        if len(ohlcv) == 0:
+            print(
+                'Warning: Exchange returned zero entries prior to end time. See note?')
+            break
+        position_ms = ohlcv[-1][0] + tick_size_ms
+        if len(ohlcv) < batch_size and position_ms < end:
+            print(
+                'Warning: Exchange returned fewer rows than expected. Check your batch size?')
+        print('Entries Processed: {}'.format(
+            (position_ms - start_ms) // tick_size_ms))
         yield ohlcv
 
 
@@ -62,11 +69,11 @@ def write_csv(filename, generator):
             writer.writerows(data)
 
 
-def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, timeframe, start, limit,
+def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, tick_size, start_ms, num_ticks,
                         batch_size_max):
     try:
         ohlcv_generator = scrape_ohlcv(max_retries, exchange, symbol,
-                                       timeframe, start, limit, batch_size_max)
+                                       tick_size, start_ms, num_ticks, batch_size_max)
         write_csv(filename, ohlcv_generator)
         print('Scraping for {} succeeded.'.format(filename))
     except RetryError:
@@ -89,7 +96,6 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks):
     )
 
 
-# TODO: Eventually create a server and a database for backtest data (instead of CSVs).
 def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
     for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
@@ -100,12 +106,21 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
             print('{} does not expose OHLCV data.'.format(exchange.id))
             continue
         os.makedirs(get_data_directory(data_dir, exchange_id), exist_ok=True)
-        # Convert start time from string to milliseconds integer if needed.
-        if isinstance(start, str):
-            start_ms = exchange.parse8601(start)
+        # Validate start time.
+        start_ms = exchange.parse8601(start)
+        now = exchange.milliseconds()
+        if start_ms > now:
+            raise RequestError(
+                'Start time in the future for exchange {}.'.format(exchange_id))
+        # Validate number of ticks.
+        tick_size_ms = tick_size_to_ms(exchange, tick_size)
         if num_ticks is None:
-            num_ticks = (exchange.milliseconds() -
-                         start_ms) // timeframe_to_ms(exchange, tick_size)
+            num_ticks = (now - start_ms) // tick_size_ms
+        elif start_ms + num_ticks * tick_size_ms > now:
+            print('End time in the future for exchange {}. Clamping ticks.'.format(
+                exchange_id))
+            num_ticks = (now - start_ms) // tick_size_ms
+        # Scrape each pair for exchange to a separate file.
         for pair in pairs:
             if not pair in exchange.symbols:
                 print('Exchange {} does not trade {}.'.format(exchange_id, pair))
@@ -118,7 +133,6 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
                                 pair, tick_size, start, num_ticks, batch_size_max)
 
 def grab_all_pairs(data_dir, exchanges, tick_size):
-    print("Chang")
     for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
             'enableRateLimit': True
