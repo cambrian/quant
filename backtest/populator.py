@@ -9,6 +9,10 @@ MAX_ATTEMPTS = 5
 BATCH_SIZE = 1000
 
 
+class RateError(Exception):
+    pass
+
+
 class RetryError(Exception):
     pass
 
@@ -28,16 +32,24 @@ def retry_fetch_ohlcv(max_retries, exchange, symbol, timeframe, since, batch_siz
 def scrape_ohlcv(max_retries, exchange, symbol, timeframe, since, limit):
     timeframe_seconds = exchange.parse_timeframe(timeframe)
     timeframe_ms = timeframe_seconds * 1000
+    start = since
     end = since + limit * timeframe_ms
+    print('Batch Size: {}'.format(BATCH_SIZE))
+    print('Total Entries: {}'.format((end - start) // timeframe_ms))
     all_ohlcv = []
     while True:
         if since >= end:
             break
+        print('Entries Processed: {}'.format(
+            (since - start) // timeframe_ms))
         batch_size = max(0, min(BATCH_SIZE, (end - since) // timeframe_ms))
         ohlcv = retry_fetch_ohlcv(
             max_retries, exchange, symbol, timeframe, since, batch_size)
         all_ohlcv = ohlcv + all_ohlcv
         since += batch_size * timeframe_ms
+        if len(ohlcv) < batch_size and since < end:
+            raise RateError(
+                'Exchange returned fewer rows than expected. Try a smaller batch size.')
     return all_ohlcv
 
 
