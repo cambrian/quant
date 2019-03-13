@@ -7,7 +7,7 @@ import string
 MAX_ATTEMPTS = 5
 
 # Subject to debate/change (currently top 20 highest volume coins on CMC).
-good_coins = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO',
+GOOD_COINS = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO',
               'DASH', 'ZEC', 'BCH', 'ETC', 'BNB', 'XLM', 'TRX', 'ONT', 'AE', 'OMG', 'BSV']
 
 
@@ -144,6 +144,6 @@ def grab_all_pairs(data_dir, exchanges, tick_size):
         })
         exchange.load_markets()
         good_symbols = list(filter(lambda x: x.split(
-            '/')[0] in good_coins and x.split('/')[1] in good_coins, exchange.symbols))
+            '/')[0] in GOOD_COINS and x.split('/')[1] in GOOD_COINS, exchange.symbols))
         populate(data_dir, [(exchange_id, batch_size_max)],
                  good_symbols, tick_size, '2000-01-01T00:00:00Z')
