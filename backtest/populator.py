@@ -1,8 +1,10 @@
-import ccxt
-import time
 import csv
 import os
 import string
+import time
+
+import ccxt
+import pandas as pd
 
 MAX_ATTEMPTS = 5
 
@@ -11,7 +13,7 @@ GOOD_COINS = ['BTC', 'USD', 'ETH', 'LTC', 'EOS', 'USDT', 'XRP', 'QTUM', 'NEO',
               'DASH', 'ZEC', 'BCH', 'ETC', 'BNB', 'XLM', 'TRX', 'ONT', 'AE', 'OMG', 'BSV']
 
 
-class RequestError(Exception):
+class ParamsError(Exception):
     pass
 
 
@@ -98,6 +100,17 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str='all
     )
 
 
+def load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str='all'):
+    path = get_data_path(data_dir, exchange, pair,
+                         tick_size, start, num_ticks_str)
+    try:
+        frame = pd.read_csv(path, index_col=0)
+        frame.index = pd.to_datetime(frame.index, unit='ms')
+        return frame
+    except FileNotFoundError:
+        raise ParamsError('The requested data has not been downloaded.')
+
+
 def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
     for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
@@ -112,7 +125,7 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
         start_ms = exchange.parse8601(start)
         now = exchange.milliseconds()
         if start_ms > now:
-            raise RequestError(
+            raise ParamsError(
                 'Start time in the future for exchange {}.'.format(exchange_id))
         # Validate number of ticks.
         tick_size_ms = tick_size_to_ms(exchange, tick_size)
