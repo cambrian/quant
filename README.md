@@ -1,2 +1,2 @@
 # quant
-Market-making for cryptocurrencies.
+Quantitative trading for cryptocurrencies.
