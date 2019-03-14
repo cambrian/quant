@@ -26,17 +26,17 @@ def tick_size_to_ms(exchange, tick_size):
     return tick_size_seconds * 1000
 
 
-def retry_fetch_ohlcv(max_retries, exchange, symbol, tick_size_ms, position_ms, batch_size):
+def retry_fetch_ohlcv(max_retries, exchange, pair, tick_size_ms, position_ms, batch_size):
     for _ in range(max_retries):
         ohlcv = exchange.fetch_ohlcv(
-            symbol, tick_size_ms, position_ms, batch_size)
+            pair, tick_size_ms, position_ms, batch_size)
         if ohlcv is not None:
             return ohlcv
     raise RetryError('Failed to fetch {} from {} in {} attempts.'
-                     .format(symbol, exchange, max_retries))
+                     .format(pair, exchange, max_retries))
 
 
-def scrape_ohlcv(max_retries, exchange, symbol, tick_size, start_ms, num_ticks, batch_size_max):
+def scrape_ohlcv(max_retries, exchange, pair, tick_size, start_ms, num_ticks, batch_size_max):
     tick_size_ms = tick_size_to_ms(exchange, tick_size)
     position_ms = start_ms
     end = start_ms + num_ticks * tick_size_ms
@@ -49,7 +49,7 @@ def scrape_ohlcv(max_retries, exchange, symbol, tick_size, start_ms, num_ticks, 
         batch_size = max(
             0, min(batch_size_max, (end - position_ms) // tick_size_ms))
         ohlcv = [row for row in retry_fetch_ohlcv(
-            max_retries, exchange, symbol, tick_size, position_ms, batch_size) if row[0] < end]
+            max_retries, exchange, pair, tick_size, position_ms, batch_size) if row[0] < end]
         if len(ohlcv) == 0:
             print(
                 'Warning: Exchange returned zero entries prior to end time. See note?')
@@ -73,10 +73,10 @@ def write_csv(filename, generator):
             writer.writerows(data)
 
 
-def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, tick_size, start_ms, num_ticks,
+def scrape_ohlcv_to_csv(filename, max_retries, exchange, pair, tick_size, start_ms, num_ticks,
                         batch_size_max):
     try:
-        ohlcv_generator = scrape_ohlcv(max_retries, exchange, symbol,
+        ohlcv_generator = scrape_ohlcv(max_retries, exchange, pair,
                                        tick_size, start_ms, num_ticks, batch_size_max)
         write_csv(filename, ohlcv_generator)
         print('Scraping for {} succeeded.'.format(filename))
