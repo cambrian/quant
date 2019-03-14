@@ -82,19 +82,19 @@ def scrape_ohlcv_to_csv(filename, max_retries, exchange, symbol, tick_size, star
         print('Scraping for {} failed.'.format(filename))
 
 
-def get_data_filename(pair, tick_size, start, num_ticks):
+def get_data_filename(pair, tick_size, start, num_ticks_str='all'):
     return '{}-{}-{}-{}'.format(pair.replace('/', '-'),
-                                tick_size, start.replace(':', '-'), str(num_ticks))
+                                tick_size, start.replace(':', '-'), num_ticks_str)
 
 
 def get_data_directory(data_dir, exchange):
     return '{}/{}'.format(data_dir, exchange)
 
 
-def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks):
+def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str='all'):
     return '{}/{}.csv'.format(
         get_data_directory(data_dir, exchange),
-        get_data_filename(pair, tick_size, start, num_ticks)
+        get_data_filename(pair, tick_size, start, num_ticks_str)
     )
 
 
@@ -118,10 +118,14 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
         tick_size_ms = tick_size_to_ms(exchange, tick_size)
         if num_ticks is None:
             num_ticks = (now - start_ms) // tick_size_ms
+            num_ticks_str = 'all'
         elif start_ms + num_ticks * tick_size_ms > now:
             print('End time in the future for exchange {}. Clamping ticks.'.format(
                 exchange_id))
             num_ticks = (now - start_ms) // tick_size_ms
+            num_ticks_str = str(num_ticks)
+        else:
+            num_ticks_str = str(num_ticks)
         # Scrape each pair for exchange to a separate file.
         for pair in pairs:
             if not pair in exchange.symbols:
@@ -130,7 +134,7 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
             print('Downloading price history for {} on exchange {}.'.format(
                 pair, exchange_id))
             path = get_data_path(data_dir, exchange_id, pair,
-                                 tick_size, start, num_ticks)
+                                 tick_size, start, num_ticks_str)
             scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
                                 pair, tick_size, start_ms, num_ticks, batch_size_max)
 
