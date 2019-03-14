@@ -1,8 +1,22 @@
 import backtrader as bt
 import backtrader.analyzers as analyzers
 import pandas as pd
+import populator
 import os
-from strategies import *
+
+
+class SimpleRsiStrategy(bt.Strategy):
+    def __init__(self):
+        self.rsi = bt.indicators.RSI_SMA(
+            self.data.close, period=21, safediv=True)
+
+    def next(self):
+        if not self.position:
+            if self.rsi < 30:
+                self.buy(size=10)
+        else:
+            if self.rsi > 70:
+                self.sell(size=10)
 
 
 def test_strategy(strategy, data, plot=False):
@@ -10,7 +24,7 @@ def test_strategy(strategy, data, plot=False):
     cerebro.addstrategy(strategy)
     data = bt.feeds.PandasData(dataname=data)
     cerebro.adddata(data)
-    # Sharpe ratio compares strategy against "risk-free" average S&P 500 APY
+    # Sharpe ratio compares strategy against "risk-free" average S&P 500 APY.
     cerebro.addanalyzer(analyzers.SharpeRatio,
                         riskfreerate=0.06, _name='sharpe')
     cerebro.addanalyzer(analyzers.DrawDown, _name='drawdown')
@@ -29,19 +43,7 @@ def test_strategy(strategy, data, plot=False):
     }
 
 
-def load_csv(path):
-    df = pd.read_csv(path, index_col=0)
-    df.index = pd.to_datetime(df.index, unit='ms')
-    return df
-
-
-data_path = 'data/binance'
-csvs = ['BTC-USDT-1m-2019-01-01T00-00-00Z-720.csv',
-        'BTC-USDT-1m-2010-01-01T00-00-00Z-4836858.csv']
-strategies = [SimpleRsiStrategy]
-
-for csv_name in csvs:
-    for strategy in strategies:
-        print('Evaluating {} on {}...'.format(strategy.__name__, csv_name))
-        df = load_csv(os.path.join(data_path, csv_name))
-        print(test_strategy(strategy, df))
+print('Evaluating SimpleRsiStrategy on Binance BTC/USDT.')
+df = populator.load_data_as_frame(
+    'data', 'binance', 'BTC/USDT', '1m', '2000-01-01T00:00:00Z')
+print(test_strategy(SimpleRsiStrategy, df))
