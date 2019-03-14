@@ -11,4 +11,19 @@ class Strategy(ABC):
 
 class HoldStrategy(Strategy):
     def step(self, balances, prices):
-        return {'btc_usd': 0, 'eth_usd': 0}
+        return {}
+
+
+class MovingAverage:
+    def __init__(self, half_life):
+        self.__a = 0.5 ** (1 / half_life)
+        self.__value = None
+
+    @property
+    def value(self):
+        return self.__value
+
+    def step(self, value):
+        if self.__value is None:
+            self.__value = value
+        self.__value = self.__a * self.__value + (1-self.__a) * value
