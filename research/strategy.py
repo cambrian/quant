@@ -3,14 +3,14 @@ from abc import ABC, abstractmethod
 
 class Strategy(ABC):
     @abstractmethod
-    def step(self, balances, prices):
-        '''Should return orders as { btc_usd: size_in_usd, eth_usd: size_in_usd }
+    def step(self, balances, prices, volumes):
+        '''Should return orders as { <pair>: size_in_base_currency }
         All orders execute at the last trade price (lame i know).'''
         pass
 
 
 class HoldStrategy(Strategy):
-    def step(self, balances, prices):
+    def step(self, balances, prices, volumes):
         return {}
 
 
