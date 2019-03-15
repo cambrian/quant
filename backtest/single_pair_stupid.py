@@ -75,7 +75,7 @@ def run_test(strategy, name, data, plot=False):
         cerebro.plot(style='candlestick')
 
     print('PNL %: {}'.format(
-        (cerebro.broker.getvalue() - starting_cash) / starting_cash - 1.0))
+        100.0 * (cerebro.broker.getvalue() - starting_cash) / starting_cash - 100.0))
     print('Sharpe Ratio: {}'.format(
         sim[0].analyzers.sharpe.get_analysis()['sharperatio']))
     print('Max Drawdown: {}'.format(
