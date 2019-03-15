@@ -44,30 +44,19 @@ class MaCrossOverStrategy(bt.Strategy):
             self.buy(size=10)
 
 
-def resample_to_days(df):
-    ohlcv_dict = {
-        'open': 'first',
-        'high': 'max',
-        'low': 'min',
-        'close': 'last',
-        'volume': 'sum'
-    }
-    return df.resample('D').agg(ohlcv_dict)
-
-
-btc_usdt = resample_to_days(populator.load_data_as_frame(
+btc_usdt = populator.resample_to('D', populator.load_data_as_frame(
     'data', 'binance', 'BTC/USDT', '1m', '2000-01-01T00:00:00Z'))
-eth_usdt = resample_to_days(populator.load_data_as_frame(
+eth_usdt = populator.resample_to('D', populator.load_data_as_frame(
     'data', 'binance', 'ETH/USDT', '1m', '2000-01-01T00:00:00Z'))
-xrp_usdt = resample_to_days(populator.load_data_as_frame(
+xrp_usdt = populator.resample_to('D', populator.load_data_as_frame(
     'data', 'binance', 'XRP/USDT', '1m', '2000-01-01T00:00:00Z'))
-ltc_usdt = resample_to_days(populator.load_data_as_frame(
+ltc_usdt = populator.resample_to('D', populator.load_data_as_frame(
     'data', 'binance', 'LTC/USDT', '1m', '2000-01-01T00:00:00Z'))
-eos_usdt = resample_to_days(populator.load_data_as_frame(
+eos_usdt = populator.resample_to('D', populator.load_data_as_frame(
     'data', 'binance', 'EOS/USDT', '1m', '2000-01-01T00:00:00Z'))
 
 
-def run_test(strategy, name, data, plot=False):
+def run_test(strategy, name, data):
     print('Running {} on {}.'.format(strategy.__name__, name))
 
     cerebro = bt.Cerebro()
@@ -82,9 +71,6 @@ def run_test(strategy, name, data, plot=False):
     starting_cash = 10**5
     cerebro.broker.setcash(starting_cash)
     sim = cerebro.run()
-
-    if plot:
-        cerebro.plot(style='candlestick')
 
     print('PNL %: {}'.format(
         100.0 * (cerebro.broker.getvalue() / starting_cash) - 100.0))

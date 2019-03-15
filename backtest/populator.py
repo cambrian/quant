@@ -111,6 +111,17 @@ def load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str
         raise ParamsError('The requested data has not been downloaded.')
 
 
+def resample_to(timeframe, df):
+    ohlcv_dict = {
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum'
+    }
+    return df.resample(timeframe).agg(ohlcv_dict)
+
+
 def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
     for (exchange_id, batch_size_max) in exchanges:
         exchange = getattr(ccxt, exchange_id)({
