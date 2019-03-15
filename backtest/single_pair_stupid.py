@@ -6,6 +6,7 @@
 
 import populator
 import backtrader as bt
+import pandas as pd
 
 
 class RsiStrategy(bt.Strategy):
@@ -19,7 +20,7 @@ class RsiStrategy(bt.Strategy):
                 self.buy(size=10)
         else:
             if self.rsi > 70:
-                self.sell(size=10)
+                self.buy(size=10)
 
 
 class MaCrossOverStrategy(bt.Strategy):
@@ -43,16 +44,27 @@ class MaCrossOverStrategy(bt.Strategy):
             self.buy(size=10)
 
 
-btc_usdt = populator.load_data_as_frame(
-    'data', 'binance', 'BTC/USDT', '1m', '2000-01-01T00:00:00Z')
-eth_usdt = populator.load_data_as_frame(
-    'data', 'binance', 'ETH/USDT', '1m', '2000-01-01T00:00:00Z')
-xrp_usdt = populator.load_data_as_frame(
-    'data', 'binance', 'XRP/USDT', '1m', '2000-01-01T00:00:00Z')
-ltc_usdt = populator.load_data_as_frame(
-    'data', 'binance', 'LTC/USDT', '1m', '2000-01-01T00:00:00Z')
-eos_usdt = populator.load_data_as_frame(
-    'data', 'binance', 'EOS/USDT', '1m', '2000-01-01T00:00:00Z')
+def resample_to_days(df):
+    ohlcv_dict = {
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum'
+    }
+    return df.resample('D').agg(ohlcv_dict)
+
+
+btc_usdt = resample_to_days(populator.load_data_as_frame(
+    'data', 'binance', 'BTC/USDT', '1m', '2000-01-01T00:00:00Z'))
+eth_usdt = resample_to_days(populator.load_data_as_frame(
+    'data', 'binance', 'ETH/USDT', '1m', '2000-01-01T00:00:00Z'))
+xrp_usdt = resample_to_days(populator.load_data_as_frame(
+    'data', 'binance', 'XRP/USDT', '1m', '2000-01-01T00:00:00Z'))
+ltc_usdt = resample_to_days(populator.load_data_as_frame(
+    'data', 'binance', 'LTC/USDT', '1m', '2000-01-01T00:00:00Z'))
+eos_usdt = resample_to_days(populator.load_data_as_frame(
+    'data', 'binance', 'EOS/USDT', '1m', '2000-01-01T00:00:00Z'))
 
 
 def run_test(strategy, name, data, plot=False):
@@ -62,9 +74,9 @@ def run_test(strategy, name, data, plot=False):
     cerebro.addstrategy(strategy)
     data = bt.feeds.PandasData(dataname=data)
     cerebro.adddata(data)
-    # Sharpe ratio compares strategy against "risk-free" average S&P 500 APY.
+
     cerebro.addanalyzer(bt.analyzers.SharpeRatio,
-                        riskfreerate=0.06, _name='sharpe')
+                        riskfreerate=0.00, _name='sharpe')
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 
     starting_cash = 10**5
@@ -75,11 +87,12 @@ def run_test(strategy, name, data, plot=False):
         cerebro.plot(style='candlestick')
 
     print('PNL %: {}'.format(
-        100.0 * (cerebro.broker.getvalue() - starting_cash) / starting_cash - 100.0))
+        100.0 * (cerebro.broker.getvalue() / starting_cash) - 100.0))
     print('Sharpe Ratio: {}'.format(
         sim[0].analyzers.sharpe.get_analysis()['sharperatio']))
     print('Max Drawdown: {}'.format(
         sim[0].analyzers.drawdown.get_analysis().max.drawdown))
+    print()
 
 
 strategies = [RsiStrategy, MaCrossOverStrategy]
