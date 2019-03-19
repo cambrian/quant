@@ -1,19 +1,13 @@
 from abc import ABC, abstractmethod
-from rx.concurrency.mainloopscheduler import AsyncIOScheduler
+from aiostream import stream
+
+import asyncio
 
 
 class Executor(ABC):
-    @abstractmethod
-    def __init__(self, *args):
-        self.scheduler = AsyncIOScheduler()
+    async def consume(self, fairs_feed):
+        await stream.action(fairs_feed, self._tick)
 
     @abstractmethod
-    def tick(self, fairs):
-        pass
-
-    @abstractmethod
-    def consume(self, fairs_feed):
-        fairs_feed.subscribe_on(self.scheduler).subscribe(self.tick)
-        # Actually do stuff here.
-        # Subscribe using `.subscribe_on(AsyncIOScheduler)`.
+    async def _tick(self, fairs):
         pass
