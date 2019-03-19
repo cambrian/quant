@@ -12,3 +12,20 @@ class Exchange(ABC):
     def _feed(self, pairs, time_interval):
         # Repeatedly `yield` new data at each tick.
         pass
+
+    @abstractmethod
+    def add_order(self, pair, side, ordertype, price, volume):
+        # side is buy/sell, ordertype is limit/market/other ex specific options
+        pass
+
+    @abstractmethod
+    def cancel_order(self, order_id):
+        pass
+
+    @abstractmethod
+    def get_balance(self):
+        pass
+
+    @abstractmethod
+    def get_open_positions(self):
+        pass
