@@ -51,11 +51,11 @@ class Kraken(Exchange):
                 print('caught error: ' + repr(error))
                 time.sleep(3)
 
-    async def add_order(self, pair, side, ordertype, price, volume):
+    async def add_order(self, pair, side, order_type, price, volume):
         await call_async(lambda: self.kraken.query_private('AddOrder', {
             'pair': pair,
             'type': side,
-            'ordertype': ordertype,
+            'ordertype': order_type,
             'price': price,
             'volume': volume
         }))
