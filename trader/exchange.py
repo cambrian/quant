@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from aioreactive.core import AsyncObservable
+from aiostream import stream
 
 
 class Exchange(ABC):
     # TODO: Trading/account management functions.
     def observe(self, pairs, time_interval):
         feed_generator = self._feed(pairs, time_interval)
-        return AsyncObservable.from_iterable(feed_generator)
+        return stream.iterate(feed_generator)
 
     @abstractmethod
     def _feed(self, pairs, time_interval):

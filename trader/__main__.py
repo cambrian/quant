@@ -9,11 +9,11 @@ import json
 
 
 class DummyExchange(Exchange):
-    def _feed(self, pairs, time_interval):
-        counter = 1
+    async def _feed(self, pairs, time_interval):
+        counter = time_interval
         while True:
-            time.sleep(1)
             yield counter
+            await asyncio.sleep(1)
             counter += 1
 
 
@@ -65,4 +65,4 @@ strategy = DummyStrategy()
 executor = DummyExecutor()
 exchange_feed = exchange.observe(["XBT/USD"], 5)
 strategy_feed = strategy.process(exchange_feed)
-asyncio.run(executor.consume(strategy_feed))
+asyncio.run(executor.consume(strategy_feed, exchange_feed_two))

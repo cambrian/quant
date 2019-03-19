@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from aiostream import pipe
 
 
 class Strategy(ABC):
     def process(self, data_feed):
-        return data_feed.select(self._tick)
+        return data_feed | pipe.map(self._tick)
 
     @abstractmethod
     def _tick(self, data):

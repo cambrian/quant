@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from aioreactive.core import AsyncAnonymousObserver
-import aioreactive.core as rx
+from aiostream import stream
+
+import asyncio
 
 
 class Executor(ABC):
-    async def consume(self, fairs_feed):
-        await rx.subscribe(fairs_feed, AsyncAnonymousObserver(self._tick))
+    async def consume(self, fairs_feed, other_feed):
+        await stream.action(fairs_feed, self._tick)
 
     @abstractmethod
     async def _tick(self, fairs):
