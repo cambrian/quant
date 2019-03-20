@@ -11,7 +11,7 @@ class ConsumingException(Exception):
 # See Haskell MVars.
 class MVar(object):
     def __init__(self):
-        self.consumed = False
+        self.consuming = False
         self.got_value = asyncio.Condition()
         self.value = None
 
@@ -23,7 +23,7 @@ class MVar(object):
 
     # Asynchronously keeps track of the latest element in a stream.
     async def consume(self, feed):
-        self.consumed = True
+        self.consuming = True
         await stream.action(feed, self._put)
 
     async def put(self, value):
