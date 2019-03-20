@@ -77,20 +77,24 @@ class DummyExecutor(Executor):
         super().__init__()
         self.exchange = exchange
 
-    async def _tick(self, fairs):
-        close = float(fairs[1][5])
-        print('Close: {}'.format(close))
-        if close < 3900:
+    async def _tick(self, input):
+        ((fair, stddev), data) = input
+        close = float(data[1][5])
+        print('Close: {}, Fair: {}, Stddev: {}'.format(close, fair, stddev))
+        if close < fair - stddev:
             print('Buying 1 BTC at {}.'.format(close))
             # await self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
-        elif close > 3950:
+        elif close > fair + stddev:
             print('Selling 1 BTC at {}.'.format(close))
             # await self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
 
 
 class DummyStrategy(Strategy):
     def _tick(self, data):
-        return data
+        # TODO: Strategy to derive fair estimate and stddev
+        fair = float(data[1][5])
+        stddev = 100.
+        return ((fair, stddev), data)
 
 
 async def main():
