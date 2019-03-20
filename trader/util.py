@@ -45,7 +45,7 @@ def _propagate_error(fn, name, queue):
 
 
 # Manages several threads and links their exceptions to the main thread.
-def run_threads(*fns):
+def run_threads_forever(*fns):
     exc_queue = Queue()
     threads = []
     for (name, fn) in fns:
