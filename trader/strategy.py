@@ -3,7 +3,8 @@ from aiostream import pipe
 
 
 class Strategy(ABC):
-    def process(self, data_feed):
+    def observe(self, data_feed):
+        # pylint: disable=no-member
         return data_feed | pipe.map(self._tick)
 
     @abstractmethod
