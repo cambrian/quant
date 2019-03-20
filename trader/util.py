@@ -45,5 +45,5 @@ def call_async(fn):
 async def trace_exceptions(coroutine):
     try:
         await coroutine
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
