@@ -1,4 +1,4 @@
-# TODO: See if we actually need multiple "threads" of operation (if not, we can remove asyncio).
+# TODO: Consider using threads if this gets out of hand.
 from exchange import Exchange
 from executor import Executor
 from strategy import Strategy
