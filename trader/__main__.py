@@ -1,17 +1,14 @@
-# TODO: Consider using threads if this gets out of hand.
 from exchange import Exchange
 from executor import Executor
 from strategy import Strategy
-from util import call_async, trace_exceptions
+from util import run_threads
 
-from concurrent.futures import ThreadPoolExecutor
-from websocket import create_connection
+from threading import Thread
 
-import aiohttp
-import asyncio
 import json
 import krakenex
 import time
+import websocket as ws
 
 
 class Kraken(Exchange):
@@ -20,17 +17,16 @@ class Kraken(Exchange):
         self.kraken = krakenex.API()
         # self.kraken.load_key('secret.key')
 
-    async def _feed(self, pairs, time_interval):
+    def _feed(self, pairs, time_interval):
         for _ in range(3):
             try:
-                self.session = aiohttp.ClientSession()
-                self.ws = await self.session.ws_connect('wss://ws-sandbox.kraken.com')
+                self.ws = ws.create_connection('wss://ws-sandbox.kraken.com')
             except Exception as error:
                 print('caught error: ' + repr(error))
                 time.sleep(3)
             else:
                 break
-        await self.ws.send_str(json.dumps({
+        self.ws.send(json.dumps({
             'event': 'subscribe',
             'pair': pairs,
             'subscription': {
@@ -41,9 +37,9 @@ class Kraken(Exchange):
 
         while True:
             try:
-                result = await self.ws.receive()
+                result_raw = self.ws.recv()
                 # TODO: Error handling of this await.
-                result = json.loads(result.data)
+                result = json.loads(result_raw)
                 # Ignore heartbeats.
                 if not isinstance(result, dict):
                     yield result
@@ -51,25 +47,25 @@ class Kraken(Exchange):
                 print('caught error: ' + repr(error))
                 time.sleep(3)
 
-    async def add_order(self, pair, side, order_type, price, volume):
-        await call_async(lambda: self.kraken.query_private('AddOrder', {
+    def add_order(self, pair, side, order_type, price, volume):
+        self.kraken.query_private('AddOrder', {
             'pair': pair,
             'type': side,
             'ordertype': order_type,
             'price': price,
             'volume': volume
-        }))
+        })
 
-    async def cancel_order(self, order_id):
-        await call_async(lambda: self.kraken.query_private('CancelOrder', {
+    def cancel_order(self, order_id):
+        self.kraken.query_private('CancelOrder', {
             'txid': order_id
-        }))
+        })
 
-    async def get_balance(self):
-        await call_async(lambda: self.kraken.query_private('Balance'))
+    def get_balance(self):
+        self.kraken.query_private('Balance')
 
-    async def get_open_positions(self):
-        await call_async(lambda: self.kraken.query_private('OpenPositions'))
+    def get_open_positions(self):
+        self.kraken.query_private('OpenPositions')
 
 
 class DummyExecutor(Executor):
@@ -77,36 +73,34 @@ class DummyExecutor(Executor):
         super().__init__()
         self.exchange = exchange
 
-    async def _tick(self, input):
+    def _tick(self, input):
         ((fair, stddev), data) = input
         close = float(data[1][5])
         print('Close: {}, Fair: {}, Stddev: {}'.format(close, fair, stddev))
         if close < fair - stddev:
             print('Buying 1 BTC at {}.'.format(close))
-            # await self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
+            # self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
         elif close > fair + stddev:
             print('Selling 1 BTC at {}.'.format(close))
-            # await self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
+            # self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
 
 
 class DummyStrategy(Strategy):
     def _tick(self, data):
-        # TODO: Strategy to derive fair estimate and stddev
+        # TODO: Strategy to derive fair estimate and stddev.
         fair = float(data[1][5])
-        stddev = 100.
+        stddev = 100.0
         return ((fair, stddev), data)
 
 
-async def main():
-    exchange = Kraken()
-    strategy = DummyStrategy()
-    executor = DummyExecutor(exchange)
-    exchange_feed = exchange.observe(['XBT/USD'], 5)
-    strategy_feed = strategy.observe(exchange_feed)
+exchange = Kraken()
+strategy = DummyStrategy()
+executor = DummyExecutor(exchange)
+exchange_feed = exchange.observe(['XBT/USD'], 5)
+strategy_feed = strategy.observe(exchange_feed)
 
-    await asyncio.gather(
-        trace_exceptions(executor.consume(strategy_feed)),
-        trace_exceptions(executor.run())
-    )
-
-asyncio.run(main())
+# Thread manager.
+run_threads(
+    ('strategy', lambda: executor.consume(strategy_feed)),
+    ('executor', lambda: executor.run())
+)
