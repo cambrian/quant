@@ -82,10 +82,10 @@ class DummyExecutor(Executor):
         print('Close: {}'.format(close))
         if close < 3900:
             print('Buying 1 BTC at {}.'.format(close))
-            await self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
+            # await self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
         elif close > 3950:
             print('Selling 1 BTC at {}.'.format(close))
-            await self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
+            # await self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
 
 
 class DummyStrategy(Strategy):

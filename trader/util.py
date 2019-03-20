@@ -8,6 +8,7 @@ class ConsumingException(Exception):
     pass
 
 
+# See Haskell MVars.
 class MVar(object):
     def __init__(self):
         self.consumed = False
@@ -20,7 +21,7 @@ class MVar(object):
         self.got_value.notify()
         self.got_value.release()
 
-    # Asynchronously keeps track of the latest element in a stream
+    # Asynchronously keeps track of the latest element in a stream.
     async def consume(self, feed):
         self.consumed = True
         await stream.action(feed, self._put)
