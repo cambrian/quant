@@ -2,7 +2,7 @@
 from exchange import Exchange
 from executor import Executor
 from strategy import Strategy
-from util import run_threads_forever
+from util import manage_threads
 
 from threading import Thread
 
@@ -100,8 +100,8 @@ executor = DummyExecutor(exchange)
 exchange_feed = exchange.observe(['XBT/USD'], 5)
 strategy_feed = strategy.observe(exchange_feed)
 
-# Thread manager.
-run_threads_forever(
-    ('strategy', lambda: executor.consume(strategy_feed)),
-    ('executor', lambda: executor.run())
+# Lifecycle manager.
+manage_threads(
+    ('strategy', lambda: executor.consume(strategy_feed), True),
+    ('executor', lambda: executor.run(), True)
 )
