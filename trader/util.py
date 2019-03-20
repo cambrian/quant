@@ -44,6 +44,7 @@ def _propagate_error(fn, name, queue):
         queue.put((name, traceback.format_exc()))
 
 
+# Manages several threads and links their exceptions to the main thread.
 def run_threads(*fns):
     exc_queue = Queue()
     threads = []

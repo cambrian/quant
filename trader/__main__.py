@@ -1,3 +1,4 @@
+# TODO: Add good docstring-style comments.
 from exchange import Exchange
 from executor import Executor
 from strategy import Strategy
