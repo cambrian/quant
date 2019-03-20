@@ -2,7 +2,7 @@
 from exchange import Exchange
 from executor import Executor
 from strategy import Strategy
-from util import call_async
+from util import call_async, trace_exceptions
 
 from concurrent.futures import ThreadPoolExecutor
 from websocket import create_connection
@@ -74,6 +74,7 @@ class Kraken(Exchange):
 
 class DummyExecutor(Executor):
     def __init__(self, exchange):
+        super().__init__()
         self.exchange = exchange
 
     async def _tick(self, fairs):
@@ -92,11 +93,16 @@ class DummyStrategy(Strategy):
         return data
 
 
-exchange = Kraken()
-strategy = DummyStrategy()
-executor = DummyExecutor(exchange)
-exchange_feed = exchange.observe(['XBT/USD'], 5)
-strategy_feed = strategy.observe(exchange_feed)
+async def main():
+    exchange = Kraken()
+    strategy = DummyStrategy()
+    executor = DummyExecutor(exchange)
+    exchange_feed = exchange.observe(['XBT/USD'], 5)
+    strategy_feed = strategy.observe(exchange_feed)
 
-# To add more async tasks, create a co-routine with a call to `async.gather`.
-asyncio.run(executor.consume(strategy_feed))
+    await asyncio.gather(
+        trace_exceptions(executor.consume(strategy_feed)),
+        trace_exceptions(executor.run())
+    )
+
+asyncio.run(main())
