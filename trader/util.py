@@ -27,7 +27,7 @@ class MVar(object):
         await stream.action(feed, self._put)
 
     async def put(self, value):
-        if self.consumed:
+        if self.consuming:
             raise ConsumingException('MVar already consuming a stream')
 
     async def take(self):
