@@ -16,12 +16,10 @@ class Bitfinex(Exchange):
         self.name = BITFINEX
         self.bfx = ClientV1("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
                             "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-        self.wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
-                                  "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-
-        def do_nothing(blah):
-            pass
-        self.wsclient.authenticate(do_nothing)
+        self.ws_client = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
+                                   "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+        self.ws_client.authenticate(lambda x: None)
+        self.ws_client.daemon = True
 
     def _feed(self, pair, time_interval):
         candle_queue = Queue()
@@ -29,13 +27,13 @@ class Bitfinex(Exchange):
         def add_messages_to_queue(message):
             candle_queue.put(message)
 
-        self.wsclient.subscribe_to_candles(
+        self.ws_client.subscribe_to_candles(
             symbol=pair,
             timeframe=time_interval,
             callback=add_messages_to_queue
         )
 
-        self.wsclient.start()
+        self.ws_client.start()
         time.sleep(5)
 
         while True:
