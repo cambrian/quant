@@ -1,23 +1,20 @@
 from util import MVar
 
 from abc import ABC, abstractmethod
-from aiostream import stream
-
-import asyncio
 
 
 class Executor(ABC):
     def __init__(self):
-        self.latest_input_var = MVar()
+        self.__latest_input_var = MVar()
 
-    async def consume(self, input_feed):
-        await self.latest_input_var.consume(input_feed)
+    def consume(self, input_feed):
+        self.__latest_input_var.stream(input_feed)
 
-    async def run(self):
+    def run(self):
         while True:
-            latest_input = await self.latest_input_var.take()
-            await self._tick(latest_input)
+            latest_input = self.__latest_input_var.read()
+            self._tick(latest_input)
 
     @abstractmethod
-    async def _tick(self, input):
+    def _tick(self, input):
         pass

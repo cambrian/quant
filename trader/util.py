@@ -1,51 +1,75 @@
-from aiostream import stream
+from queue import Queue
+from threading import Condition, Lock, Thread
 
-import asyncio
+import os
 import traceback
 
 
-class ConsumingException(Exception):
-    pass
-
-
-# See Haskell MVars.
+# A partial implementation of a Haskell MVar (TODO: put/take).
 class MVar(object):
     def __init__(self):
-        self.consuming = False
-        self.got_value = asyncio.Condition()
-        self.value = None
+        self.__lock = Lock()
+        self.__condition = Condition(lock=self.__lock)
+        self.__value = None
 
-    async def _put(self, value):
-        await self.got_value.acquire()
-        self.value = value
-        self.got_value.notify()
-        self.got_value.release()
+    def __swap(self, value):
+        self.__lock.acquire()
+        current_value = self.__value
+        self.__value = value
+        self.__condition.notify()
+        self.__lock.release()
+        return current_value
 
-    # Asynchronously keeps track of the latest element in a stream.
-    async def consume(self, feed):
-        self.consuming = True
-        await stream.action(feed, self._put)
-
-    async def put(self, value):
-        if self.consuming:
-            raise ConsumingException('MVar already consuming a stream')
-        await self._put(value)
-
-    async def take(self):
-        await self.got_value.acquire()
-        await self.got_value.wait()
-        taken_value = self.value
-        self.value = None
-        self.got_value.release()
+    def read(self):
+        self.__lock.acquire()
+        if self.__value is None:
+            self.__condition.wait()
+        taken_value = self.__value
+        self.__value = None
+        self.__condition.notify()
+        self.__lock.release()
         return taken_value
 
+    # Cannibalizes the MVar to be updated from a feed.
+    def stream(self, feed):
+        feed.subscribe_(self.__swap)
 
-def call_async(fn):
-    return asyncio.get_event_loop().run_in_executor(None, fn)
 
-
-async def trace_exceptions(coroutine):
+# Used to propagate unhandled errors to the main thread.
+def _propagate_error(fn, name, exc_queue):
     try:
-        await coroutine
+        fn()
+        exc_queue.put((name, None))
     except Exception:
-        traceback.print_exc()
+        exc_queue.put((name, traceback.format_exc()))
+
+
+# Manages thread lifecycles and links their exceptions to the main thread.
+# Arguments are tuples: (name, fn, [True if thread should terminate])
+def manage_threads(*threads):
+    exc_queue = Queue()
+    finite_threads = {}
+    for thread in threads:
+        if len(thread) == 3:
+            (name, fn, terminates) = thread
+            if terminates:
+                finite_threads[name] = True
+        else:
+            (name, fn) = thread
+        thread = Thread(target=lambda: _propagate_error(fn, name, exc_queue))
+        # Allows KeyboardInterrupts to kill the whole program.
+        thread.daemon = True
+        thread.start()
+    completed_threads = 0
+    while True:
+        (name, exc) = exc_queue.get()
+        completed_threads += 1
+        if name in finite_threads and exc is None:
+            print('Thread <{}> terminated.'.format(name))
+            if completed_threads == len(threads):
+                break
+        else:
+            print('Thread <{}> terminated unexpectedly!'.format(name))
+            if exc is not None:
+                print(exc[:-1])
+            os._exit(1)
