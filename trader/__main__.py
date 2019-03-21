@@ -4,13 +4,15 @@ from exchange import Exchange
 from executor import Executor
 from queue import Queue
 from strategy import Strategy
-from util import manage_threads
+from util import manage_threads, MovingAverage
 from threading import Thread
+from numpy_ringbuffer import RingBuffer
 
 import json
 import krakenex
 import time
 import websocket as ws
+import numpy as np
 
 
 class Kraken(Exchange):
@@ -18,6 +20,9 @@ class Kraken(Exchange):
     def __init__(self):
         self.kraken = krakenex.API()
         # self.kraken.load_key('secret.key')
+        # Used for order API - Prepends 'X' to base currency, prepends 'Z' to quote currency
+        self.translate = lambda x: 'X' + \
+            x[:x.find('/') + 1] + 'Z' + x[x.find('/') + 1:]
 
     def _feed(self, pairs, time_interval):
         for _ in range(3):
@@ -44,12 +49,21 @@ class Kraken(Exchange):
                 result = json.loads(result_raw)
                 # Ignore heartbeats.
                 if not isinstance(result, dict):
-                    yield result
+                    print(result)
+                    ohlcv = {}
+                    # ohlcv['ticker'] = ""
+                    ohlcv['open'] = result[1][2]
+                    ohlcv['high'] = result[1][3]
+                    ohlcv['low'] = result[1][4]
+                    ohlcv['close'] = result[1][5]
+                    ohlcv['volume'] = result[1][6]
+                    yield ohlcv
             except Exception as error:
                 print('caught error: ' + repr(error))
                 time.sleep(3)
 
     def add_order(self, pair, side, order_type, price, volume):
+        pair = self.translate(pair)
         self.kraken.query_private('AddOrder', {
             'pair': pair,
             'type': side,
@@ -76,6 +90,7 @@ class Bitfinex(Exchange):
                             "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
         self.wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
                                   "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+        self.translate = lambda x: x.replace('/', '')
 
         def do_nothing(blah):
             pass
@@ -88,6 +103,7 @@ class Bitfinex(Exchange):
             candle_queue.put(message)
 
         for pair in pairs:
+            pair = self.translate(pair)
             self.wsclient.subscribe_to_candles(
                 symbol=pair,
                 timeframe=time_interval,
@@ -101,9 +117,16 @@ class Bitfinex(Exchange):
             # Gross conditionals to avoid WS subscription events, heartbeats, and weird "catch-up"
             # respons, in that order.
             if (isinstance(message, list) and isinstance(message[1], list) and not isinstance(message[1][0], list)):
-                yield message
+                ohlcv = {}
+                ohlcv['open'] = message[1][1]
+                ohlcv['high'] = message[1][3]
+                ohlcv['low'] = message[1][4]
+                ohlcv['close'] = message[1][2]
+                ohlcv['volume'] = message[1][5]
+                yield ohlcv
 
     def add_order(self, pair, side, order_type, price, volume):
+        pair = self.translate(pair)
         return self.bfx.place_order(volume, price, side, order_type, pair)
 
     def cancel_order(self, order_id):
@@ -123,7 +146,7 @@ class DummyExecutor(Executor):
 
     def _tick(self, input):
         ((fair, stddev), data) = input
-        close = float(data[1][5])
+        close = float(data['close'])
         print('Close: {}, Fair: {}, Stddev: {}'.format(close, fair, stddev))
         if close < fair - stddev:
             print('Buying 1 BTC at {}.'.format(close))
@@ -134,27 +157,31 @@ class DummyExecutor(Executor):
 
 
 class DummyStrategy(Strategy):
+    def __init__(self):
+        self.ma1 = MovingAverage(30)
+        self.prices = RingBuffer(capacity=15, dtype=float)
+
     def _tick(self, data):
         # # TODO: Strategy to derive fair estimate and stddev.
-        print(data)
-        print(data[1][5])
-        fair = float(data[1][5])
-        stddev = 100.0
-        return ((fair, stddev), data)
+        close = float(data['close'])
+        self.prices.append(close)
+        stddev = np.std(np.array(self.prices))
+        self.ma1.step(close)
+        return ((self.ma1.value, stddev), data)
 
 
 kraken = Kraken()
 bfx = Bitfinex()
 strategy = DummyStrategy()
 executor = DummyExecutor(bfx)
-kraken_feed = kraken.observe(['XBT/USD'], 5)
+kraken_feed = kraken.observe(['BTC/USD', 'BCH/USD'], 5)
 bfx_feed = bfx.observe(['BTCUSD'], '1m')
 kraken_strategy_feed = strategy.observe(kraken_feed)
 bfx_strategy_feed = strategy.observe(bfx_feed)
 
 # Lifecycle manager.
 manage_threads(
-    ('strategy-kraken', lambda: executor.consume(kraken_strategy_feed), True),
-    ('strategy-bfx', lambda: executor.consume(bfx_strategy_feed), True),
-    ('executor', lambda: executor.run(), True)
+    ('strategy-kraken', lambda: executor.consume(kraken_strategy_feed)),
+    # ('strategy-bfx', lambda: executor.consume(bfx_strategy_feed)),
+    ('executor', lambda: executor.run())
 )
