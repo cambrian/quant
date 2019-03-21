@@ -1,10 +1,11 @@
 # TODO: Add good docstring-style comments.
+from bitfinex import ClientV1, WssClient
 from exchange import Exchange
 from executor import Executor
+from queue import Queue
 from strategy import Strategy
-from util import run_threads_forever
-
 from threading import Thread
+from util import run_threads_forever
 
 import json
 import krakenex
@@ -69,6 +70,31 @@ class Kraken(Exchange):
         self.kraken.query_private('OpenPositions')
 
 
+class Bitfinex(Exchange):
+    def __init__(self):
+        self.bfx = ClientV1("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
+                            "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+        self.wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
+                                  "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+        self.wsclient.authenticate(print)
+
+    def _feed(self, pairs, time_interval):
+
+        pass
+
+    def add_order(self, pair, side, order_type, price, volume):
+        return self.bfx.place_order(volume, price, side, order_type, pair)
+
+    def cancel_order(self, order_id):
+        return self.bfx.delete_order(order_id)
+
+    def get_balance(self):
+        return self.bfx.balances()
+
+    def get_open_positions(self):
+        return self.bfx.active_positions()
+
+
 class DummyExecutor(Executor):
     def __init__(self, exchange):
         super().__init__()
@@ -99,9 +125,24 @@ strategy = DummyStrategy()
 executor = DummyExecutor(exchange)
 exchange_feed = exchange.observe(['XBT/USD'], 5)
 strategy_feed = strategy.observe(exchange_feed)
+bfx = Bitfinex()
+wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
+                     "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+wsclient.authenticate(print)
 
-# Thread manager.
-run_threads_forever(
-    ('strategy', lambda: executor.consume(strategy_feed)),
-    ('executor', lambda: executor.run())
+
+def my_candle_handler(message):
+    print(message)
+
+
+wsclient.subscribe_to_candles(
+    symbol='BTCUSD',
+    timeframe='1m',
+    callback=my_candle_handler
 )
+
+# # Thread manager.
+# run_threads_forever(
+#     ('strategy', lambda: executor.consume(strategy_feed)),
+#     ('executor', lambda: executor.run())
+# )
