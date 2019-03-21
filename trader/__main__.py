@@ -4,8 +4,8 @@ from exchange import Exchange
 from executor import Executor
 from queue import Queue
 from strategy import Strategy
+from util import manage_threads
 from threading import Thread
-from util import run_threads_forever
 
 import json
 import krakenex
@@ -76,11 +76,32 @@ class Bitfinex(Exchange):
                             "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
         self.wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
                                   "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-        self.wsclient.authenticate(print)
+
+        def do_nothing(blah):
+            pass
+        self.wsclient.authenticate(do_nothing)
 
     def _feed(self, pairs, time_interval):
+        candle_queue = Queue()
 
-        pass
+        def add_messages_to_queue(message):
+            candle_queue.put(message)
+
+        for pair in pairs:
+            self.wsclient.subscribe_to_candles(
+                symbol=pair,
+                timeframe=time_interval,
+                callback=add_messages_to_queue
+            )
+        self.wsclient.start()
+        time.sleep(5)
+
+        while True:
+            message = candle_queue.get()
+            # Gross conditionals to avoid WS subscription events, heartbeats, and weird "catch-up"
+            # respons, in that order.
+            if (isinstance(message, list) and isinstance(message[1], list) and not isinstance(message[1][0], list)):
+                yield message
 
     def add_order(self, pair, side, order_type, price, volume):
         return self.bfx.place_order(volume, price, side, order_type, pair)
@@ -114,35 +135,26 @@ class DummyExecutor(Executor):
 
 class DummyStrategy(Strategy):
     def _tick(self, data):
-        # TODO: Strategy to derive fair estimate and stddev.
+        # # TODO: Strategy to derive fair estimate and stddev.
+        print(data)
+        print(data[1][5])
         fair = float(data[1][5])
         stddev = 100.0
         return ((fair, stddev), data)
 
 
-exchange = Kraken()
-strategy = DummyStrategy()
-executor = DummyExecutor(exchange)
-exchange_feed = exchange.observe(['XBT/USD'], 5)
-strategy_feed = strategy.observe(exchange_feed)
+kraken = Kraken()
 bfx = Bitfinex()
-wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
-                     "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-wsclient.authenticate(print)
+strategy = DummyStrategy()
+executor = DummyExecutor(bfx)
+kraken_feed = kraken.observe(['XBT/USD'], 5)
+bfx_feed = bfx.observe(['BTCUSD'], '1m')
+kraken_strategy_feed = strategy.observe(kraken_feed)
+bfx_strategy_feed = strategy.observe(bfx_feed)
 
-
-def my_candle_handler(message):
-    print(message)
-
-
-wsclient.subscribe_to_candles(
-    symbol='BTCUSD',
-    timeframe='1m',
-    callback=my_candle_handler
+# Lifecycle manager.
+manage_threads(
+    ('strategy-kraken', lambda: executor.consume(kraken_strategy_feed), True),
+    ('strategy-bfx', lambda: executor.consume(bfx_strategy_feed), True),
+    ('executor', lambda: executor.run(), True)
 )
-
-# # Thread manager.
-# run_threads_forever(
-#     ('strategy', lambda: executor.consume(strategy_feed)),
-#     ('executor', lambda: executor.run())
-# )

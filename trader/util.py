@@ -36,26 +36,40 @@ class MVar(object):
 
 
 # Used to propagate unhandled errors to the main thread.
-def _propagate_error(fn, name, queue):
+def _propagate_error(fn, name, exc_queue):
     try:
         fn()
-        queue.put((name, None))
+        exc_queue.put((name, None))
     except Exception:
-        queue.put((name, traceback.format_exc()))
+        exc_queue.put((name, traceback.format_exc()))
 
 
-# Manages several threads and links their exceptions to the main thread.
-def run_threads_forever(*fns):
+# Manages thread lifecycles and links their exceptions to the main thread.
+# Arguments are tuples: (name, fn, [True if thread should terminate])
+def manage_threads(*threads):
     exc_queue = Queue()
-    threads = []
-    for (name, fn) in fns:
+    finite_threads = {}
+    for thread in threads:
+        if len(thread) == 3:
+            (name, fn, terminates) = thread
+            if terminates:
+                finite_threads[name] = True
+        else:
+            (name, fn) = thread
         thread = Thread(target=lambda: _propagate_error(fn, name, exc_queue))
         # Allows KeyboardInterrupts to kill the whole program.
         thread.daemon = True
-        threads.append(thread)
         thread.start()
-    (name, exc) = exc_queue.get()
-    print('Thread <{}> terminated.'.format(name))
-    if exc is not None:
-        print(exc[:-1])
-    os._exit(0)
+    completed_threads = 0
+    while True:
+        (name, exc) = exc_queue.get()
+        completed_threads += 1
+        if name in finite_threads and exc is None:
+            print('Thread <{}> terminated.'.format(name))
+            if completed_threads == len(threads):
+                break
+        else:
+            print('Thread <{}> terminated unexpectedly!'.format(name))
+            if exc is not None:
+                print(exc[:-1])
+            os._exit(1)
