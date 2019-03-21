@@ -9,7 +9,7 @@ import trader.strategy as strategy
 bitfinex_eth_feed = exchanges[BITFINEX].observe('ETHUSD', '1m')
 kraken_btc_feed = exchanges[KRAKEN].observe('XBT/USD', 5)
 dummy_strategy = strategy.Dummy(bitfinex_eth_feed, kraken_btc_feed)
-dummy_executor = executor.Dummy(dummy_strategy)
+dummy_executor = executor.Dummy(dummy_strategy.feed)
 
 # Run all threads.
 manage_threads(

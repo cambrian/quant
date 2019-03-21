@@ -6,10 +6,10 @@ _thread_count = 0
 
 
 class Executor(ABC):
-    def __init__(self, strategy):
+    def __init__(self, strategy_feed):
         global _thread_count
         self.__latest_input_var = MVar()
-        self.__latest_input_var.stream(strategy.feed)
+        self.__latest_input_var.stream(strategy_feed)
 
         def run():
             while True:
