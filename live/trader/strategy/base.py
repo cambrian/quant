@@ -20,7 +20,8 @@ class Strategy(ABC):
             if (exchange, pair) not in consuming:
                 consuming[(exchange, pair)] = True
                 feed.subscribe_(
-                    lambda ohlcv: tick_queue.put((exchange, pair, ohlcv)))
+                    lambda ohlcv, exchange=exchange, pair=pair:
+                        tick_queue.put((exchange, pair, ohlcv)))
 
         def feed_generator():
             while True:
@@ -34,6 +35,5 @@ class Strategy(ABC):
 
     @abstractmethod
     def _tick(self, exchange, pair, ohlcv):
-        # Returns a dictionary of { pair: (fair_price, std_dev) }.
-        # TODO: Return info about what exchanges are valid to trade on.
+        # Returns a list of (exchange, pair, fair_price, std_dev, [auxiliary_data]).
         pass

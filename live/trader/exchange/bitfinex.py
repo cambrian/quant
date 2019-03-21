@@ -1,5 +1,5 @@
 from trader.exchange.base import Exchange
-from trader.constants import KRAKEN
+from trader.constants import BITFINEX
 
 from queue import Queue
 from bitfinex import ClientV1, WssClient
@@ -13,12 +13,11 @@ import websocket as ws
 class Bitfinex(Exchange):
     def __init__(self):
         super().__init__()
-        self.name = Bitfinex
+        self.name = BITFINEX
         self.bfx = ClientV1("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
                             "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
         self.wsclient = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
                                   "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-        self.translate = lambda x: x.replace('/', '')
 
         def do_nothing(blah):
             pass
@@ -30,7 +29,6 @@ class Bitfinex(Exchange):
         def add_messages_to_queue(message):
             candle_queue.put(message)
 
-        pair = self.translate(pair)
         self.wsclient.subscribe_to_candles(
             symbol=pair,
             timeframe=time_interval,
@@ -56,7 +54,6 @@ class Bitfinex(Exchange):
                 yield ohlcv
 
     def add_order(self, pair, side, order_type, price, volume):
-        pair = self.translate(pair)
         return self.bfx.place_order(volume, price, side, order_type, pair)
 
     def cancel_order(self, order_id):
