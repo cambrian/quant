@@ -15,10 +15,11 @@ class Dummy(Strategy):
 
     def _tick(self, exchange, pair, ohlcv):
         print(exchange, pair, ohlcv)
-        if exchange == KRAKEN and pair == 'XBT/USD':
+        if exchange == BITFINEX and pair == 'BTCUSD':
             close = float(ohlcv['close'])
             self.prices.append(close)
-            stddev = np.std(np.array(self.prices))
-            self.ma.step(close)
-            return [(exchange, pair, self.ma.value, stddev, ohlcv)]
+            if len(self.prices) == self.prices.maxlen:
+                stddev = np.std(np.array(self.prices))
+                self.ma.step(close)
+                return [(exchange, pair, self.ma.value, stddev, ohlcv)]
         return []

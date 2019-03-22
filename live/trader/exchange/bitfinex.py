@@ -14,10 +14,10 @@ class Bitfinex(Exchange):
     def __init__(self):
         super().__init__()
         self.name = BITFINEX
-        self.bfx = ClientV1("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
-                            "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
-        self.ws_client = WssClient("UsuNjCcFLJjNvOwmKoaTWFmiGx1uV5ELrOZ6BwLxJrN",
-                                   "ra33x1guxsasZBE6YLCGhhtCyDCNPIBAAXMK0wtmpYO")
+        self.bfx = ClientV1("hMbOGccQLyJgC0bdwHJlNbVrlGxVZby0UaXWHIWlPWw",
+                            "MLZezmZQftoYeWT7aa2jflBcS8dtNkAhKzxiYVgiacS")
+        self.ws_client = WssClient("hMbOGccQLyJgC0bdwHJlNbVrlGxVZby0UaXWHIWlPWw",
+                                   "MLZezmZQftoYeWT7aa2jflBcS8dtNkAhKzxiYVgiacS")
         self.ws_client.authenticate(lambda x: None)
         self.ws_client.daemon = True
 
@@ -61,4 +61,5 @@ class Bitfinex(Exchange):
         return self.bfx.balances()
 
     def get_open_positions(self):
-        return self.bfx.active_positions()
+        # return self.bfx.active_positions()
+        return self.bfx.active_orders()
