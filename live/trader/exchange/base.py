@@ -1,13 +1,26 @@
 from abc import ABC, abstractmethod
 
 import rx
+import rx.operators as op
+
+_thread_count = 0
 
 
 class Exchange(ABC):
+    def __init__(self):
+        self.threads = []
+        self.name = None
+
     # TODO: Trading/account management functions.
-    def observe(self, pairs, time_interval):
-        feed_generator = self._feed(pairs, time_interval)
-        return rx.from_iterable(feed_generator)
+    def observe(self, pair, time_interval):
+        global _thread_count
+        feed_generator = self._feed(pair, time_interval)
+        feed = rx.from_iterable(feed_generator).pipe(op.publish())
+        feed_thread = ('exchange-' + self.__class__.__name__.lower() + '-' + pair + '-'
+                       + str(_thread_count), feed.connect)
+        self.threads.append(feed_thread)
+        _thread_count += 1
+        return (self.name, pair, feed)
 
     @abstractmethod
     def _feed(self, pairs, time_interval):

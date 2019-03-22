@@ -1,10 +1,5 @@
-# TODO: Add good docstring-style comments.
-from exchange import Exchange
-from executor import Executor
-from strategy import Strategy
-from util import run_threads_forever
-
-from threading import Thread
+from trader.exchange.base import Exchange
+from trader.constants import KRAKEN
 
 import json
 import krakenex
@@ -15,10 +10,14 @@ import websocket as ws
 class Kraken(Exchange):
     # TODO: Get real Kraken account w/ KYC and money.
     def __init__(self):
+        super().__init__()
+        self.name = KRAKEN
         self.kraken = krakenex.API()
         # self.kraken.load_key('secret.key')
+        self.translate = lambda x: 'X' + \
+            x[:x.find('/') + 1] + 'Z' + x[x.find('/') + 1:]
 
-    def _feed(self, pairs, time_interval):
+    def _feed(self, pair, time_interval):
         for _ in range(3):
             try:
                 self.ws = ws.create_connection('wss://ws-sandbox.kraken.com')
@@ -27,9 +26,10 @@ class Kraken(Exchange):
                 time.sleep(3)
             else:
                 break
+
         self.ws.send(json.dumps({
             'event': 'subscribe',
-            'pair': pairs,
+            'pair': [pair],
             'subscription': {
                 'name': 'ohlc',
                 'interval': time_interval
@@ -43,12 +43,19 @@ class Kraken(Exchange):
                 result = json.loads(result_raw)
                 # Ignore heartbeats.
                 if not isinstance(result, dict):
-                    yield result
+                    ohlcv = {}
+                    ohlcv['open'] = result[1][2]
+                    ohlcv['high'] = result[1][3]
+                    ohlcv['low'] = result[1][4]
+                    ohlcv['close'] = result[1][5]
+                    ohlcv['volume'] = result[1][6]
+                    yield ohlcv
             except Exception as error:
                 print('caught error: ' + repr(error))
                 time.sleep(3)
 
     def add_order(self, pair, side, order_type, price, volume):
+        pair = self.translate(pair)
         self.kraken.query_private('AddOrder', {
             'pair': pair,
             'type': side,
@@ -67,41 +74,3 @@ class Kraken(Exchange):
 
     def get_open_positions(self):
         self.kraken.query_private('OpenPositions')
-
-
-class DummyExecutor(Executor):
-    def __init__(self, exchange):
-        super().__init__()
-        self.exchange = exchange
-
-    def _tick(self, input):
-        ((fair, stddev), data) = input
-        close = float(data[1][5])
-        print('Close: {}, Fair: {}, Stddev: {}'.format(close, fair, stddev))
-        if close < fair - stddev:
-            print('Buying 1 BTC at {}.'.format(close))
-            # self.exchange.add_order('XXBTZUSD', 'buy', 'market', close, 1)
-        elif close > fair + stddev:
-            print('Selling 1 BTC at {}.'.format(close))
-            # self.exchange.add_order('XXBTZUSD', 'sell', 'market', close, 1)
-
-
-class DummyStrategy(Strategy):
-    def _tick(self, data):
-        # TODO: Strategy to derive fair estimate and stddev.
-        fair = float(data[1][5])
-        stddev = 100.0
-        return ((fair, stddev), data)
-
-
-exchange = Kraken()
-strategy = DummyStrategy()
-executor = DummyExecutor(exchange)
-exchange_feed = exchange.observe(['XBT/USD'], 5)
-strategy_feed = strategy.observe(exchange_feed)
-
-# Thread manager.
-run_threads_forever(
-    ('strategy', lambda: executor.consume(strategy_feed)),
-    ('executor', lambda: executor.run())
-)
