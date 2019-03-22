@@ -1,0 +1,6 @@
+bitfinex-v2==1.1.5
+krakenex==2.1.0
+numpy==1.16.2
+numpy-ringbuffer==0.2.1
+websocket-client==0.55.0
+Rx==3.0.0a0

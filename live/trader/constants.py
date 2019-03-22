@@ -1,0 +1,2 @@
+BITFINEX = 'bitfinex'
+KRAKEN = 'kraken'
