@@ -19,7 +19,11 @@ class Dummy(Strategy):
             close = float(ohlcv['close'])
             self.prices.append(close)
             if len(self.prices) == self.prices.maxlen:
-                stddev = np.std(np.array(self.prices))
+                std_dev = np.std(np.array(self.prices))
                 self.ma.step(close)
-                return [(exchange, pair, self.ma.value, stddev, ohlcv)]
+                return [(exchange, pair, {
+                    'fair_price': self.ma.value,
+                    'std_dev': std_dev,
+                    'ohlcv': ohlcv
+                })]
         return []
