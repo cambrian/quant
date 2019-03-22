@@ -12,13 +12,11 @@ class MVar(object):
         self.__condition = Condition(lock=self.__lock)
         self.__value = None
 
-    def __swap(self, value):
+    def __modify(self, fn):
         self.__lock.acquire()
-        current_value = self.__value
-        self.__value = value
+        self.__value = fn(self.__value)
         self.__condition.notify()
         self.__lock.release()
-        return current_value
 
     def read(self):
         self.__lock.acquire()
@@ -31,8 +29,12 @@ class MVar(object):
         return taken_value
 
     # Cannibalizes the MVar to be updated from a feed.
-    def stream(self, feed):
-        feed.subscribe_(self.__swap)
+    # The update function should take the existing MVar value and return an update to it based on
+    # an incoming piece of data.
+    def stream(self, feed, update):
+        def curried_update(x):
+            return lambda current: update(current, x)
+        feed.subscribe_(lambda x: self.__modify(curried_update(x)))
 
 
 # Used to propagate unhandled errors to the main thread.

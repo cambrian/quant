@@ -1,6 +1,8 @@
 from trader.exchange.base import Exchange
 from trader.constants import KRAKEN
 
+from datetime import datetime
+
 import json
 import krakenex
 import time
@@ -44,6 +46,7 @@ class Kraken(Exchange):
                 # Ignore heartbeats.
                 if not isinstance(result, dict):
                     ohlcv = {}
+                    ohlcv['timestamp'] = datetime.now()
                     ohlcv['open'] = result[1][2]
                     ohlcv['high'] = result[1][3]
                     ohlcv['low'] = result[1][4]

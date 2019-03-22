@@ -1,6 +1,7 @@
 from trader.exchange.base import Exchange
 from trader.constants import BITFINEX
 
+from datetime import datetime
 from queue import Queue
 from bitfinex import ClientV1, WssClient
 
@@ -44,6 +45,7 @@ class Bitfinex(Exchange):
                     and isinstance(message[1], list)
                     and not isinstance(message[1][0], list)):
                 ohlcv = {}
+                ohlcv['timestamp'] = datetime.now()
                 ohlcv['open'] = message[1][1]
                 ohlcv['high'] = message[1][3]
                 ohlcv['low'] = message[1][4]

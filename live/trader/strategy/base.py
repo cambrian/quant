@@ -1,6 +1,7 @@
 from trader.util import MVar
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from queue import Queue
 
 import rx
@@ -26,7 +27,11 @@ class Strategy(ABC):
         def feed_generator():
             while True:
                 exchange, pair, ohlcv = tick_queue.get()
-                yield self._tick(exchange, pair, ohlcv)
+                tick_data = self._tick(exchange, pair, ohlcv)
+                timestamp = datetime.now()
+                for i in range(len(tick_data)):
+                    tick_data[i][2]['timestamp'] = timestamp
+                yield tick_data
 
         self.feed = rx.from_iterable(feed_generator()).pipe(op.publish())
         self.thread = ('strategy-' + self.__class__.__name__.lower() + '-' + str(_thread_count),
@@ -35,5 +40,5 @@ class Strategy(ABC):
 
     @abstractmethod
     def _tick(self, exchange, pair, ohlcv):
-        # Returns a list of (exchange, pair, fair_price, std_dev, [auxiliary_data]).
+        # Returns a list of (exchange, pair, {fair_price, std_dev, [auxiliary_data]}).
         pass
