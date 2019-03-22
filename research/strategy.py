@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from math import sqrt
 
 
 class Strategy(ABC):
@@ -33,3 +34,25 @@ class MovingAverage:
     @property
     def ready(self):
         return self.__samples_needed == 0
+
+
+class Gaussian:
+    def __init__(self, mean, variance):
+        self.mean = mean
+        self.variance = variance
+
+    @property
+    def stddev(self):
+        return sqrt(self.stddev)
+
+    def __add__(self, x):
+        return Gaussian(self.mean + x.mean, self.variance + x.variance)
+
+    def __mul__(self, scalar):
+        return Gaussian(self.mean * scalar, self.variance * scalar * scalar)
+
+    def __sub__(self, x):
+        return self + -x
+
+    def __div__(self, scalar):
+        return self * (1/scalar)
