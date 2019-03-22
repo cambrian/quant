@@ -6,6 +6,18 @@ _thread_count = 0
 
 
 class Executor(ABC):
+    """An abstract class for executing strategies.
+
+    Attributes:
+        thread (list): A thread to run the executor. Pass this to `manage_threads`.
+        name (str): A canonical name for this exchange.
+
+    Args:
+        strategy_feed (Feed): A feed tuple containing a multicast Observable, obtained by running
+            ticks of this strategy.
+
+    """
+
     def __init__(self, strategy_feed):
         global _thread_count
         self.__latest_inputs_var = MVar()
@@ -28,7 +40,7 @@ class Executor(ABC):
 
         def run():
             while True:
-                latest_inputs = self.__latest_inputs_var.read()
+                latest_inputs = self.__latest_inputs_var.read_on_write()
                 self._tick(latest_inputs)
 
         self.thread = (
@@ -37,4 +49,11 @@ class Executor(ABC):
 
     @abstractmethod
     def _tick(self, strategy_inputs):
+        """Generates and executes orders when a strategy has new information.
+
+        Args:
+            strategy_inputs (dict): A multi-level dictionary indexed by exchange and then pair. Each
+                element contains the latest fair price and standard deviation.
+
+        """
         pass

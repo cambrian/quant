@@ -1,4 +1,3 @@
-# TODO: Add good docstring-style comments.
 from trader.constants import BITFINEX, KRAKEN
 from trader.exchange import exchanges
 from trader.util import manage_threads

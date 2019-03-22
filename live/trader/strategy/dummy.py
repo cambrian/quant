@@ -8,6 +8,8 @@ import numpy as np
 
 
 class Dummy(Strategy):
+    """A shitty strategy for testing purposes."""
+
     def __init__(self, *data_feeds):
         super().__init__(*data_feeds)
         self.ma = MovingAverage(30)

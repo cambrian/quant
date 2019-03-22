@@ -5,11 +5,46 @@ import os
 import traceback
 
 
-# A partial implementation of a Haskell MVar (TODO: put/take).
+class MovingAverage:
+    """An exponential moving average.
+
+    Attributes:
+        half_life (float): The half life of samples passed to `step`.
+
+    """
+
+    def __init__(self, half_life):
+        self.__a = 0.5 ** (1 / half_life)
+        self.__value = None
+        self.__samples_needed = half_life
+
+    @property
+    def value(self):
+        return self.__value
+
+    def step(self, value):
+        if self.__value is None:
+            self.__value = value
+        self.__value = self.__a * self.__value + (1-self.__a) * value
+        self.__samples_needed = max(0, self.__samples_needed - 1)
+
+    @property
+    def ready(self):
+        return self.__samples_needed == 0
+
+
 class MVar(object):
+    """A partial implementation of a Haskell MVar.
+
+    Notably, several of the usual functions (take/swap/read) are missing, but the general concept
+    (of a shared memory location for threads) is the same.
+
+    """
+
     def __init__(self):
         self.__lock = Lock()
         self.__condition = Condition(lock=self.__lock)
+        self.__changed = False
         self.__value = None
 
     def __modify(self, fn):
@@ -18,20 +53,29 @@ class MVar(object):
         self.__condition.notify()
         self.__lock.release()
 
-    def read(self):
+    def read_on_write(self):
+        """Waits for the MVar to be written to, then reads its value non-destructively.
+
+        Returns:
+            The read value.
+
+        """
         self.__lock.acquire()
-        if self.__value is None:
+        if self.__changed == False:
             self.__condition.wait()
-        taken_value = self.__value
-        self.__value = None
+        read_value = self.__value
         self.__condition.notify()
         self.__lock.release()
-        return taken_value
+        return read_value
 
-    # Cannibalizes the MVar to be updated from a feed.
-    # The update function should take the existing MVar value and return an update to it based on
-    # an incoming piece of data.
     def stream(self, feed, update):
+        """Cannibalizes the MVar to be updated from a feed.
+
+        Args:
+            feed (Observable): An observable of some element type.
+            update (Function): A function that takes an existing value of this MVar and an element
+                of the observable, returning an updated value of the MVar.
+        """
         def curried_update(x):
             return lambda current: update(current, x)
         feed.subscribe_(lambda x: self.__modify(curried_update(x)))
@@ -49,6 +93,12 @@ def _propagate_error(fn, name, exc_queue):
 # Manages thread lifecycles and links their exceptions to the main thread.
 # Arguments are tuples: (name, fn, [True if thread should terminate])
 def manage_threads(*threads):
+    """Manages thread lifecycles and links their exceptions to the main thread.
+
+    Args:
+        threads: Tuples that look like (name, fn to run, [True if thread should terminate]).
+
+    """
     exc_queue = Queue()
     finite_threads = {}
     for thread in threads:
@@ -75,24 +125,3 @@ def manage_threads(*threads):
             if exc is not None:
                 print(exc[:-1])
             os._exit(1)
-
-
-class MovingAverage:
-    def __init__(self, half_life):
-        self.__a = 0.5 ** (1 / half_life)
-        self.__value = None
-        self.__samples_needed = half_life
-
-    @property
-    def value(self):
-        return self.__value
-
-    def step(self, value):
-        if self.__value is None:
-            self.__value = value
-        self.__value = self.__a * self.__value + (1-self.__a) * value
-        self.__samples_needed = max(0, self.__samples_needed - 1)
-
-    @property
-    def ready(self):
-        return self.__samples_needed == 0

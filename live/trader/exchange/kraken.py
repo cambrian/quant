@@ -10,6 +10,8 @@ import websocket as ws
 
 
 class Kraken(Exchange):
+    """The Kraken exchange."""
+
     # TODO: Get real Kraken account w/ KYC and money.
     def __init__(self):
         super().__init__()
