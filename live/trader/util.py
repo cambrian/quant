@@ -90,8 +90,6 @@ def _propagate_error(fn, name, exc_queue):
         exc_queue.put((name, traceback.format_exc()))
 
 
-# Manages thread lifecycles and links their exceptions to the main thread.
-# Arguments are tuples: (name, fn, [True if thread should terminate])
 def manage_threads(*threads):
     """Manages thread lifecycles and links their exceptions to the main thread.
 
