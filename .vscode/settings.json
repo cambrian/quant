@@ -1,17 +1,23 @@
 {
-  "editor.formatOnSave": true,
-  "editor.rulers": [
-    100
-  ],
-  "files.eol": "\n",
-  "files.exclude": {
-    "**/*.pyc": {
-      "when": "$(basename).py"
+    "editor.formatOnSave": true,
+    "editor.rulers": [
+        100
+    ],
+    "files.eol": "\n",
+    "files.exclude": {
+        "**/*.pyc": {
+            "when": "$(basename).py"
+        },
+        "**/__pycache__": true
     },
-    "**/__pycache__": true
-  },
-  "files.trimTrailingWhitespace": true,
-  "python.linting.pylintEnabled": true,
-  "python.jediEnabled": true,
-  "python.pythonPath": "/usr/local/bin/python3"
+    "files.trimTrailingWhitespace": true,
+    "python.linting.pylintEnabled": true,
+    "python.jediEnabled": true,
+    "python.pythonPath": "/usr/local/bin/python3",
+    "python.formatting.autopep8Args": [
+        "--max-line-length=100"
+    ],
+    "python.linting.pep8Args": [
+        "--max-line-length=100"
+    ]
 }
