@@ -1,19 +1,26 @@
-from trader.constants import BITFINEX, KRAKEN
-from trader.exchange import exchanges
-from trader.util import manage_threads
+from trader.exchange import Exchanges
+from trader.util.constants import BITFINEX, KRAKEN
+from trader.util.thread import ThreadManager
 
 import trader.executor as executor
 import trader.strategy as strategy
 
-bitfinex_btc_feed = exchanges[BITFINEX].observe('BTCUSD', '1m')
-# kraken_btc_feed = exchanges[KRAKEN].observe('XBT/USD', 5)
-dummy_strategy = strategy.Dummy(bitfinex_btc_feed)
-dummy_executor = executor.Dummy(dummy_strategy.feed)
+# Get singleton exchange instances.
+feed_thread_manager = ThreadManager()
+bitfinex = Exchanges.get(BITFINEX)
 
-# Run all threads.
-manage_threads(
-    *exchanges[BITFINEX].threads,
-    # *exchanges[KRAKEN].threads,
-    dummy_strategy.thread,
-    dummy_executor.thread
-)
+# Declare a new feed from Bitfinex price data (this only wires it up).
+bitfinex_btc_usd_1m = bitfinex.observe(feed_thread_manager, 'BTCUSD', '1m')
+
+# Initialize and wire up our Dummy strategy.
+dummy_strategy = strategy.Dummy(feed_thread_manager, {
+    (BITFINEX, 'BTCUSD', '1m'): bitfinex_btc_usd_1m
+})
+
+# Initialize and wire up our Dummy executor.
+dummy_executor = executor.Dummy(feed_thread_manager, {
+    strategy.Dummy: dummy_strategy.feed
+})
+
+# Run feed processors.
+feed_thread_manager.run()

@@ -1,45 +1,32 @@
-from abc import ABC, abstractmethod
+from trader.util import Feed
 
-import rx
-import rx.operators as op
+from abc import ABC, abstractmethod
 
 _thread_count = 0
 
 
 class Exchange(ABC):
-    """An abstract class for interacting with an exchange.
+    """An abstract class for interacting with an exchange."""
 
-    Attributes:
-        threads (list): List of feed threads generated for this exchange. Pass this to
-            `manage_threads`.
-        name (str): A canonical name for this exchange.
-
-    """
-
-    def __init__(self):
-        self.threads = []
-        self.name = None
-
-    # TODO: Trading/account management functions.
-    def observe(self, pair, time_interval):
-        """Returns an asychronous price feed for a particular pair on this exchange.
+    def observe(self, thread_manager, pair, time_interval):
+        """Returns a price feed for a particular pair on this exchange.
 
         Args:
+            thread_manager (ThreadManager): A thread manager to run the feed on.
             pair (str): The pair, specified in the format of the exchange.
             time_interval: The time interval for candles, specified in the format of the exchange.
 
         Returns:
-            A tuple representing a price feed and containing an Observable.
+            Feed: A feed of OHLCV candles (see `feed`).
 
         """
         global _thread_count
-        feed_generator = self._feed(pair, time_interval)
-        feed = rx.from_iterable(feed_generator).pipe(op.publish())
-        feed_thread = ('exchange-' + self.name.lower() + '-' + pair + '-' + str(_thread_count),
-                       feed.connect)
-        self.threads.append(feed_thread)
+        feed = Feed(self._feed(pair, time_interval))
+        feed_name = 'exchange-{name}-{pair}-{id}'.format(
+            name=self.__class__.__name__.lower(), pair=pair, id=str(_thread_count))
+        thread_manager.attach(feed_name, feed.run)
         _thread_count += 1
-        return (self.name, pair, feed)
+        return feed
 
     @abstractmethod
     def _feed(self, pair, time_interval):

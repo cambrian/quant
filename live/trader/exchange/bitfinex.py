@@ -1,5 +1,5 @@
 from trader.exchange.base import Exchange
-from trader.constants import BITFINEX
+from trader.util.constants import BITFINEX
 
 from datetime import datetime
 from queue import Queue
@@ -22,7 +22,6 @@ class Bitfinex(Exchange):
 
     def __init__(self):
         super().__init__()
-        self.name = BITFINEX
         self.bfx = ClientV1(os.getenv('BITFINEX_API_KEY', ''),
                             os.getenv('BITFINEX_SECRET', ''))
         self.ws_client = WssClient(os.getenv('BITFINEX_API_KEY', ''),
