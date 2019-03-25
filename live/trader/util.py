@@ -5,7 +5,7 @@ import os
 import traceback
 
 
-class MovingAverage:
+class Ema:
     """An exponential moving average.
 
     Attributes:

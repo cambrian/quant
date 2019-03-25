@@ -1,6 +1,6 @@
 from trader.constants import BITFINEX, KRAKEN
 from trader.strategy.base import Strategy
-from trader.util import MovingAverage
+from trader.util import Ema
 
 from numpy_ringbuffer import RingBuffer
 
@@ -12,7 +12,7 @@ class Dummy(Strategy):
 
     def __init__(self, *data_feeds):
         super().__init__(*data_feeds)
-        self.ma = MovingAverage(30)
+        self.ma = Ema(30)
         self.prices = RingBuffer(capacity=15, dtype=float)
 
     def _tick(self, exchange, pair, ohlcv):
