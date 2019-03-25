@@ -6,8 +6,9 @@ from operator import itemgetter
 
 
 class Dummy(Executor):
+    """A shitty executor for testing purposes."""
+
     def _tick(self, strategy_inputs):
-        print(strategy_inputs)
         if BITFINEX in strategy_inputs and 'BTCUSD' in strategy_inputs[BITFINEX]:
             data = strategy_inputs[BITFINEX]['BTCUSD']
             ohlcv, fair_price, std_dev = itemgetter(

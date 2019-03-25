@@ -11,6 +11,19 @@ _thread_count = 0
 
 
 class Strategy(ABC):
+    """An abstract class for writing strategies.
+
+    Attributes:
+        feed (Feed): A feed tuple containing a multicast Observable, obtained by running ticks of
+            this strategy.
+        thread (list): A thread to run the executor. Pass this to `manage_threads`.
+
+    Args:
+        strategy_feed (Feed): A feed tuple containing an Observable, obtained by running ticks of a
+            strategy.
+
+    """
+
     def __init__(self, *data_feeds):
         global _thread_count
         tick_queue = Queue()
@@ -40,5 +53,21 @@ class Strategy(ABC):
 
     @abstractmethod
     def _tick(self, exchange, pair, ohlcv):
-        # Returns a list of (exchange, pair, {fair_price, std_dev, [auxiliary_data]}).
+        """The actual implementation of a strategy.
+
+        Strategies should take the feed data received at each tick and incorporate it into their
+        running models of the market.
+
+        Args:
+            exchange (str): The exchange for this feed data.
+            pair (str): The pair for this feed data.
+            ohlcv (dict): A dictionary with `timestamp`, `open`, `high`, `low`, `close`, and
+                `volume`, which represents a candle for the given pair and exchange. The strategy
+                will implicitly expect these candles on a particular time interval.
+
+        Returns:
+            A list of strategy updates (exchange, pair, {fair_price, std_dev, [auxiliary_data]}) for
+            different exchanges/pairs.
+
+        """
         pass

@@ -7,18 +7,26 @@ from bitfinex import ClientV1, WssClient
 
 import json
 import krakenex
+import os
 import time
 import websocket as ws
 
 
 class Bitfinex(Exchange):
+    """The Bitfinex exchange.
+
+    Store your API key and secret in the `BITFINEX_API_KEY` and `BITFINEX_SECRET` environment
+    variables.
+
+    """
+
     def __init__(self):
         super().__init__()
         self.name = BITFINEX
-        self.bfx = ClientV1("hMbOGccQLyJgC0bdwHJlNbVrlGxVZby0UaXWHIWlPWw",
-                            "MLZezmZQftoYeWT7aa2jflBcS8dtNkAhKzxiYVgiacS")
-        self.ws_client = WssClient("hMbOGccQLyJgC0bdwHJlNbVrlGxVZby0UaXWHIWlPWw",
-                                   "MLZezmZQftoYeWT7aa2jflBcS8dtNkAhKzxiYVgiacS")
+        self.bfx = ClientV1(os.getenv('BITFINEX_API_KEY', ''),
+                            os.getenv('BITFINEX_SECRET', ''))
+        self.ws_client = WssClient(os.getenv('BITFINEX_API_KEY', ''),
+                                   os.getenv('BITFINEX_SECRET', ''))
         self.ws_client.authenticate(lambda x: None)
         self.ws_client.daemon = True
 
