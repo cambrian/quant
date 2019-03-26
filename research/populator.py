@@ -188,3 +188,9 @@ def grab_all_pairs(data_dir, exchanges, tick_size):
             '/')[0] in GOOD_COINS and x.split('/')[1] in GOOD_COINS, exchange.symbols))
         populate(data_dir, [(exchange_id, batch_size_max)],
                  good_symbols, tick_size, '2000-01-01T00:00:00Z')
+
+
+if __name__ == '__main__':
+    data_dir = 'data'
+    exchanges = [('binance', 1000), ('bitfinex', 200)]
+    grab_all_pairs(data_dir, exchanges, '1m')

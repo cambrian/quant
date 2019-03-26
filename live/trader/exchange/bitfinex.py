@@ -1,5 +1,5 @@
 from trader.exchange.base import Exchange
-from trader.constants import BITFINEX
+from trader.util.constants import BITFINEX
 
 from datetime import datetime
 from queue import Queue
@@ -22,7 +22,6 @@ class Bitfinex(Exchange):
 
     def __init__(self):
         super().__init__()
-        self.name = BITFINEX
         self.bfx = ClientV1(os.getenv('BITFINEX_API_KEY', ''),
                             os.getenv('BITFINEX_SECRET', ''))
         self.ws_client = WssClient(os.getenv('BITFINEX_API_KEY', ''),
@@ -61,8 +60,19 @@ class Bitfinex(Exchange):
                 ohlcv['volume'] = message[1][5]
                 yield ohlcv
 
-    def add_order(self, pair, side, order_type, price, volume):
-        return self.bfx.place_order(volume, price, side, order_type, pair)
+    def add_order(self, pair, side, order_type, price, volume, maker=False):
+        payload = {
+            "request": "/v1/order/new",
+            "nonce": self.bfx._nonce(),
+            "symbol": pair,
+            "amount": volume,
+            "price": price,
+            "exchange": "bitfinex",
+            "side": side,
+            "type": order_type,
+            "is_postonly": maker
+        }
+        return self.bfx._post("/order/new", payload=payload, verify=True)
 
     def cancel_order(self, order_id):
         return self.bfx.delete_order(order_id)
@@ -71,5 +81,4 @@ class Bitfinex(Exchange):
         return self.bfx.balances()
 
     def get_open_positions(self):
-        # return self.bfx.active_positions()
         return self.bfx.active_orders()
