@@ -18,7 +18,10 @@ class BeatError(Exception):
 
 
 class Beat:
-    """A helper utility for sleeping in timed loops (e.g. things to run once a minute).
+    """A helper utility for running timed loops.
+
+    Use this to schedule a function that runs once a minute, regardless of how long it takes to
+    actually run the function.
 
     Args:
         interval (int): Milliseconds between beats.
@@ -30,8 +33,8 @@ class Beat:
         self.__last_beat = None
 
     def loop(self):
-        """A condition to initiate the timed loop."""
-        # Run a sleep if a last beat time exists.
+        """Runs the timed loop and sleeps as necessary."""
+        # Run sleep if a last beat time exists.
         if self.__last_beat is not None:
             delta = datetime.datetime.now() - self.__last_beat
             duration_to_sleep = (self.__interval / 1000.0) - delta.total_seconds()
