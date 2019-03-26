@@ -73,7 +73,6 @@ class Bitfinex(Exchange):
             "is_postonly": maker
         }
         return self.bfx._post("/order/new", payload=payload, verify=True)
-        # return self.bfx.place_order(volume, price, side, order_type, pair)
 
     def cancel_order(self, order_id):
         return self.bfx.delete_order(order_id)
@@ -82,5 +81,4 @@ class Bitfinex(Exchange):
         return self.bfx.balances()
 
     def get_open_positions(self):
-        # return self.bfx.active_positions()
         return self.bfx.active_orders()
