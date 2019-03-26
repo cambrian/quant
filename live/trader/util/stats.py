@@ -1,3 +1,12 @@
+"""The `statistics` module.
+
+Useful statistics for strategies and executors to use.
+
+TODO: Reorganize me when the research stuff is integrated.
+
+"""
+
+
 class MovingAverage:
     """An exponential moving average.
 

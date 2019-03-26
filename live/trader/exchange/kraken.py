@@ -1,12 +1,7 @@
 from trader.exchange.base import Exchange
 from trader.util.constants import KRAKEN
 
-from datetime import datetime
-
-import json
 import krakenex
-import time
-import websocket as ws
 
 
 class Kraken(Exchange):
@@ -20,43 +15,17 @@ class Kraken(Exchange):
         self.translate = lambda x: 'X' + \
             x[:x.find('/') + 1] + 'Z' + x[x.find('/') + 1:]
 
-    def _feed(self, pair, time_interval):
-        for _ in range(3):
-            try:
-                self.ws = ws.create_connection('wss://ws-sandbox.kraken.com')
-            except Exception as error:
-                print('caught error: ' + repr(error))
-                time.sleep(3)
-            else:
-                break
+    def _book(self, pair):
+        # The name `pair` should be translated from its value in `constants` to an exchange-specific
+        # identifier.
+        # TODO
+        pass
 
-        self.ws.send(json.dumps({
-            'event': 'subscribe',
-            'pair': [pair],
-            'subscription': {
-                'name': 'ohlc',
-                'interval': time_interval
-            }
-        }))
-
-        while True:
-            try:
-                result_raw = self.ws.recv()
-                # TODO: Error handling of this await.
-                result = json.loads(result_raw)
-                # Ignore heartbeats.
-                if not isinstance(result, dict):
-                    ohlcv = {}
-                    ohlcv['timestamp'] = datetime.now()
-                    ohlcv['open'] = result[1][2]
-                    ohlcv['high'] = result[1][3]
-                    ohlcv['low'] = result[1][4]
-                    ohlcv['close'] = result[1][5]
-                    ohlcv['volume'] = result[1][6]
-                    yield ohlcv
-            except Exception as error:
-                print('caught error: ' + repr(error))
-                time.sleep(3)
+    def prices(self, pairs):
+        # The names in `pairs` should be translated from their values in `constants` to
+        # exchange-specific identifiers.
+        # TODO
+        pass
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         pair = self.translate(pair)
