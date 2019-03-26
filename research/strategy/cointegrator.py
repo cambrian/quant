@@ -15,11 +15,6 @@ def cointegrate(data):
     return np.array(eigenvectors)[r]
 
 
-def plot_eigenvectors(evs):
-    evs /= np.linalg.norm(evs, axis=1, keepdims=True)
-    plot_matrix(pd.DataFrame(evs))
-
-
 class CointegratorStrategy(Strategy):
     def __init__(self, cointegration_window_size):
         '''Edges are expressed in standard deviations of the currency price. Size is expressed in
