@@ -2,9 +2,9 @@ import csv
 import os
 import string
 import time
-
 import ccxt
 import pandas as pd
+from functools import reduce
 
 MAX_ATTEMPTS = 5
 
@@ -101,14 +101,29 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str='all
 
 
 def load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str='all'):
-    path = get_data_path(data_dir, exchange, pair,
-                         tick_size, start, num_ticks_str)
-    try:
-        frame = pd.read_csv(path, index_col=0)
-        frame.index = pd.to_datetime(frame.index, unit='ms')
-        return frame
-    except FileNotFoundError:
+    path = get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str)
+    if not os.path.isfile(path):
         raise ParamsError('The requested data has not been downloaded.')
+    frame = pd.read_csv(path, index_col=0)
+    frame.index = pd.to_datetime(frame.index, unit='ms')
+    return frame
+
+
+def aggregate_data(data_dir, exchanges, pairs, tick_size, start, num_ticks_str='all'):
+    dfs = []
+    for exchange in exchanges:
+        for pair in pairs:
+            if not os.path.isfile(get_data_path(data_dir, exchange, pair, tick_size,
+                                                start, num_ticks_str)):
+                continue
+            df = load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str)
+            df.rename(lambda col: '{}_{}_{}'.format(col, exchange, pair.replace('/', '_')),
+                      axis=1, inplace=True)
+            first_ts, last_ts = df.index[0], df.index[-1]
+            print('Loaded pair {} on {} ({} to {})'.format(pair, exchange, first_ts, last_ts))
+            dfs.append(df)
+
+    return reduce(lambda l, r: pd.merge(l, r, left_index=True, right_index=True, how='outer'), dfs)
 
 
 def resample_to(timeframe, df):
