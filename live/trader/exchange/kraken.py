@@ -1,5 +1,5 @@
 from trader.exchange.base import Exchange
-from trader.constants import KRAKEN
+from trader.util.constants import KRAKEN
 
 from datetime import datetime
 
@@ -15,7 +15,6 @@ class Kraken(Exchange):
     # TODO: Get real Kraken account w/ KYC and money.
     def __init__(self):
         super().__init__()
-        self.name = KRAKEN
         self.kraken = krakenex.API()
         # self.kraken.load_key('secret.key')
         self.translate = lambda x: 'X' + \
