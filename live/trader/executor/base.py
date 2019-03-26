@@ -44,14 +44,14 @@ class Executor(ABC):
         if len(expected_strategy_feeds) > 0:
             raise MissingStrategyFeedError('see output for details')
 
-        def run():
+        def runner():
             while True:
                 latest_strategy_results = latest_strategy_results_var.read_on_write()
                 self._tick(latest_strategy_results)
 
-        self.thread = (
-            'executor-' + self.__class__.__name__.lower() + '-' + str(_thread_count), run)
-        _thread_count += 1
+        runner_name = 'executor-{name}-{id}'.format(
+            name=self.__class__.__name__.lower(), id=self.__id)
+        self.__thread_manager.attach(runner_name, runner)
 
     def __attach_strategy_feed(self, strategy_results_var, strategy, results_feed):
         """Attaches a strategy feed for this executor to consume.
@@ -64,22 +64,23 @@ class Executor(ABC):
             results_feed (Feed): A feed of results for that strategy type.
 
         """
-        def update(results, latest_strategy_results):
-            try:
-                latest_results = latest_strategy_results[strategy]
-            except KeyError:
-                latest_results = {}
+        # TODO: Clean this function up?
+        def merge(results, latest_results):
+            if strategy not in latest_results:
+                latest_results[strategy] = {}
             for result_item in results:
                 exchange = result_item[0]
                 pair = result_item[1]
-                if exchange not in latest_results:
-                    latest_results[exchange] = {}
-                if pair not in latest_results[exchange]:
-                    latest_results[exchange][pair] = result_item[2]
-                elif result_item[2]['timestamp'] > latest_results[exchange][pair]['timestamp']:
-                    latest_results[exchange][pair] = result_item[2]
+                if exchange not in latest_results[strategy]:
+                    latest_results[strategy][exchange] = {}
+                if pair not in latest_results[strategy][exchange]:
+                    latest_results[strategy][exchange][pair] = result_item[2]
+                elif (result_item[2]['timestamp'] >
+                      latest_results[strategy][exchange][pair]['timestamp']):
+                    latest_results[strategy][exchange][pair] = result_item[2]
             return latest_results
-        _, runner = results_feed.fold(update, {}, acc_var=strategy_results_var)
+
+        _, runner = results_feed.fold(merge, {}, acc_var=strategy_results_var)
         runner_name = 'executor-{name}-{id}-strategy-{strategy}'.format(
             name=self.__class__.__name__.lower(), id=self.__id, strategy=strategy.__name__)
         self.__thread_manager.attach(runner_name, runner)

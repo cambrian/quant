@@ -22,15 +22,14 @@ class Dummy(Strategy):
 
     def _tick(self, exchange, pair, time_interval, ohlcv):
         print(exchange, pair, time_interval, ohlcv)
-        if exchange == BITFINEX and pair == 'BTCUSD' and time_interval == '1m':
-            close = float(ohlcv['close'])
-            self.prices.append(close)
-            if len(self.prices) == self.prices.maxlen:
-                std_dev = np.std(np.array(self.prices))
-                self.ma.step(close)
-                return [(exchange, pair, {
-                    'fair_price': self.ma.value,
-                    'std_dev': std_dev,
-                    'ohlcv': ohlcv
-                })]
-        return []
+        close = float(ohlcv['close'])
+        self.prices.append(close)
+        # if len(self.prices) == self.prices.maxlen:
+        std_dev = np.std(np.array(self.prices))
+        self.ma.step(close)
+        return [(exchange, pair, {
+            'fair_price': self.ma.value,
+            'std_dev': std_dev,
+            'ohlcv': ohlcv
+        })]
+        # return []

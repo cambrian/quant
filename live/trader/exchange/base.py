@@ -8,7 +8,7 @@ _thread_count = 0
 class Exchange(ABC):
     """An abstract class for interacting with an exchange."""
 
-    def observe(self, thread_manager, pair, time_interval):
+    def feed(self, thread_manager, pair, time_interval):
         """Returns a price feed for a particular pair on this exchange.
 
         Args:
@@ -23,7 +23,7 @@ class Exchange(ABC):
         global _thread_count
         feed = Feed(self._feed(pair, time_interval))
         feed_name = 'exchange-{name}-{pair}-{id}'.format(
-            name=self.__class__.__name__.lower(), pair=pair, id=str(_thread_count))
+            name=self.__class__.__name__.lower(), pair=pair, id=_thread_count)
         thread_manager.attach(feed_name, feed.run)
         _thread_count += 1
         return feed

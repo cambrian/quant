@@ -67,14 +67,14 @@ class Feed:
             acc_var = MVar()
 
         def update(item):
-            global current_acc
+            nonlocal current_acc
             current_acc = fn(item, current_acc)
             acc_var.swap(current_acc)
 
         _, runner = self._sink(partial(map, update), **kwargs)
         return acc_var, runner
 
-    def observe(self, fn, **kwargs):
+    def subscribe(self, fn, **kwargs):
         """A specialized version of `map` that discards the result feed."""
         _, runner = self.map(fn, **kwargs)
         return runner

@@ -27,13 +27,14 @@ class Strategy(ABC):
 
     def __init__(self, thread_manager, price_feeds):
         self.__thread_manager = thread_manager
-        self.__update_queue = Queue()
+        # TODO: Make this queue bounded?
+        self.__tick_queue = Queue()
 
         global _thread_count
         self.__id = _thread_count
         _thread_count += 1
 
-        # Attach passed-in price feeds to the update queue.
+        # Attach passed-in price feeds to the tick queue.
         expected_price_feeds = self.expected_price_feeds()
         for (exchange, pair, time_interval), ohlcv_feed in price_feeds.items():
             if (exchange, pair, time_interval) in expected_price_feeds:
@@ -42,18 +43,18 @@ class Strategy(ABC):
                 expected_price_feeds.remove((exchange, pair, time_interval))
             else:
                 print('Ignoring the {pair} ({time_interval}) feed on {exchange}.'.format(
-                    pair=pair, time_interval=str(time_interval), exchange=exchange))
+                    pair=pair, time_interval=time_interval, exchange=exchange))
 
         # Ensure that we have all the feeds we expected.
         for (exchange, pair, time_interval) in expected_price_feeds:
             print('Missing the {pair} ({time_interval}) feed on {exchange}.'.format(
-                pair=pair, time_interval=str(time_interval), exchange=exchange))
+                pair=pair, time_interval=time_interval, exchange=exchange))
         if len(expected_price_feeds) > 0:
             raise MissingPriceFeedError('see output for details')
 
         def feed_generator():
             while True:
-                results = self.__update_queue.get()()
+                results = self.__tick_queue.get()()
                 timestamp = datetime.now()
                 for i in range(len(results)):
                     results[i][2]['timestamp'] = timestamp
@@ -78,13 +79,13 @@ class Strategy(ABC):
 
         """
         def enqueue(ohlcv):
-            def update():
-                self._tick(exchange, pair, time_interval, ohlcv)
-            return update
-        runner = ohlcv_feed.observe(enqueue)
+            def tick():
+                return self._tick(exchange, pair, time_interval, ohlcv)
+            self.__tick_queue.put(tick)
+        runner = ohlcv_feed.subscribe(enqueue)
         runner_name = 'strategy-{name}-{id}-feed-{exchange}-{pair}-{time_interval}'.format(
             name=self.__class__.__name__.lower(), id=self.__id, exchange=exchange, pair=pair,
-            time_interval=str(time_interval))
+            time_interval=time_interval)
         self.__thread_manager.attach(runner_name, runner)
 
     @property
