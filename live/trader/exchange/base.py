@@ -32,11 +32,13 @@ class Exchange(ABC):
         pass
 
     @abstractmethod
-    def prices(self, pairs):
+    def prices(self, pairs, time_frame):
         """Queries prices and volumes for the given pairs.
 
         Args:
             pairs (str): A list of pairs to query.
+            time_frame (type depends on exchange): granularity of pricing data, in
+            exchange's format.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.

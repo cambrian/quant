@@ -13,7 +13,7 @@ dummy_executor = executor.Dummy()
 def main():
     beat = Beat(60000)
     while beat.loop():
-        bitfinex_data = bitfinex.prices(BTC_USD)
+        bitfinex_data = bitfinex.prices([BTC_USD], '1m')
         fairs = dummy_strategy.tick(bitfinex_data)
         dummy_executor.tick(fairs)
 
