@@ -125,3 +125,5 @@ dmypy.json
 .DS_Store
 *.csv
 *.key
+*.pkl
+*.h5
