@@ -2,9 +2,9 @@ import csv
 import os
 import string
 import time
-
 import ccxt
 import pandas as pd
+from functools import reduce
 
 MAX_ATTEMPTS = 5
 
@@ -65,10 +65,8 @@ def scrape_ohlcv(max_retries, exchange, pair, tick_size, start_ms, num_ticks, ba
 
 def write_csv(filename, generator):
     with open(filename, 'w+') as f:
-        writer = csv.writer(f, delimiter=',', quotechar='"',
-                            quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(['timestamp', 'open', 'high',
-                         'low', 'close', 'volume'])
+        writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         for data in generator:
             writer.writerows(data)
 
@@ -101,14 +99,33 @@ def get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str='all
 
 
 def load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str='all'):
-    path = get_data_path(data_dir, exchange, pair,
-                         tick_size, start, num_ticks_str)
-    try:
-        frame = pd.read_csv(path, index_col=0)
-        frame.index = pd.to_datetime(frame.index, unit='ms')
-        return frame
-    except FileNotFoundError:
-        raise ParamsError('The requested data has not been downloaded.')
+    path = get_data_path(data_dir, exchange, pair, tick_size, start, num_ticks_str)
+    if not os.path.isfile(path):
+        print('WARNING: Data for {} on {} does not exist.'.format(pair, exchange))
+        return None
+    df = pd.read_csv(path, index_col=0)
+    if df.empty:
+        print('WARNING: Empty CSV for {} on {}'.format(pair, exchange))
+        return None
+    df.index = pd.to_datetime(df.index, unit='ms')
+    return df
+
+
+def aggregate_data(data_dir, exchange_pairs, tick_size, start, num_ticks_str='all'):
+    '''`exchange_pairs` is dict of form `{'binance': ['BTC/ETH', 'XMR/BTC', ...], ...}`'''
+    dfs = []
+    for exchange in exchange_pairs:
+        for pair in exchange_pairs[exchange]:
+            df = load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str)
+            if df is None:
+                continue
+            df.rename(lambda col: '{}_{}_{}'.format(col, exchange, pair.replace('/', '_')),
+                      axis=1, inplace=True)
+            first_ts, last_ts = df.index[0], df.index[-1]
+            print('Loaded pair {} on {} ({} to {})'.format(pair, exchange, first_ts, last_ts))
+            dfs.append(df)
+
+    return reduce(lambda l, r: pd.merge(l, r, left_index=True, right_index=True, how='outer'), dfs)
 
 
 def resample_to(timeframe, df):
@@ -136,16 +153,14 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
         start_ms = exchange.parse8601(start)
         now = exchange.milliseconds()
         if start_ms > now:
-            raise ParamsError(
-                'Start time in the future for exchange {}.'.format(exchange_id))
+            raise ParamsError('Start time in the future for exchange {}.'.format(exchange_id))
         # Validate number of ticks.
         tick_size_ms = tick_size_to_ms(exchange, tick_size)
         if num_ticks is None:
             num_ticks = (now - start_ms) // tick_size_ms
             num_ticks_str = 'all'
         elif start_ms + num_ticks * tick_size_ms > now:
-            print('End time in the future for exchange {}. Clamping ticks.'.format(
-                exchange_id))
+            print('End time in the future for exchange {}. Clamping ticks.'.format(exchange_id))
             num_ticks = (now - start_ms) // tick_size_ms
             num_ticks_str = str(num_ticks)
         else:
@@ -157,8 +172,7 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
                 continue
             print('Downloading price history for {} on exchange {}.'.format(
                 pair, exchange_id))
-            path = get_data_path(data_dir, exchange_id, pair,
-                                 tick_size, start, num_ticks_str)
+            path = get_data_path(data_dir, exchange_id, pair, tick_size, start, num_ticks_str)
             scrape_ohlcv_to_csv(path, MAX_ATTEMPTS, exchange,
                                 pair, tick_size, start_ms, num_ticks, batch_size_max)
 
