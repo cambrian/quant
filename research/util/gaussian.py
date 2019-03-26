@@ -15,8 +15,6 @@ class Gaussian:
 
     @property
     def stddev(self):
-        if (isinstance(self.variance, pd.Series)):
-            return self.variance.apply(sqrt)
         return np.sqrt(self.variance)
 
     def __add__(self, scalar):
