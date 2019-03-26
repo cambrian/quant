@@ -1,19 +1,22 @@
 from trader.exchange.base import Exchange
-from trader.util.constants import KRAKEN
+from trader.util.constants import KRAKEN, BTC_USD, ETH_USD, XRP_USD
 
 import krakenex
+import pandas as pd
 
 
 class Kraken(Exchange):
     """The Kraken exchange."""
 
-    # TODO: Get real Kraken account w/ KYC and money.
     def __init__(self):
         super().__init__()
         self.kraken = krakenex.API()
         # self.kraken.load_key('secret.key')
-        self.translate = lambda x: 'X' + \
-            x[:x.find('/') + 1] + 'Z' + x[x.find('/') + 1:]
+        self.translate = {
+            BTC_USD: 'XXBTZUSD',
+            ETH_USD: 'XETHZUSD',
+            XRP_USD: 'XXRPZUSD'
+        }
 
     def _book(self, pair):
         # The name `pair` should be translated from its value in `constants` to an exchange-specific
@@ -21,14 +24,27 @@ class Kraken(Exchange):
         # TODO
         pass
 
-    def prices(self, pairs):
-        # The names in `pairs` should be translated from their values in `constants` to
-        # exchange-specific identifiers.
-        # TODO
-        pass
+    # time_frame expected to be integer in minutes
+    def prices(self, pairs, time_frame):
+        data = {
+            'Close': [],
+            'Volume': []
+        }
+        for pair in pairs:
+            pair = self.translate[pair]
+            params = {
+                'pair': pair,
+                'timeframe': time_frame
+            }
+            # Most recent update is second to last element in array - last element is unconfirmed
+            # Open, high, low, close, vwap, volume
+            ohlcvv = self.kraken.query_public("OHLC", data=params)['result'][pair][-2][1:]
+            data['Close'].append(ohlcvv[3])
+            data['Volume'].append(ohlcvv[5])
+        return pd.DataFrame.from_dict(data, orient='index', columns=pairs)
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
-        pair = self.translate(pair)
+        pair = self.translate[pair]
         query = {
             'pair': pair,
             'type': side,
