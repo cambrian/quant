@@ -15,7 +15,7 @@ class KalmanFilterStrategy(Strategy):
         self.moving_prices_history = None
         self.correlation_window_size = correlation_window_size
         self.moving_prices = Ema(movement_half_life)
-        self.moving_volumes = Ema(movement_half_life)
+        self.moving_volumes = Ema(correlation_window_size / 2)
         self.prev_prediction = None
 
     def step(self, prices, volumes):
