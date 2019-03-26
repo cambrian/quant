@@ -61,8 +61,20 @@ class Bitfinex(Exchange):
                 ohlcv['volume'] = message[1][5]
                 yield ohlcv
 
-    def add_order(self, pair, side, order_type, price, volume):
-        return self.bfx.place_order(volume, price, side, order_type, pair)
+    def add_order(self, pair, side, order_type, price, volume, maker=False):
+        payload = {
+            "request": "/v1/order/new",
+            "nonce": self.bfx._nonce(),
+            "symbol": pair,
+            "amount": volume,
+            "price": price,
+            "exchange": "bitfinex",
+            "side": side,
+            "type": order_type,
+            "is_postonly": maker
+        }
+        return self.bfx._post("/order/new", payload=payload, verify=True)
+        # return self.bfx.place_order(volume, price, side, order_type, pair)
 
     def cancel_order(self, order_id):
         return self.bfx.delete_order(order_id)

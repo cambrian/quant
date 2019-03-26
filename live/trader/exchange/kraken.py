@@ -59,15 +59,18 @@ class Kraken(Exchange):
                 print('caught error: ' + repr(error))
                 time.sleep(3)
 
-    def add_order(self, pair, side, order_type, price, volume):
+    def add_order(self, pair, side, order_type, price, volume, maker=False):
         pair = self.translate(pair)
-        self.kraken.query_private('AddOrder', {
+        query = {
             'pair': pair,
             'type': side,
             'ordertype': order_type,
             'price': price,
             'volume': volume
-        })
+        }
+        if maker:
+            query['oflags'] = 'post'
+        self.kraken.query_private('AddOrder', query)
 
     def cancel_order(self, order_id):
         self.kraken.query_private('CancelOrder', {
