@@ -1,8 +1,55 @@
+"""The `thread` module.
+
+Useful primitives and infrastructure for multithreading.
+
+"""
+
 from queue import Queue
 from threading import Condition, Lock, Thread
 
+import datetime
 import os
+import time
 import traceback
+
+
+class BeatError(Exception):
+    pass
+
+
+class Beat:
+    """A helper utility for running timed loops.
+
+    Use this to schedule a function that runs once a minute, regardless of how long it takes to
+    actually run the function.
+
+    Args:
+        interval (int): Milliseconds between beats.
+
+    """
+
+    def __init__(self, interval):
+        self.__interval = interval
+        self.__last_beat = None
+
+    def loop(self):
+        """Runs the timed loop and sleeps as necessary."""
+        # Run sleep if a last beat time exists.
+        if self.__last_beat is not None:
+            delta = datetime.datetime.now() - self.__last_beat
+            duration_to_sleep = (self.__interval / 1000.0) - delta.total_seconds()
+            if duration_to_sleep < 0:
+                raise BeatError('loop body too slow for beat interval')
+            time.sleep(duration_to_sleep)
+            self.__last_beat = None
+
+        # Set a new last beat time for the next iteration.
+        self.__last_beat = datetime.datetime.now()
+        return True
+
+    def clear(self):
+        """Clears the last beat time for this loop."""
+        self.__last_beat = None
 
 
 class MVar:

@@ -47,8 +47,10 @@ class KalmanFilterStrategy(Strategy):
         corr = df.corr()
         deltas = prices - df.mean()
         predicted_delta_means = corr.mul(deltas, axis=0).mul(stddevs, axis=1).div(stddevs, axis=0)
-        # scale by 1/r^2
-        predicted_delta_variances = df.cov().div(stddevs, axis=0).pow(2) / (corr * corr)
+        volume_signals = np.sqrt(self.moving_volumes.value * self.prev_prediction.mean)
+        volume_factor = np.max(volume_signals) / volume_signals
+        predicted_delta_variances = np.abs(df.cov().mul(stddevs, axis=1).div(
+            stddevs, axis=0)) * volume_factor / (corr * corr)
         predicted_deltas = Gaussian.join([Gaussian(
             predicted_delta_means.loc[i], predicted_delta_variances.loc[i]) for i in prices.index])
 

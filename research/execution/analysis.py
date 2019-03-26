@@ -37,7 +37,7 @@ def max_abs_drawdown(pnls):
     return mdd
 
 
-def analyze(results):
+def analyze(results, plot=True):
     '''Analyzes P/L and various risk metrics for the given run results.
     Plots balances (with P/L) and market risk over time.
 
@@ -48,6 +48,7 @@ def analyze(results):
     balance_values = results['balances'] * prices_
 
     pnls = balance_values.sum(axis=1)
+    pnl = pnls.iloc[-1]
 
     # Market risk
     (pmms, pmm_weights) = principal_market_movements(results['data']['prices'])
@@ -57,19 +58,21 @@ def analyze(results):
 
     total_positions = np.abs(balance_values.drop(columns=['usd']).values).sum()
 
-    fig, axs = plt.subplots(1, 2, figsize=(16, 4))
-    balance_values.plot(ax=axs[0])
-    pd.DataFrame(pnls, columns=['P/L']).plot(ax=axs[0])
-    pd.DataFrame(risks, columns=['Market Risk']).plot(ax=axs[1])
-    axs[1].axhline(0, color='grey')
-    plt.show()
-    pnl = pnls.iloc[-1]
-    print('Return on maximum market risk: {0}'.format(pnl / (risks.values.max() + 1e-10)))
-    print('Return on total market risk:   {0}'.format(pnl / (risks.values.sum() + 1e-10)))
-    print('Return on total positions:     {0}'.format(pnl / (total_positions + 1e-10)))
-    print('Sharpe ratio:                  {0}'.format(pnl / (pnls.std() + 1e-10)))
-    print('Final P/L:                     {0}'.format(pnl))
-    print('Maximum absolute drawdown:     {0}'.format(max_abs_drawdown(pnls)))
-    print('Maximum market risk:           {0}'.format(risks.values.max()))
-    print('Final balances:')
-    print(results['balances'].iloc[-1])
+    if plot:
+        fig, axs = plt.subplots(1, 2, figsize=(16, 4))
+        balance_values.plot(ax=axs[0])
+        pd.DataFrame(pnls, columns=['P/L']).plot(ax=axs[0])
+        pd.DataFrame(risks, columns=['Market Risk']).plot(ax=axs[1])
+        axs[1].axhline(0, color='grey')
+        plt.show()
+        print('Return on maximum market risk: {0}'.format(pnl / (risks.values.max() + 1e-10)))
+        print('Return on total market risk:   {0}'.format(pnl / (risks.values.sum() + 1e-10)))
+        print('Return on total positions:     {0}'.format(pnl / (total_positions + 1e-10)))
+        print('Sharpe ratio:                  {0}'.format(pnl / (pnls.std() + 1e-10)))
+        print('Final P/L:                     {0}'.format(pnl))
+        print('Maximum absolute drawdown:     {0}'.format(max_abs_drawdown(pnls)))
+        print('Maximum market risk:           {0}'.format(risks.values.max()))
+        print('Final balances:')
+        print(results['balances'].iloc[-1])
+
+    return pnl / (risks.values.max() + 1e-10)
