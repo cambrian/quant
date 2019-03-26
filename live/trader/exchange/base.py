@@ -17,7 +17,7 @@ class Exchange(ABC):
             time_interval: The time interval for candles, specified in the format of the exchange.
 
         Returns:
-            Feed: A feed of OHLCV candles (see `feed`).
+            Feed: A feed of OHLCV candles (see `_feed`).
 
         """
         global _thread_count

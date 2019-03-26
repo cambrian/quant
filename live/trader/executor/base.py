@@ -35,12 +35,12 @@ class Executor(ABC):
                 expected_strategy_feeds.remove(strategy)
             else:
                 print('Ignoring the feed for strategy {strategy}.'.format(
-                    strategy=strategy.__name__))
+                    strategy=strategy.__name__.lower()))
 
         # Ensure that we have all the feeds we expected.
         for strategy in expected_strategy_feeds:
             print('Missing the feed for strategy {strategy}.'.format(
-                strategy=strategy.__name__))
+                strategy=strategy.__name__.lower()))
         if len(expected_strategy_feeds) > 0:
             raise MissingStrategyFeedError('see output for details')
 
@@ -59,7 +59,7 @@ class Executor(ABC):
         Not a public method but documented here for clarity.
 
         Args:
-            strategy_results_var (MVar): An MVar to place consumed results in.
+            strategy_results_var (MVar): An `MVar` to accumulate consumed results in.
             strategy (type): The strategy type.
             results_feed (Feed): A feed of results for that strategy type.
 
@@ -82,7 +82,7 @@ class Executor(ABC):
 
         _, runner = results_feed.fold(merge, {}, acc_var=strategy_results_var)
         runner_name = 'executor-{name}-{id}-strategy-{strategy}'.format(
-            name=self.__class__.__name__.lower(), id=self.__id, strategy=strategy.__name__)
+            name=self.__class__.__name__.lower(), id=self.__id, strategy=strategy.__name__.lower())
         self.__thread_manager.attach(runner_name, runner)
 
     @abstractmethod

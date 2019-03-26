@@ -55,8 +55,8 @@ class Feed:
             fn (Function): An accumulating function that takes a feed item and the current
                 accumulator value at each tick.
             acc: An initial value for the accumulator.
-            acc_var: An optional argument to provide your own pre-existing MVar. This is useful in
-                certain cases, such as folding many feeds into a single MVar.
+            acc_var: An optional argument to provide your own pre-existing `MVar`. This is useful in
+                certain scenarios, such as folding many feeds into a single `MVar`.
 
         Returns:
             (MVar, Function): The `MVar` and a function to run the accumulation.

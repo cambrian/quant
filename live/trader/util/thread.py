@@ -8,8 +8,8 @@ import traceback
 class MVar:
     """A partial implementation of a Haskell MVar.
 
-    Many of the usual functions (e.g. put or take) are missing, but the general concept (of a shared
-    memory location for threads) is the same.
+    Many of the usual functions (e.g. `put` or `take`) are missing, but the general concept (of a
+    shared memory location for threads) is the same.
 
     """
 
@@ -20,7 +20,7 @@ class MVar:
         self.__value = None
 
     def swap(self, new_value):
-        """Puts a new value in the MVar and returns the old value, if any.
+        """Puts a new value in the `MVar` and returns the old value, if any.
 
         Args:
             new_value: The new value.
@@ -37,7 +37,7 @@ class MVar:
         return old_value
 
     def read_on_write(self):
-        """Reads the current value of the MVar when it is written to.
+        """Reads the current value of the `MVar` when it is written to.
 
         Returns:
             The current value.
@@ -83,9 +83,6 @@ class ThreadManager:
             name (str): A name to identify the new thread.
             fn (Function): A function to run on the new thread.
             should_terminate (bool): Whether we expect this function to terminate (or run forever).
-
-        Returns:
-            The old value.
 
         """
         if should_terminate:

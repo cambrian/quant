@@ -24,12 +24,12 @@ class Dummy(Strategy):
         print(exchange, pair, time_interval, ohlcv)
         close = float(ohlcv['close'])
         self.prices.append(close)
-        # if len(self.prices) == self.prices.maxlen:
-        std_dev = np.std(np.array(self.prices))
-        self.ma.step(close)
-        return [(exchange, pair, {
-            'fair_price': self.ma.value,
-            'std_dev': std_dev,
-            'ohlcv': ohlcv
-        })]
-        # return []
+        if len(self.prices) == self.prices.maxlen:
+            std_dev = np.std(np.array(self.prices))
+            self.ma.step(close)
+            return [(exchange, pair, {
+                'fair_price': self.ma.value,
+                'std_dev': std_dev,
+                'ohlcv': ohlcv
+            })]
+        return []
