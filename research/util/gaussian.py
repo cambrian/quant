@@ -15,8 +15,6 @@ class Gaussian:
 
     @property
     def stddev(self):
-        if (isinstance(self.variance, pd.Series)):
-            return self.variance.apply(sqrt)
         return np.sqrt(self.variance)
 
     def __add__(self, scalar):
@@ -68,8 +66,7 @@ class Gaussian:
         means = pd.DataFrame([x.mean for x in xs])
         variances = pd.DataFrame([x.variance for x in xs])
         variance_partial_product = (variances.product() / variances)
-        mean = (variance_partial_product * means).sum() / \
-            variance_partial_product.sum()
+        mean = (variance_partial_product * means).sum() / variance_partial_product.sum()
         variance = variances.product() / variance_partial_product.sum()
 
         return Gaussian(mean, variance)
@@ -91,8 +88,7 @@ class Gaussian:
         3.260869565217391
         <BLANKLINE>
         '''
-        mean = (self.mean * x.variance + x.mean * self.variance) / \
-            (self.variance + x.variance)
+        mean = (self.mean * x.variance + x.mean * self.variance) / (self.variance + x.variance)
         variance = self.variance * x.variance / (self.variance + x.variance)
         return Gaussian(mean, variance)
 

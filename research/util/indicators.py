@@ -7,6 +7,10 @@ class Ema:
         self.__samples_needed = half_life
 
     @property
+    def a(self):
+        return self.__a
+
+    @property
     def value(self):
         return self.__value
 
