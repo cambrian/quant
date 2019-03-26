@@ -2,43 +2,44 @@ from trader.util import Feed
 
 from abc import ABC, abstractmethod
 
-_thread_count = 0
-
 
 class Exchange(ABC):
     """An abstract class for interacting with an exchange."""
 
-    def feed(self, thread_manager, pair, time_interval):
-        """Returns a price feed for a particular pair on this exchange.
+    def book(self, pair):
+        """Returns a stream of order books for the given pair.
 
         Args:
-            thread_manager (ThreadManager): A thread manager to run the feed on.
-            pair (str): The pair, specified in the format of the exchange.
-            time_interval: The time interval for candles, specified in the format of the exchange.
+            pair (str): The pair to stream.
 
         Returns:
-            Feed: A feed of OHLCV candles (see `_feed`).
+            Feed: A feed of book dataframes (see `_book`).
 
         """
-        global _thread_count
-        feed = Feed(self._feed(pair, time_interval))
-        feed_name = 'exchange-{name}-{pair}-{id}'.format(
-            name=self.__class__.__name__.lower(), pair=pair, id=_thread_count)
-        thread_manager.attach(feed_name, feed.run)
-        _thread_count += 1
-        return feed
+        return Feed(self._book(pair))
 
     @abstractmethod
-    def _feed(self, pair, time_interval):
-        """Yields OHLCV candles for the given pair and time interval on this exchange.
+    def _book(self, pair):
+        """Generates a stream of order books for the given pair.
 
         Args:
-            pair (str): The pair, specified in the format of the exchange.
-            time_interval: The time interval for candles, specified in the format of the exchange.
+            pair (str): The pair to stream.
 
         Yields:
-            A dictionary with `timestamp`, `open`, `high`, `low`, `close`, and `volume`, which
-                represents a candle for the given pair and time interval.
+            DataFrame: A Pandas dataframe of book entries (side/price/volume).
+
+        """
+        pass
+
+    @abstractmethod
+    def prices(self, pairs):
+        """Queries prices and volumes for the given pairs.
+
+        Args:
+            pairs (str): A list of pairs to query.
+
+        Returns:
+            DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
 
         """
         pass
