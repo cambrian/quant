@@ -1,6 +1,6 @@
-from trader.util import Feed
-
 from abc import ABC, abstractmethod
+
+from trader.util import Feed
 
 
 class Exchange(ABC):

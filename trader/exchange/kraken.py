@@ -1,8 +1,8 @@
-from trader.exchange.base import Exchange
-from trader.util.constants import KRAKEN, BTC_USD, ETH_USD, XRP_USD
-
 import krakenex
 import pandas as pd
+
+from trader.exchange.base import Exchange
+from trader.util.constants import BTC_USD, ETH_USD, KRAKEN, XRP_USD
 
 
 class Kraken(Exchange):

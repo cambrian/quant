@@ -1,16 +1,15 @@
 """The `thread` module.
 
-Useful primitives and infrastructure for multithreading.
+Primitives and infrastructure for multithreading.
 
 """
-
-from queue import Queue
-from threading import Condition, Lock, Thread
 
 import datetime
 import os
 import time
 import traceback
+from queue import Queue
+from threading import Condition, Lock, Thread
 
 
 class BeatError(Exception):

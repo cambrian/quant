@@ -1,7 +1,7 @@
-from trader.util.thread import MVar
-
 from functools import partial, reduce
 from queue import Queue
+
+from trader.util.thread import MVar
 
 
 class Feed:

@@ -16,7 +16,7 @@ class Strategy(ABC):
                 price data for each exchange you care about.
 
         Returns:
-            dict: A dictionary of Gaussian fairs by ticker symbol.
+            Gaussian: A multivariate Gaussian (over a DataFrame) with a variable per currency.
 
         """
         pass

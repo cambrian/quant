@@ -9,7 +9,8 @@ class Executor(ABC):
         """Incorporates new price information to generate and execute orders.
 
         Args:
-            fairs (dict): A dictionary of Gaussian fairs by ticker symbol.
+            fairs (Gaussian): A multivariate Gaussian (over a DataFrame) with a variable per
+                currency.
 
         """
         pass

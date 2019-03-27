@@ -1,11 +1,12 @@
-from trader.exchange.base import Exchange
-from trader.util.constants import BTC_USD, ETH_USD, XRP_USD
-from bitfinex import ClientV1, ClientV2, WssClient
+import os
+import time
 from queue import Queue
 
-import os
 import pandas as pd
-import time
+from bitfinex import ClientV1, ClientV2, WssClient
+
+from trader.exchange.base import Exchange
+from trader.util.constants import BTC_USD, ETH_USD, XRP_USD
 
 
 class Bitfinex(Exchange):

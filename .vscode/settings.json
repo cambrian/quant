@@ -1,4 +1,7 @@
 {
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
     "editor.formatOnSave": true,
     "editor.rulers": [
         100
@@ -12,12 +15,16 @@
     },
     "files.trimTrailingWhitespace": true,
     "python.linting.pylintEnabled": true,
-    "python.jediEnabled": true,
-    "python.pythonPath": "/usr/local/bin/python3",
     "python.formatting.autopep8Args": [
         "--max-line-length=100"
     ],
+    "python.jediEnabled": true,
     "python.linting.pep8Args": [
         "--max-line-length=100"
+    ],
+    "python.pythonPath": "/usr/local/bin/python3",
+    "python.sortImports.args": [
+        "-ns",
+        "__init__.py"
     ]
 }

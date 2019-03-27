@@ -1,4 +1,5 @@
 from trader.strategy.base import Strategy
+from trader.util.stats import Gaussian
 
 
 class Dummy(Strategy):
@@ -6,4 +7,4 @@ class Dummy(Strategy):
 
     def tick(self, prices):
         # TODO
-        return {}
+        return Gaussian([], [])
