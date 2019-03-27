@@ -1,10 +1,9 @@
-from strategy import Strategy
-from util.indicators import Ema
-from util.gaussian import Gaussian
-
 import numpy as np
 import pandas as pd
 from numpy_ringbuffer import RingBuffer
+
+from strategy import Strategy
+from trader.util.stats import Ema, Gaussian
 
 
 class KalmanFilterStrategy(Strategy):

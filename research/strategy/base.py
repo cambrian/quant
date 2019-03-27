@@ -1,7 +1,7 @@
-from util.gaussian import Gaussian
-
 from abc import ABC, abstractmethod
 from math import sqrt
+
+from trader.util.stats import Gaussian
 
 
 class Strategy(ABC):

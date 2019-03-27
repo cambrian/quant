@@ -1,11 +1,13 @@
-from strategy import Strategy
-from util.gaussian import Gaussian
+from math import log1p, sqrt
 
 import numpy as np
 import pandas as pd
 from numpy_ringbuffer import RingBuffer
+
+from strategy import Strategy
+from trader.util.stats import Gaussian
+
 from .johansen.johansen import Johansen
-from math import sqrt, log1p
 
 
 def cointegrate(data):
