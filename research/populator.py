@@ -2,9 +2,10 @@ import csv
 import os
 import string
 import time
+from functools import reduce
+
 import ccxt
 import pandas as pd
-from functools import reduce
 
 MAX_ATTEMPTS = 5
 
