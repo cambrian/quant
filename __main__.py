@@ -15,7 +15,7 @@ def main():
     while beat.loop():
         bitfinex_data = bitfinex.prices([BTC_USD], '1m')
         dummy_fairs = dummy_strategy.tick(bitfinex_data)
-        fairs = Gaussian.fuse([dummy_fairs])
+        fairs = Gaussian.intersect([dummy_fairs])
         dummy_executor.tick(fairs)
 
 

@@ -50,7 +50,7 @@ class KalmanFilterStrategy(Strategy):
         volume_factor = np.max(volume_signals) / volume_signals
         predicted_delta_variances = np.abs(df.cov().mul(stddevs, axis=1).div(
             stddevs, axis=0)) * volume_factor / (corr * corr)
-        predicted_deltas = Gaussian.join([Gaussian(
+        predicted_deltas = Gaussian.intersect([Gaussian(
             predicted_delta_means.loc[i], predicted_delta_variances.loc[i]) for i in prices.index])
 
         new_prediction = Gaussian.sum([self.prev_prediction, diff]) & (predicted_deltas + df.mean())

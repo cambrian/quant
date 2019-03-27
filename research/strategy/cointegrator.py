@@ -47,6 +47,6 @@ class CointegratorStrategy(Strategy):
             fair_variance = synth_cointegrations.var()
             fairs.append(Gaussian(fair_mean, fair_variance))
         if len(fairs) > 0:
-            return Gaussian.join(fairs)
+            return Gaussian.intersect(fairs)
         else:
             return self.null_estimate(prices)
