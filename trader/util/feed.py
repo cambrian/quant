@@ -8,7 +8,11 @@ class Feed:
     """A multicast stream type for Python.
 
     Transformations of a feed (such as `map` or `filter`) return both a result and a function to run
-    the transformation (ideally on a separate thread).
+    the transformation on a separate thread.
+
+    TODO: Allow transformations that change the iterable on the same thread. This makes the library
+    less mistake-proof, since `feed.map(foo)` might have unexpected behavior if `feed.map_in_place`
+    (for example) is called later on.
 
     Args:
         iterable: An iterable to initialize the feed from.
