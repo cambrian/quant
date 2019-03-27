@@ -126,7 +126,7 @@ class Gaussian:
             xs (list): A list of Gaussians.
 
         Examples:
-            Input: Gaussian.fuse([Gaussian(3,5), Gaussian(4,15), Gaussian(5,25)])
+            Input: Gaussian.fuse([Gaussian(3, 5), Gaussian(4, 15), Gaussian(5, 25)])
             Output: Gaussian(3.4782608695652177, 3.260869565217391)
 
             Input: Gaussian.fuse([])
@@ -172,8 +172,11 @@ class Gaussian:
         '''Multiplication of two i.i.d. Gaussian variables. The result is NOT Gaussian but we return
         a Gaussian approximation with the same mean and covariance.
 
-        TODO: Does this work in the multivariate case?
-        TODO: Add citation for this approximation.
+        As a reminder, we have Var(XY) = (Var(X) + E[X]^2) * (Var(Y) + E[Y]^2) - E[X]^2 * E[Y]^2
+        and E[XY] = E[X] * E[Y] for (X, Y) independent.
+
+        NOTE: If the Gaussians are multivariate, `__matmul__` computes a point-wise result for each
+        dimension. This result makes no sense if either covariance matrix is non-diagonal.
 
         '''
         mean = self._mean * x._mean
