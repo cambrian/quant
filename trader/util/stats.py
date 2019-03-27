@@ -126,10 +126,10 @@ class Gaussian:
             xs (list): A list of Gaussians.
 
         Examples:
-            Input: Gaussian.join([Gaussian(3,5), Gaussian(4,15), Gaussian(5,25)])
+            Input: Gaussian.fuse([Gaussian(3,5), Gaussian(4,15), Gaussian(5,25)])
             Output: Gaussian(3.4782608695652177, 3.260869565217391)
 
-            Input: Gaussian.join([])
+            Input: Gaussian.fuse([])
             Output: Gaussian([], [])
 
         '''
