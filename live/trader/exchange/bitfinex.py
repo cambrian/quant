@@ -49,20 +49,23 @@ class Bitfinex(Exchange):
         )
         self.ws_client.start()
         # Current state of order_book is always first message
-        order_book = book_queue.get()[1]
+        raw_book = book_queue.get()[1]
+        order_book = {}
+        for order in raw_book:
+            side = 'bid' if order[2] > 0 else 'ask'
+            order_book[order[0]] = (side, order[1], abs(order[2]))
 
         while True:
-            yield order_book
+            yield pd.DataFrame(order_book.values(), columns=['Side', 'Price', 'Volume'])
             change = book_queue.get()
             if len(change) > 1:
                 # Order was filled
                 if change[1][1] == 0:
-                    for i in range(0, len(order_book)):
-                        if order_book[i][0] == change[1][0]:
-                            del order_book[i]
-                            break
+                    if change[1][0] in order_book:
+                        order_book.pop(change[1][0], None)
                 else:
-                    order_book.append(change[1])
+                    side = 'bid' if change[1][2] > 0 else 'ask'
+                    order_book[change[1][0]] = (side, change[1][1], abs(change[1][2]))
 
     # time_frame expected as string rep: '1m', '5m', '1h', etc.
     def prices(self, pairs, time_frame):
