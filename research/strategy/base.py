@@ -24,7 +24,7 @@ class CombinedStrategy(Strategy):
     def step(self, prices, volumes):
         fairs = [s.step(prices, volumes) for s in self.strategies]
         # TODO: populate fairs with 0-mean, high variance values for any pairs not shared
-        return Gaussian.join(fairs)
+        return Gaussian.intersect(fairs)
 
 
 class HoldStrategy(Strategy):

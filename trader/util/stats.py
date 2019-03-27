@@ -125,9 +125,9 @@ class Gaussian:
                         np.sum([x._covariance for x in xs], axis=0))
 
     @staticmethod
-    def join(xs):
-        '''Returns the joint probability distribution of many Gaussian distributions in the same
-        space by multiplying (and then normalizing) their PDFs.
+    def intersect(xs):
+        '''Computes an intersection of many Gaussian distributions in the same space by multiplying
+        (and then normalizing) their PDFs.
 
         This is used e.g. in computing the new state of a Kalman filter.
 
@@ -137,12 +137,14 @@ class Gaussian:
         Args:
             xs (list): A list of Gaussians.
 
-        Examples:
-            Input: Gaussian.fuse([Gaussian(3, 5), Gaussian(4, 15), Gaussian(5, 25)])
-            Output: Gaussian(3.4782608695652177, 3.260869565217391)
+        >>> Gaussian.intersect([Gaussian(3, 5), Gaussian(4, 15), Gaussian(5, 25)])
+        Gaussian(3.4782608695652177, 3.260869565217391)
 
-            Input: Gaussian.fuse([])
-            Output: Gaussian([], [])
+        >>> Gaussian.intersect([])
+        Gaussian([], [])
+
+        >>> Gaussian.intersect([Gaussian(1,1)])
+        Gaussian(1, 1)
 
         '''
 
@@ -155,7 +157,7 @@ class Gaussian:
         return acc
 
     def __and__(self, x):
-        '''Binary operator version of `fuse`.
+        '''Binary operator version of `intersect`.
 
         Requires only one inverse via formula here: https://math.stackexchange.com/a/964103.
 
