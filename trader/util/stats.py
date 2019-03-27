@@ -60,17 +60,27 @@ class Gaussian:
             treated as floats.
         covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case or
             a list/array/series of variances in the uncorrelated case).
-
+    >>> Gaussian(1,1)
+    Gaussian(1, 1)
+    >>> Gaussian([1,1], [1,1])
+    Gaussian([1 1], [[1 0]
+     [0 1]])
+    >>> Gaussian([1,1], [[1,0], [0,1]])
+    Gaussian([1 1], [[1 0]
+     [0 1]])
+    >>> Gaussian([1,1], np.array([[1,0], [0,1]]))
+    Gaussian([1 1], [[1 0]
+     [0 1]])
     '''
 
     def __init__(self, mean, covariance):
         # Marshal non-NumPy/Pandas types into NumPy.
-        if type(mean) == float or type(mean) == int:
-            mean = np.asarray([mean])
-            covariance = np.diag([covariance])
-        elif type(mean) == list:
-            mean = np.asarray(mean)
-            covariance = np.asarray(covariance)
+        if len(np.shape(mean)) == 0:
+            mean = np.array([mean])
+            covariance = np.array([covariance])
+        elif len(np.shape(mean)) == 1:
+            mean = np.array(mean)
+            covariance = np.array(covariance)
 
         # Convert a vector of variances into a covariance matrix.
         if len(covariance.shape) == 1:
@@ -162,13 +172,43 @@ class Gaussian:
     def __sub__(self, x):
         return self + -x
 
-    def __mul__(self, scalar):
-        '''Scalar multiplication. For the product of two PDFs see `__and__`, and for the product of
-        two i.i.d. variables see __matmul__.'''
-        return Gaussian(self._mean * scalar, self._covariance * scalar * scalar)
+    def __mul__(self, s):
+        '''Scalar multiplication. s may be a scalar or 1-d vector.
 
-    def __div__(self, scalar):
-        return self * (1 / scalar)
+        For the product of two PDFs see `__and__`, and for the product of two i.i.d. variables
+        see __matmul__.
+
+        >>> Gaussian([1,1], [1,1]) * [1,2]
+        Gaussian([1 2], [[1 0]
+         [0 4]])
+        '''
+        # Marshal non-NumPy/Pandas types into NumPy.
+        if len(np.shape(s)) == 0:
+            s = np.array([s])
+        elif len(np.shape(s)) == 1:
+            s = np.array(s)
+        s_diag = np.diag(s)
+        return Gaussian(self._mean * s, self._covariance * s_diag * s_diag)
+
+    def __truediv__(self, s):
+        '''Scalar division. s may be a scalar or 1-d vector.
+
+        >>> Gaussian([1,2], [1,2]) / 2
+        Gaussian([0.5 1. ], [[0.25 0.  ]
+         [0.   0.5 ]])
+        >>> Gaussian([1,2], [1,2]) / [1,2]
+        Gaussian([1. 1.], [[1.  0. ]
+         [0.  0.5]])
+        '''
+        # Marshal non-NumPy/Pandas types into NumPy.
+        if len(np.shape(s)) == 0:
+            s = np.array([s])
+        elif len(np.shape(s)) == 1:
+            s = np.array(s)
+        return self * (1 / s)
+
+    def __div__(self, s):
+        return self.__truediv__(s)
 
     def __matmul__(self, x):
         '''Multiplication of two i.i.d. Gaussian variables. The result is NOT Gaussian but we return
