@@ -115,9 +115,11 @@ class Gaussian:
                         np.sum([x._covariance for x in xs], axis=0))
 
     @staticmethod
-    def fuse(xs):
-        '''Fuses many Gaussian distributions in the same space by multiplying (and then normalizing)
-        their PDFs. This is used e.g. in computing the new state of a Kalman filter.
+    def join(xs):
+        '''Returns the joint probability distribution of many Gaussian distributions in the same
+        space by multiplying (and then normalizing) their PDFs.
+
+        This is used e.g. in computing the new state of a Kalman filter.
 
         TODO: Vectorize this (no iterative `and`).
         TODO: Check that input observations make sense.
