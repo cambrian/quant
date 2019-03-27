@@ -17,6 +17,10 @@ class Kraken(Exchange):
             ETH_USD: 'XETHZUSD',
             XRP_USD: 'XXRPZUSD'
         }
+        self.__fees = {
+            'maker': 0.0016,
+            'taker': 0.0026
+        }
 
     def _book(self, pair):
         # The name `pair` should be translated from its value in `constants` to an exchange-specific
@@ -42,6 +46,11 @@ class Kraken(Exchange):
             data['Close'].append(ohlcvv[3])
             data['Volume'].append(ohlcvv[5])
         return pd.DataFrame.from_dict(data, orient='index', columns=pairs)
+
+    @property
+    def fees(self):
+        # TODO: Update fees by pair schedule
+        return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         pair = self.translate[pair]

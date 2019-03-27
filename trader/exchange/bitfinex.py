@@ -32,6 +32,10 @@ class Bitfinex(Exchange):
             ETH_USD: 'tETHUSD',
             XRP_USD: 'tXRPUSD'
         }
+        self.__fees = {
+            'maker': 0.001,
+            'taker': 0.002
+        }
 
     def _book(self, pair):
         # TODO: Update orderbook on each.get() rather than just yield message
@@ -81,6 +85,10 @@ class Bitfinex(Exchange):
             data['Close'].append(ochlv[1])
             data['Volume'].append(ochlv[4])
         return pd.DataFrame.from_dict(data, orient='index', columns=pairs)
+
+    @property
+    def fees(self):
+        return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         payload = {

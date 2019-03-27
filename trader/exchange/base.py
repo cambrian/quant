@@ -46,6 +46,17 @@ class Exchange(ABC):
         """
         pass
 
+    @property
+    @abstractmethod
+    def fees(self):
+        """Queries exchange fees for the given pairs
+
+        Returns:
+            Dict: Map of maker/taker to fee set by exchange
+
+        """
+        pass
+
     @abstractmethod
     def add_order(self, pair, side, order_type, price, volume):
         # Param side is buy/sell.
