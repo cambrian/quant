@@ -1,10 +1,11 @@
 from trader.exchange.base import Exchange
 from trader.util.constants import BTC_USD, ETH_USD, XRP_USD
-
 from bitfinex import ClientV1, ClientV2, WssClient
+from queue import Queue
 
 import os
 import pandas as pd
+import time
 
 
 class Bitfinex(Exchange):
@@ -32,10 +33,36 @@ class Bitfinex(Exchange):
         }
 
     def _book(self, pair):
-        # The name `pair` should be translated from its value in `constants` to an exchange-specific
-        # identifier.
-        # TODO
-        pass
+        # TODO: Update orderbook on each.get() rather than just yield message
+        pair = self.translate[pair]
+        book_queue = Queue()
+
+        def add_messages_to_queue(message):
+            # Ignore status/subscription dicts
+            if (isinstance(message, list)):
+                book_queue.put(message)
+
+        self.ws_client.subscribe_to_orderbook(
+            pair,
+            precision='R0',
+            callback=add_messages_to_queue
+        )
+        self.ws_client.start()
+        # Current state of order_book is always first message
+        order_book = book_queue.get()[1]
+
+        while True:
+            yield order_book
+            change = book_queue.get()
+            if len(change) > 1:
+                # Order was filled
+                if change[1][1] == 0:
+                    for i in range(0, len(order_book)):
+                        if order_book[i][0] == change[1][0]:
+                            del order_book[i]
+                            break
+                else:
+                    order_book.append(change[1])
 
     # time_frame expected as string rep: '1m', '5m', '1h', etc.
     def prices(self, pairs, time_frame):
