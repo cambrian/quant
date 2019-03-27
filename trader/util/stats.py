@@ -170,7 +170,12 @@ class Gaussian:
 
     def __matmul__(self, x):
         '''Multiplication of two i.i.d. Gaussian variables. The result is NOT Gaussian but we return
-        a Gaussian approximation with the same mean and covariance.'''
+        a Gaussian approximation with the same mean and covariance.
+
+        TODO: Does this work in the multivariate case?
+        TODO: Add citation for this approximation.
+
+        '''
         mean = self._mean * x._mean
         covariance = ((self._covariance + x._mean * x._mean)
                       * (x._covariance + self._mean * self._mean)
