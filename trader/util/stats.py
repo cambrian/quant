@@ -88,26 +88,34 @@ class Gaussian:
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
             raise GaussianError('mean and covariance have mismatched dimension')
 
-        self._mean = mean
-        self._covariance = covariance
+        self.__mean = mean
+        self.__covariance = covariance
 
     @property
     def mean(self):
-        if self._mean.size == 1:
-            return np.asscalar(np.asarray(self._mean))
-        return self._mean
+        '''
+        >>> Gaussian(1,0).mean
+        1
+        '''
+        if self.__mean.size == 1:
+            return np.asscalar(self.__mean)
+        return self.__mean
 
     @property
     def covariance(self):
-        if self._covariance.size == 1:
-            return np.asscalar(np.asarray(self._covariance))
-        return self._covariance
+        '''
+        >>> Gaussian(1,0).covariance
+        0
+        '''
+        if self.__covariance.size == 1:
+            return np.asscalar(self.__covariance)
+        return self.__covariance
 
     @property
     def variance(self):
-        if self._covariance.size == 1:
+        if self.__covariance.size == 1:
             return self.covariance
-        return np.diag(self._covariance)
+        return np.diag(self.__covariance)
 
     @property
     def stddev(self):
@@ -121,8 +129,8 @@ class Gaussian:
             xs (list): A list of Gaussians.
 
         '''
-        return Gaussian(np.sum([x._mean for x in xs], axis=0),
-                        np.sum([x._covariance for x in xs], axis=0))
+        return Gaussian(np.sum([x.__mean for x in xs], axis=0),
+                        np.sum([x.__covariance for x in xs], axis=0))
 
     @staticmethod
     def intersect(xs):
@@ -162,14 +170,14 @@ class Gaussian:
         Requires only one inverse via formula here: https://math.stackexchange.com/a/964103.
 
         '''
-        sum_inv = np.linalg.inv(self._covariance + x._covariance)
-        covariance = self._covariance @ sum_inv @ x._covariance
-        mean = x._covariance @ sum_inv @ self._mean + self._covariance @ sum_inv @ x._mean
+        sum_inv = np.linalg.inv(self.__covariance + x.__covariance)
+        covariance = self.__covariance @ sum_inv @ x.__covariance
+        mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
 
     def __add__(self, scalar):
         '''Add a scalar to the Gaussian. For the sum of i.i.d. Gaussians see `sum`.'''
-        return Gaussian(self._mean + scalar, self._covariance)
+        return Gaussian(self.__mean + scalar, self.__covariance)
 
     def __sub__(self, x):
         return self + -x
@@ -190,7 +198,7 @@ class Gaussian:
         elif len(np.shape(s)) == 1:
             s = np.array(s)
         s_diag = np.diag(s)
-        return Gaussian(self._mean * s, self._covariance * s_diag * s_diag)
+        return Gaussian(self.__mean * s, self.__covariance * s_diag * s_diag)
 
     def __truediv__(self, s):
         '''Scalar division. s may be a scalar or 1-d vector.
@@ -223,10 +231,10 @@ class Gaussian:
         dimension. This result makes no sense if either covariance matrix is non-diagonal.
 
         '''
-        mean = self._mean * x._mean
-        covariance = ((self._covariance + x._mean * x._mean)
-                      * (x._covariance + self._mean * self._mean)
-                      - (self._mean * self._mean * x._mean * x._mean))
+        mean = self.__mean * x.__mean
+        covariance = ((self.__covariance + x.__mean * x.__mean)
+                      * (x.__covariance + self.__mean * self.__mean)
+                      - (self.__mean * self.__mean * x.__mean * x.__mean))
         return Gaussian(mean, covariance)
 
     def __repr__(self):
