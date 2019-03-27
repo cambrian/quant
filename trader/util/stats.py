@@ -61,16 +61,42 @@ class Gaussian:
         covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case or
             a list/array/series of variances in the uncorrelated case).
     >>> Gaussian(1,1)
-    Gaussian(1, 1)
+    Gaussian:
+    mean:
+    1
+    covariance:
+    1
     >>> Gaussian([1,1], [1,1])
-    Gaussian([1 1], [[1 0]
-     [0 1]])
+    Gaussian:
+    mean:
+    [1 1]
+    covariance:
+    [[1 0]
+     [0 1]]
     >>> Gaussian([1,1], [[1,0], [0,1]])
-    Gaussian([1 1], [[1 0]
-     [0 1]])
+    Gaussian:
+    mean:
+    [1 1]
+    covariance:
+    [[1 0]
+     [0 1]]
     >>> Gaussian([1,1], np.array([[1,0], [0,1]]))
-    Gaussian([1 1], [[1 0]
-     [0 1]])
+    Gaussian:
+    mean:
+    [1 1]
+    covariance:
+    [[1 0]
+     [0 1]]
+    >>> Gaussian(pd.Series([1,1]), pd.Series([1,1]))
+    Gaussian:
+    mean:
+    0    1
+    1    1
+    dtype: int64
+    covariance:
+       0  1
+    0  1  0
+    1  0  1
     '''
 
     def __init__(self, mean, covariance):
@@ -78,13 +104,18 @@ class Gaussian:
         if len(np.shape(mean)) == 0:
             mean = np.array([mean])
             covariance = np.array([covariance])
-        elif len(np.shape(mean)) == 1:
+        elif isinstance(mean, list):
             mean = np.array(mean)
             covariance = np.array(covariance)
 
         # Convert a vector of variances into a covariance matrix.
         if len(covariance.shape) == 1:
             covariance = np.diag(covariance)
+
+        # keep index names in covariance if using pandas
+        if isinstance(mean, pd.Series):
+            covariance = pd.DataFrame(covariance, index=mean.index, columns=mean.index)
+
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
             raise GaussianError('mean and covariance have mismatched dimension')
 
@@ -128,6 +159,21 @@ class Gaussian:
         Args:
             xs (list): A list of Gaussians.
 
+        >>> Gaussian.sum([Gaussian(3, 5), Gaussian(4, 15), Gaussian(5, 25)])
+        Gaussian:
+        mean:
+        12
+        covariance:
+        45
+        >>> Gaussian.sum([ \
+                Gaussian(pd.Series([1,1], index=['a', 'b']), pd.Series([1,1], index=['a', 'b'])), \
+                Gaussian(pd.Series([1,1], index=['a', 'b']), pd.Series([1,1], index=['a', 'b'])) \
+            ])
+        Gaussian:
+        mean:
+        12
+        covariance:
+        45
         '''
         return Gaussian(np.sum([x.__mean for x in xs], axis=0),
                         np.sum([x.__covariance for x in xs], axis=0))
@@ -146,14 +192,25 @@ class Gaussian:
             xs (list): A list of Gaussians.
 
         >>> Gaussian.intersect([Gaussian(3, 5), Gaussian(4, 15), Gaussian(5, 25)])
-        Gaussian(3.4782608695652177, 3.260869565217391)
+        Gaussian:
+        mean:
+        3.4782608695652177
+        covariance:
+        3.260869565217391
 
         >>> Gaussian.intersect([])
-        Gaussian([], [])
+        Gaussian:
+        mean:
+        []
+        covariance:
+        []
 
         >>> Gaussian.intersect([Gaussian(1,1)])
-        Gaussian(1, 1)
-
+        Gaussian:
+        mean:
+        1
+        covariance:
+        1
         '''
 
         if len(xs) == 0:
@@ -169,14 +226,42 @@ class Gaussian:
 
         Requires only one inverse via formula here: https://math.stackexchange.com/a/964103.
 
+        >>> Gaussian(pd.Series([1,1], index=['a', 'b']), pd.Series([1,1], index=['a', 'b'])) \
+            & Gaussian(pd.Series([1,1], index=['a', 'b']), pd.Series([1,1], index=['a', 'b']))
+        Gaussian:
+        mean:
+        a    1.0
+        b    1.0
+        dtype: float64
+        covariance:
+             a    b
+        a  0.5  0.0
+        b  0.0  0.5
+
+        >>> Gaussian(pd.Series([1,1]), pd.Series([1,1])) \
+            & Gaussian(pd.Series([1,1]), pd.Series([1,1]))
+        Gaussian:
+        mean:
+        0    1.0
+        1    1.0
+        dtype: float64
+        covariance:
+             0    1
+        0  0.5  0.0
+        1  0.0  0.5
         '''
         sum_inv = np.linalg.inv(self.__covariance + x.__covariance)
+        if isinstance(x.__covariance, pd.DataFrame):
+            sum_inv = pd.DataFrame(sum_inv, index=self.__covariance.index,
+                                   columns=self.__covariance.columns)
         covariance = self.__covariance @ sum_inv @ x.__covariance
         mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
 
     def __add__(self, scalar):
-        '''Add a scalar to the Gaussian. For the sum of i.i.d. Gaussians see `sum`.'''
+        '''Add a scalar to the Gaussian. For the sum of i.i.d. Gaussians see `sum`.
+
+        '''
         return Gaussian(self.__mean + scalar, self.__covariance)
 
     def __sub__(self, x):
@@ -189,13 +274,17 @@ class Gaussian:
         see __matmul__.
 
         >>> Gaussian([1,1], [1,1]) * [1,2]
-        Gaussian([1 2], [[1 0]
-         [0 4]])
+        Gaussian:
+        mean:
+        [1 2]
+        covariance:
+        [[1 0]
+         [0 4]]
         '''
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(s)) == 0:
             s = np.array([s])
-        elif len(np.shape(s)) == 1:
+        elif type(s) == list:
             s = np.array(s)
         s_diag = np.diag(s)
         return Gaussian(self.__mean * s, self.__covariance * s_diag * s_diag)
@@ -204,16 +293,24 @@ class Gaussian:
         '''Scalar division. s may be a scalar or 1-d vector.
 
         >>> Gaussian([1,2], [1,2]) / 2
-        Gaussian([0.5 1. ], [[0.25 0.  ]
-         [0.   0.5 ]])
+        Gaussian:
+        mean:
+        [0.5 1. ]
+        covariance:
+        [[0.25 0.  ]
+         [0.   0.5 ]]
         >>> Gaussian([1,2], [1,2]) / [1,2]
-        Gaussian([1. 1.], [[1.  0. ]
-         [0.  0.5]])
+        Gaussian:
+        mean:
+        [1. 1.]
+        covariance:
+        [[1.  0. ]
+         [0.  0.5]]
         '''
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(s)) == 0:
             s = np.array([s])
-        elif len(np.shape(s)) == 1:
+        elif type(s) == list:
             s = np.array(s)
         return self * (1 / s)
 
@@ -238,4 +335,4 @@ class Gaussian:
         return Gaussian(mean, covariance)
 
     def __repr__(self):
-        return 'Gaussian({}, {})'.format(self.mean, self.covariance)
+        return 'Gaussian:\nmean:\n{}\ncovariance:\n{}'.format(self.mean, self.covariance)
