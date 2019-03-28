@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import time
+from collections import defaultdict
 from queue import Queue
 
 import pandas as pd
@@ -11,7 +12,7 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange
-from trader.util.constants import BITFINEX, BTC_USD, ETH_USD, XRP_USD, base_currency
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 
 
 class Bitfinex(Exchange):
@@ -31,26 +32,14 @@ class Bitfinex(Exchange):
         )
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
-        self.__translate = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
+        self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
+        self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
-        self.__balances = {
-            base_currency(BTC_USD): 0.0,
-            base_currency(ETH_USD): 0.0,
-            base_currency(XRP_USD): 0.0,
-            "USD": 0.0,
-        }
-
-    @property
-    def fees(self):
-        return self.__fees
-
-    @property
-    def balances(self):
-        return self.__balances
+        self.__balances = defaultdict(float)
 
     def _book(self, pair):
-        trans_pair = self.__translate[pair]
+        trans_pair = self.__translate_to[pair]
         book_queue = Queue()
 
         def add_messages_to_queue(message):
@@ -89,8 +78,8 @@ class Bitfinex(Exchange):
                 if not delete:
                     order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
-    # Thread function to constantly track exchange's balance
-    def _track_balance(self):
+    # Thread function to constantly track exchange's balance.
+    def track_balances(self):
         ws = create_connection("wss://api.bitfinex.com/ws/")
         nonce = int(time.time() * 1000000)
         auth_payload = "AUTH{}".format(nonce)
@@ -119,9 +108,9 @@ class Bitfinex(Exchange):
                 elif msg["event"] == "error":
                     break
             else:
-                # Ignore heartbeats and only listen on this chan_id
+                # Ignore heartbeats and only listen on this chan_id.
                 if len(msg) > 1 and msg[0] == chan_id and msg[1] != "hb":
-                    # Wallet snapshot/update, update balances to reflect
+                    # Disambiguate wallet snapshot/update:
                     if msg[1] == "ws":
                         for update in msg[2]:
                             self._update_balances(update)
@@ -129,9 +118,9 @@ class Bitfinex(Exchange):
                         self._update_balances(msg[2])
 
     def _update_balances(self, update):
-        # Only track exchange wallets
+        # Only track exchange (trading) wallet.
         if len(update) >= 3 and update[0] == "exchange":
-            self.__balances[update[1]] = update[2]
+            self.__balances[self.__translate_from[update[1]]] = update[2]
 
     def prices(self, pairs, time_frame):
         """
@@ -141,7 +130,7 @@ class Bitfinex(Exchange):
         """
         data = {"close": [], "volume": []}
         for pair in pairs:
-            pair = self.__translate[pair]
+            pair = self.__translate_to[pair]
             # Ignore index [0] timestamp.
             ochlv = self.__bfxv1.candles(time_frame, pair, "last")[1:]
             data["close"].append(ochlv[1])
@@ -161,6 +150,14 @@ class Bitfinex(Exchange):
             "is_postonly": maker,
         }
         return self.__bfxv1._post("/order/new", payload=payload, verify=True)
+
+    @property
+    def fees(self):
+        return self.__fees
+
+    @property
+    def balances(self):
+        return self.__balances
 
     def cancel_order(self, order_id):
         return self.__bfxv1.delete_order(order_id)

@@ -6,7 +6,11 @@ from trader.util.constants import BTC_USD, ETH_USD, KRAKEN, XRP_USD
 
 
 class Kraken(Exchange):
-    """The Kraken exchange."""
+    """The Kraken exchange.
+
+    TODO: Add required methods.
+
+    """
 
     def __init__(self):
         super().__init__()
@@ -14,11 +18,6 @@ class Kraken(Exchange):
         # self.__kraken.load_key('secret.key')
         self.__translate = {BTC_USD: "XXBTZUSD", ETH_USD: "XETHZUSD", XRP_USD: "XXRPZUSD"}
         self.__fees = {"maker": 0.0016, "taker": 0.0026}
-
-    @property
-    def fees(self):
-        # TODO: Update fees by pair schedule.
-        return self.__fees
 
     def _book(self, pair):
         # The name `pair` should be translated from its value in `constants` to an exchange-specific
@@ -42,6 +41,11 @@ class Kraken(Exchange):
             data["close"].append(ohlcvv[3])
             data["volume"].append(ohlcvv[5])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+
+    @property
+    def fees(self):
+        # TODO: Update fees by pair schedule.
+        return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         pair = self.__translate[pair]

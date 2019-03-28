@@ -27,6 +27,7 @@ class Dummy(Executor):
             # update_balances(balances, fill)
 
     def tick_fairs(self, fairs):
+        # TODO: Have this run the order loop.
         self.__fairs = fairs
 
     # TODO

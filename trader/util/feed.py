@@ -16,14 +16,14 @@ class Feed:
 
     Args:
         iterable: An iterable to initialize the feed from.
-        initializer (Function): An initializer to run when the feed thread is started. NOTE: You
+        _initializer (Function): An initializer to run when the feed thread is started. NOTE: You
             should NOT use this parameter.
 
     """
 
-    def __init__(self, iterable, initializer=None):
+    def __init__(self, iterable, _initializer=None):
         self.__iterable = iterable
-        self.__initializer = initializer
+        self.__initializer = _initializer
         self.__sinks = []
 
     def _sink(self, transform, buffer_size=256):

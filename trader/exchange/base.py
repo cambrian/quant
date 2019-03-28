@@ -32,6 +32,15 @@ class Exchange(ABC):
         """
         pass
 
+    def track_balances(self, pair):
+        """Returns a function to dynamically track and update internal balance state.
+
+        Args:
+            pair (str): The pair to track.
+
+        """
+        pass
+
     @abstractmethod
     def prices(self, pairs, time_frame):
         """Queries prices and volumes for the given pairs.
