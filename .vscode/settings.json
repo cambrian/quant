@@ -18,7 +18,12 @@
     "python.formatting.autopep8Args": [
         "--max-line-length=100"
     ],
+    "python.formatting.provider": "black",
     "python.jediEnabled": true,
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "100"
+    ],
     "python.linting.pep8Args": [
         "--max-line-length=100"
     ],

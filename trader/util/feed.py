@@ -42,7 +42,9 @@ class Feed:
         """
         feed_queue = Queue(maxsize=buffer_size)
         # Delay attachment to parent for stateless behavior.
-        def initializer(): self.__sinks.append(feed_queue.put_nowait)
+        def initializer():
+            self.__sinks.append(feed_queue.put_nowait)
+
         feed = Feed(transform(iter(feed_queue.get, None)), initializer)
         return feed, feed.run
 

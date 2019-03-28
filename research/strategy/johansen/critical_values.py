@@ -138,5 +138,5 @@ mapping = {
     "MAX_EVAL_3": MAX_EVAL_3,
     "TRACE_3": TRACE_3,
     "MAX_EVAL_4": MAX_EVAL_4,
-    "TRACE_4": TRACE_4
+    "TRACE_4": TRACE_4,
 }

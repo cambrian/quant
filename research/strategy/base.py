@@ -7,11 +7,11 @@ from trader.util.stats import Gaussian
 class Strategy(ABC):
     @abstractmethod
     def step(self, prices, volumes):
-        '''Should return fairs as multi-variate Gaussian.'''
+        """Should return fairs as multi-variate Gaussian."""
         pass
 
     def null_estimate(self, prices):
-        '''Returns fair estimates centered at the given prices with very low confidence.'''
+        """Returns fair estimates centered at the given prices with very low confidence."""
         mean = prices
         variance = prices.replace(prices, 1e100)
         return Gaussian(mean, variance)
@@ -28,7 +28,7 @@ class CombinedStrategy(Strategy):
 
 
 class HoldStrategy(Strategy):
-    '''Always returns null estimate.'''
+    """Always returns null estimate."""
 
     def step(self, prices, _volumes):
         return self.null_estimate(prices)

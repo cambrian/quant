@@ -7,8 +7,8 @@ from trader.util.stats import Ema, Gaussian
 
 
 class KalmanFilterStrategy(Strategy):
-    '''Predicts fairs based on correlated movements between pairs.
-    All inputs should be cointegrated.'''
+    """Predicts fairs based on correlated movements between pairs.
+    All inputs should be cointegrated."""
 
     def __init__(self, correlation_window_size, movement_half_life):
         self.moving_prices_history = None
@@ -20,7 +20,8 @@ class KalmanFilterStrategy(Strategy):
     def step(self, prices, volumes):
         if self.moving_prices_history is None:
             self.moving_prices_history = RingBuffer(
-                self.correlation_window_size, dtype=(np.float, len(prices.index)))
+                self.correlation_window_size, dtype=(np.float, len(prices.index))
+            )
 
         if self.prev_prediction is None:
             self.prev_prediction = self.null_estimate(prices)
@@ -45,14 +46,25 @@ class KalmanFilterStrategy(Strategy):
         stddevs = df.std()
         corr = df.corr()
         deltas = prices - df.mean()
-        predicted_delta_means = corr.mul(deltas, axis=0).mul(stddevs, axis=1).div(stddevs, axis=0)
+        predicted_delta_means = (
+            corr.mul(deltas, axis=0).mul(stddevs, axis=1).div(stddevs, axis=0)
+        )
         volume_signals = np.sqrt(self.moving_volumes.value * self.prev_prediction.mean)
         volume_factor = np.max(volume_signals) / volume_signals
-        predicted_delta_variances = np.abs(df.cov().mul(stddevs, axis=1).div(
-            stddevs, axis=0)) * volume_factor / (corr * corr)
-        predicted_deltas = Gaussian.intersect([Gaussian(
-            predicted_delta_means.loc[i], predicted_delta_variances.loc[i]) for i in prices.index])
+        predicted_delta_variances = (
+            np.abs(df.cov().mul(stddevs, axis=1).div(stddevs, axis=0))
+            * volume_factor
+            / (corr * corr)
+        )
+        predicted_deltas = Gaussian.intersect(
+            [
+                Gaussian(predicted_delta_means.loc[i], predicted_delta_variances.loc[i])
+                for i in prices.index
+            ]
+        )
 
-        new_prediction = Gaussian.sum([self.prev_prediction, diff]) & (predicted_deltas + df.mean())
+        new_prediction = Gaussian.sum([self.prev_prediction, diff]) & (
+            predicted_deltas + df.mean()
+        )
         self.prev_prediction = new_prediction
         return new_prediction

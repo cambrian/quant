@@ -34,7 +34,7 @@ class Ema:
     def step(self, value):
         if self.__value is None:
             self.__value = value
-        self.__value = self.__a * self.__value + (1-self.__a) * value
+        self.__value = self.__a * self.__value + (1 - self.__a) * value
         self.__samples_needed = max(0, self.__samples_needed - 1)
 
     @property
@@ -47,7 +47,7 @@ class GaussianError(Exception):
 
 
 class Gaussian:
-    '''Single or multi-variate Gaussian.
+    """Single or multi-variate Gaussian.
 
     For multi-variate Gaussians, set the mean and variance to NumPy arrays or Pandas series. The
     dimension/type of mean and variance should match.
@@ -101,7 +101,7 @@ class Gaussian:
     0  1  0
     1  0  1
 
-    '''
+    """
 
     def __init__(self, mean, covariance):
         # Marshal non-NumPy/Pandas types into NumPy.
@@ -121,35 +121,35 @@ class Gaussian:
             covariance = pd.DataFrame(covariance, index=mean.index, columns=mean.index)
 
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
-            raise GaussianError('mean and covariance have mismatched dimension')
+            raise GaussianError("mean and covariance have mismatched dimension")
 
         self.__mean = mean
         self.__covariance = covariance
 
     @property
     def mean(self):
-        '''
+        """
         >>> Gaussian(1, 0).mean
         1
 
         >>> Gaussian(pd.Series([2]), pd.DataFrame([1])).mean
         2
 
-        '''
+        """
         if self.__mean.size == 1:
             return np.asscalar(self.__mean)
         return self.__mean
 
     @property
     def covariance(self):
-        '''
+        """
         >>> Gaussian(1, 0).covariance
         0
 
         >>> Gaussian(pd.Series([2]), pd.DataFrame([1])).covariance
         1
 
-        '''
+        """
         if self.__covariance.size == 1:
             # The call to `np.array` is necessary when the covariance is a DataFrame with a single
             # entry (see doctest example).
@@ -168,7 +168,7 @@ class Gaussian:
 
     @staticmethod
     def sum(xs):
-        '''Sum of many i.i.d. Gaussian variables or scalars.
+        """Sum of many i.i.d. Gaussian variables or scalars.
 
         Args:
             xs (list): A list of Gaussians.
@@ -194,7 +194,7 @@ class Gaussian:
         a  2  0
         b  0  2
 
-        '''
+        """
         if len(xs) == 0:
             return Gaussian([], [])
 
@@ -205,7 +205,7 @@ class Gaussian:
 
     @staticmethod
     def intersect(xs):
-        '''Computes an intersection of many Gaussian distributions in the same space by multiplying
+        """Computes an intersection of many Gaussian distributions in the same space by multiplying
         (and then normalizing) their PDFs.
 
         This is used e.g. in computing the new state of a Kalman filter.
@@ -237,7 +237,7 @@ class Gaussian:
         covariance:
         1
 
-        '''
+        """
         if len(xs) == 0:
             return Gaussian([], [])
 
@@ -247,7 +247,7 @@ class Gaussian:
         return acc
 
     def __and__(self, x):
-        '''Binary operator version of `intersect`.
+        """Binary operator version of `intersect`.
 
         Requires only one inverse via formula here: https://math.stackexchange.com/a/964103.
 
@@ -275,17 +275,23 @@ class Gaussian:
         0  0.5  0.0
         1  0.0  0.5
 
-        '''
+        """
         sum_inv = np.linalg.inv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
-            sum_inv = pd.DataFrame(sum_inv, index=self.__covariance.index,
-                                   columns=self.__covariance.columns)
+            sum_inv = pd.DataFrame(
+                sum_inv,
+                index=self.__covariance.index,
+                columns=self.__covariance.columns,
+            )
         covariance = self.__covariance @ sum_inv @ x.__covariance
-        mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
+        mean = (
+            x.__covariance @ sum_inv @ self.__mean
+            + self.__covariance @ sum_inv @ x.__mean
+        )
         return Gaussian(mean, covariance)
 
     def __add__(self, x):
-        '''Add a scalar or another Gaussian to the Gaussian.
+        """Add a scalar or another Gaussian to the Gaussian.
 
         >>> Gaussian([1, 1], [[1, 2], [3, 4]]) + 3
         Gaussian:
@@ -303,13 +309,13 @@ class Gaussian:
         [[2 4]
          [6 8]]
 
-        '''
+        """
         if isinstance(x, Gaussian):
             return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
         return Gaussian(self.__mean + x, self.__covariance)
 
     def __sub__(self, x):
-        '''
+        """
         >>> Gaussian([1, 1], [[1, 2], [3, 4]]) - 1
         Gaussian:
         mean:
@@ -317,11 +323,11 @@ class Gaussian:
         covariance:
         [[1 2]
          [3 4]]
-        '''
+        """
         return self + -x
 
     def __mul__(self, s):
-        '''Scalar multiplication. `s` may be a scalar or 1D vector.
+        """Scalar multiplication. `s` may be a scalar or 1D vector.
 
         For the product of two PDFs see `__and__`, and for the product of two i.i.d. variables
         see `__matmul__`.
@@ -334,7 +340,7 @@ class Gaussian:
         [[1 0]
          [0 4]]
 
-        '''
+        """
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(s)) == 0:
             s = np.array([s])
@@ -344,7 +350,7 @@ class Gaussian:
         return Gaussian(self.__mean * s, self.__covariance * s_diag * s_diag)
 
     def __truediv__(self, s):
-        '''Scalar division. `s` may be a scalar or 1D vector.
+        """Scalar division. `s` may be a scalar or 1D vector.
 
         >>> Gaussian([1, 2], [1, 2]) / 2
         Gaussian:
@@ -362,7 +368,7 @@ class Gaussian:
         [[1.  0. ]
          [0.  0.5]]
 
-        '''
+        """
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(s)) == 0:
             s = np.array([s])
@@ -374,7 +380,7 @@ class Gaussian:
         return self.__truediv__(s)
 
     def __matmul__(self, x):
-        '''Multiplication of two i.i.d. Gaussian variables. The result is NOT Gaussian but we return
+        """Multiplication of two i.i.d. Gaussian variables. The result is NOT Gaussian but we return
         a Gaussian approximation with the same mean and covariance.
 
         As a reminder, we have Var(XY) = (Var(X) + E[X]^2) * (Var(Y) + E[Y]^2) - E[X]^2 * E[Y]^2
@@ -383,12 +389,14 @@ class Gaussian:
         NOTE: If the Gaussians are multivariate, `__matmul__` computes a point-wise result for each
         dimension. This result makes no sense if either covariance matrix is non-diagonal.
 
-        '''
+        """
         mean = self.__mean * x.__mean
-        covariance = ((self.__covariance + x.__mean * x.__mean)
-                      * (x.__covariance + self.__mean * self.__mean)
-                      - (self.__mean * self.__mean * x.__mean * x.__mean))
+        covariance = (self.__covariance + x.__mean * x.__mean) * (
+            x.__covariance + self.__mean * self.__mean
+        ) - (self.__mean * self.__mean * x.__mean * x.__mean)
         return Gaussian(mean, covariance)
 
     def __repr__(self):
-        return 'Gaussian:\nmean:\n{}\ncovariance:\n{}'.format(self.mean, self.covariance)
+        return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(
+            self.mean, self.covariance
+        )

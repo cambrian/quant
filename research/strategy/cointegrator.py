@@ -11,23 +11,24 @@ from .johansen.johansen import Johansen
 
 
 def cointegrate(data):
-    '''Returns eigenvectors for statistically-significant cointegration relations.
-    TODO: return confidences, by using eigenvalues directly.'''
+    """Returns eigenvectors for statistically-significant cointegration relations.
+    TODO: return confidences, by using eigenvalues directly."""
     eigenvectors, r = Johansen(data, model=2, significance_level=1).johansen()
     return np.array(eigenvectors)[r]
 
 
 class CointegratorStrategy(Strategy):
     def __init__(self, cointegration_window_size):
-        '''Edges are expressed in standard deviations of the currency price. Size is expressed in
-        $ per stdev of edge.'''
+        """Edges are expressed in standard deviations of the currency price. Size is expressed in
+        $ per stdev of edge."""
         self.cointegration_window = None
         self.cointegration_window_size = cointegration_window_size
 
     def step(self, prices, _volumes):
         if self.cointegration_window is None:
             self.cointegration_window = RingBuffer(
-                self.cointegration_window_size, dtype=(np.float, len(prices.index)))
+                self.cointegration_window_size, dtype=(np.float, len(prices.index))
+            )
 
         self.cointegration_window.append(prices)
 
@@ -43,7 +44,9 @@ class CointegratorStrategy(Strategy):
             R /= np.diag(R)[:None]
             np.fill_diagonal(R, 0)
             synth_cointegrations = pd.DataFrame(df.values.dot(R), columns=df.columns)
-            fair_mean = prices + synth_cointegrations.iloc[-1] - synth_cointegrations.mean()
+            fair_mean = (
+                prices + synth_cointegrations.iloc[-1] - synth_cointegrations.mean()
+            )
             fair_variance = synth_cointegrations.var()
             fairs.append(Gaussian(fair_mean, fair_variance))
         if len(fairs) > 0:

@@ -38,7 +38,7 @@ class Beat:
             delta = datetime.datetime.now() - self.__last_beat
             duration_to_sleep = (self.__interval / 1000.0) - delta.total_seconds()
             if duration_to_sleep < 0:
-                raise BeatError('loop body too slow for beat interval')
+                raise BeatError("loop body too slow for beat interval")
             time.sleep(duration_to_sleep)
             self.__last_beat = None
 
@@ -117,7 +117,7 @@ class ThreadManager:
             if should_terminate:
                 reason = None
             else:
-                reason = 'Expected thread to run forever.\n'
+                reason = "Expected thread to run forever.\n"
             self.__termination_queue.put((name, reason))
         except Exception:
             self.__termination_queue.put((name, traceback.format_exc()))
@@ -134,7 +134,9 @@ class ThreadManager:
         if should_terminate:
             self.__finite_thread_count += 1
 
-        def runner(): self.__propagate_error(name, fn, should_terminate)
+        def runner():
+            self.__propagate_error(name, fn, should_terminate)
+
         self.__thread_runners.append(runner)
 
     def run(self):
@@ -149,11 +151,11 @@ class ThreadManager:
             (name, exc) = self.__termination_queue.get()
             completed_threads += 1
             if exc is None:
-                print('Thread <{}> terminated.'.format(name))
+                print("Thread <{}> terminated.".format(name))
                 if completed_threads == self.__finite_thread_count:
                     break
             else:
-                print('Thread <{}> terminated unexpectedly!'.format(name))
+                print("Thread <{}> terminated unexpectedly!".format(name))
                 if exc is not None:
                     print(exc[:-1])
                 os._exit(1)

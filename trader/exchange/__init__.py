@@ -12,10 +12,7 @@ from trader.util.constants import BITFINEX, KRAKEN
 
 class Exchanges:
     _exchanges = {}
-    _initializers = {
-        KRAKEN: lambda: Kraken(),
-        BITFINEX: lambda: Bitfinex()
-    }
+    _initializers = {KRAKEN: lambda: Kraken(), BITFINEX: lambda: Bitfinex()}
 
     @staticmethod
     def get(exchange):

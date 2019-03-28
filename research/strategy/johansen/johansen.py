@@ -15,7 +15,7 @@ class Johansen(object):
 
     """
 
-    def __init__(self, x, model, k=1, trace=True,  significance_level=1):
+    def __init__(self, x, model, k=1, trace=True, significance_level=1):
         """
         :param x: (nobs, m) array of time series. nobs is the number of
         observations, or time stamps, and m is the number of series.
@@ -64,9 +64,9 @@ class Johansen(object):
 
         critical_values_str = critical_values.mapping[key]
 
-        select_critical_values = np.array(
-            critical_values_str.split(),
-            float).reshape(-1, 3)
+        select_critical_values = np.array(critical_values_str.split(), float).reshape(
+            -1, 3
+        )
 
         self.critical_values = select_critical_values[:, significance_level]
 
@@ -89,14 +89,14 @@ class Johansen(object):
         x_diff = np.diff(self.x, axis=0)
 
         # Lags of x_diff.
-        x_diff_lags = lagmat(x_diff, self.k, trim='both')
+        x_diff_lags = lagmat(x_diff, self.k, trim="both")
 
         # First lag of x.
-        x_lag = lagmat(self.x, 1, trim='both')
+        x_lag = lagmat(self.x, 1, trim="both")
 
         # Trim x_diff and x_lag so they line up with x_diff_lags.
-        x_diff = x_diff[self.k:]
-        x_lag = x_lag[self.k:]
+        x_diff = x_diff[self.k :]
+        x_lag = x_lag[self.k :]
 
         # Include intercept in the regressions if self.model != 0.
         if self.model != 0:
@@ -144,8 +144,7 @@ class Johansen(object):
         evec_Svv_evec = np.dot(eigenvectors.T, np.dot(Svv, eigenvectors))
         cholesky_factor = np.linalg.cholesky(evec_Svv_evec)
         try:
-            eigenvectors = np.dot(eigenvectors,
-                                  np.linalg.inv(cholesky_factor.T))
+            eigenvectors = np.dot(eigenvectors, np.linalg.inv(cholesky_factor.T))
         except:
             print("Unable to take the inverse of the Cholesky factor.")
             return None
