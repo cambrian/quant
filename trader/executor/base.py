@@ -17,7 +17,8 @@ class Executor(ABC):
 
     @abstractmethod
     def tick_fairs(self, fairs):
-        """Incorporates new price information into the executor's world model.
+        """Reacts to new price information (for different exchanges and pairs) by placing orders in
+        the market.
 
         Args:
             fairs (Gaussian): A multivariate Gaussian (over a DataFrame) with a variable per

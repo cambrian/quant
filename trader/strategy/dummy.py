@@ -7,4 +7,4 @@ class Dummy(Strategy):
 
     def tick(self, prices):
         # TODO
-        return Gaussian([], [])
+        return Gaussian([1], [1])
