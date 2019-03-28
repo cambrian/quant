@@ -1,2 +1,2 @@
 # trader
-Run `pip3 install -r requirements.txt` to get your dependencies.
+A production framework for running quantitative strategies.

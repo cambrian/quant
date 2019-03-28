@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Try to ensure use of the Python 3 pip.
 if [ -x "$(command -v pip3)" ]; then
     pip3 install -r requirements.txt
