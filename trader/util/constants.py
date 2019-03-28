@@ -8,6 +8,10 @@ Constants to identify common entities in the code.
 BITFINEX = "bitfinex"
 KRAKEN = "kraken"
 
+# Sides
+BUY = "buy"
+SELL = "sell"
+
 # Currencies.
 USD = "USD"
 USDT = "USDT"
@@ -24,6 +28,9 @@ XRP_USD = (XRP, USD)
 BTC_USDT = (BTC, USDT)
 ETH_USDT = (ETH, USDT)
 XRP_USDT = (XRP, USDT)
+
+# Global sizing param: $$ per std dev of edge
+SIZE = 100
 
 
 def base_currency(pair):
