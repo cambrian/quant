@@ -19,6 +19,11 @@ def main():
         dummy_executor.tick(fairs)
 
 
+book_feed = bitfinex.book(BTC_USD)
+executor_feed_runner = book_feed.subscribe(dummy_executor.main)
+
 thread_manager = ThreadManager()
 thread_manager.attach('main', main)
+thread_manager.attach('book_feed', book_feed.run)
+thread_manager.attach('executor', executor_feed_runner)
 thread_manager.run()

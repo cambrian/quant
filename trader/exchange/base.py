@@ -26,7 +26,7 @@ class Exchange(ABC):
             pair (str): The pair to stream.
 
         Yields:
-            DataFrame: A Pandas dataframe of book entries (side/price/volume).
+            Orderbook (tuple): Tuple of (Exchange, pair, best bid, best ask)
 
         """
         pass
