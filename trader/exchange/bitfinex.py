@@ -20,12 +20,8 @@ class Bitfinex(Exchange):
 
     def __init__(self):
         super().__init__()
-        self.__bfxv1 = ClientV1(
-            os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
-        )
-        self.__bfxv1 = ClientV2(
-            os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
-        )
+        self.__bfxv1 = ClientV1(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
+        self.__bfxv1 = ClientV2(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
         self.__ws_client = WssClient(
             os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
         )
@@ -55,10 +51,7 @@ class Bitfinex(Exchange):
 
         # Current state of `order_book` is always first message.
         raw_book = book_queue.get()[1]
-        order_book = {
-            "bid": SortedList(key=lambda x: -x[0]),
-            "ask": SortedList(key=lambda x: x[0]),
-        }
+        order_book = {"bid": SortedList(key=lambda x: -x[0]), "ask": SortedList(key=lambda x: x[0])}
         for order in raw_book:
             if order[2] > 0:
                 order_book["bid"].add((order[1], abs(order[2]), order[0]))
@@ -80,9 +73,7 @@ class Bitfinex(Exchange):
                             delete = True
                         break
                 if not delete:
-                    order_book[side].add(
-                        (change[1][1], abs(change[1][2]), change[1][0])
-                    )
+                    order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
     def prices(self, pairs, time_frame):
         """

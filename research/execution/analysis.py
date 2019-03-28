@@ -17,9 +17,7 @@ def principal_market_movements(prices):
     price_deltas = prices.diff().iloc[1:].rolling(RISK_WINDOW).sum().iloc[RISK_WINDOW:]
     price_deltas_scaled = scaler.fit_transform(price_deltas)
     pca.fit(price_deltas_scaled)
-    pcs = pd.DataFrame(
-        scaler.inverse_transform(pca.components_), columns=price_deltas.columns
-    )
+    pcs = pd.DataFrame(scaler.inverse_transform(pca.components_), columns=price_deltas.columns)
     return (pcs, pca.explained_variance_ratio_)
 
 
@@ -45,9 +43,7 @@ def analyze(results, plot=True):
 
     Note: RoRs are per-tick. They are NOT comparable across time scales."""
     # Balance values
-    prices_ = results["data"]["prices"].rename(
-        columns=lambda pair: pair.partition("_")[0]
-    )
+    prices_ = results["data"]["prices"].rename(columns=lambda pair: pair.partition("_")[0])
     prices_["usd"] = 1
     balance_values = results["balances"] * prices_
 
@@ -56,9 +52,7 @@ def analyze(results, plot=True):
 
     # Market risk
     (pmms, pmm_weights) = principal_market_movements(results["data"]["prices"])
-    balances_ = (
-        results["balances"].drop(columns=["usd"]).rename(columns=lambda c: c + "_usd")
-    )
+    balances_ = results["balances"].drop(columns=["usd"]).rename(columns=lambda c: c + "_usd")
     component_risks = np.abs(balances_ @ pmms.T)
     risks = component_risks @ pmm_weights
 
@@ -71,19 +65,9 @@ def analyze(results, plot=True):
         pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
         axs[1].axhline(0, color="grey")
         plt.show()
-        print(
-            "Return on maximum market risk: {0}".format(
-                pnl / (risks.values.max() + 1e-10)
-            )
-        )
-        print(
-            "Return on total market risk:   {0}".format(
-                pnl / (risks.values.sum() + 1e-10)
-            )
-        )
-        print(
-            "Return on total positions:     {0}".format(pnl / (total_positions + 1e-10))
-        )
+        print("Return on maximum market risk: {0}".format(pnl / (risks.values.max() + 1e-10)))
+        print("Return on total market risk:   {0}".format(pnl / (risks.values.sum() + 1e-10)))
+        print("Return on total positions:     {0}".format(pnl / (total_positions + 1e-10)))
         print("Sharpe ratio:                  {0}".format(pnl / (pnls.std() + 1e-10)))
         print("Final P/L:                     {0}".format(pnl))
         print("Maximum absolute drawdown:     {0}".format(max_abs_drawdown(pnls)))

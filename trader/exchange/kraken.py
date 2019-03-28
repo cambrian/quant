@@ -12,11 +12,7 @@ class Kraken(Exchange):
         super().__init__()
         self.__kraken = krakenex.API()
         # self.__kraken.load_key('secret.key')
-        self.__translate = {
-            BTC_USD: "XXBTZUSD",
-            ETH_USD: "XETHZUSD",
-            XRP_USD: "XXRPZUSD",
-        }
+        self.__translate = {BTC_USD: "XXBTZUSD", ETH_USD: "XETHZUSD", XRP_USD: "XXRPZUSD"}
         self.__fees = {"maker": 0.0016, "taker": 0.0026}
 
     @property
@@ -42,9 +38,7 @@ class Kraken(Exchange):
             # Most recent update is second to last element in array (last element is an ongoing
             # candle).
             # Fields: open, high, low, close, vwap, volume
-            ohlcvv = self.__kraken.query_public("OHLC", data=params)["result"][pair][
-                -2
-            ][1:]
+            ohlcvv = self.__kraken.query_public("OHLC", data=params)["result"][pair][-2][1:]
             data["close"].append(ohlcvv[3])
             data["volume"].append(ohlcvv[5])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)

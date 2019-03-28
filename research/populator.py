@@ -47,9 +47,7 @@ def tick_size_to_ms(exchange, tick_size):
     return tick_size_seconds * 1000
 
 
-def retry_fetch_ohlcv(
-    max_retries, exchange, pair, tick_size_ms, position_ms, batch_size
-):
+def retry_fetch_ohlcv(max_retries, exchange, pair, tick_size_ms, position_ms, batch_size):
     for _ in range(max_retries):
         ohlcv = exchange.fetch_ohlcv(pair, tick_size_ms, position_ms, batch_size)
         if ohlcv is not None:
@@ -59,9 +57,7 @@ def retry_fetch_ohlcv(
     )
 
 
-def scrape_ohlcv(
-    max_retries, exchange, pair, tick_size, start_ms, num_ticks, batch_size_max
-):
+def scrape_ohlcv(max_retries, exchange, pair, tick_size, start_ms, num_ticks, batch_size_max):
     tick_size_ms = tick_size_to_ms(exchange, tick_size)
     position_ms = start_ms
     end = start_ms + num_ticks * tick_size_ms
@@ -80,15 +76,11 @@ def scrape_ohlcv(
             if row[0] < end
         ]
         if len(ohlcv) == 0:
-            print(
-                "Warning: Exchange returned zero entries prior to end time. See note?"
-            )
+            print("Warning: Exchange returned zero entries prior to end time. See note?")
             break
         position_ms = ohlcv[-1][0] + tick_size_ms
         if len(ohlcv) < batch_size and position_ms < end:
-            print(
-                "Warning: Exchange returned fewer rows than expected. Check your batch size?"
-            )
+            print("Warning: Exchange returned fewer rows than expected. Check your batch size?")
         print("Entries Processed: {}".format((position_ms - start_ms) // tick_size_ms))
         yield ohlcv
 
@@ -102,14 +94,7 @@ def write_csv(filename, generator):
 
 
 def scrape_ohlcv_to_csv(
-    filename,
-    max_retries,
-    exchange,
-    pair,
-    tick_size,
-    start_ms,
-    num_ticks,
-    batch_size_max,
+    filename, max_retries, exchange, pair, tick_size, start_ms, num_ticks, batch_size_max
 ):
     try:
         ohlcv_generator = scrape_ohlcv(
@@ -156,9 +141,7 @@ def aggregate_data(data_dir, exchange_pairs, tick_size, start, num_ticks_str="al
     dfs = []
     for exchange in exchange_pairs:
         for pair in exchange_pairs[exchange]:
-            df = load_data_as_frame(
-                data_dir, exchange, pair, tick_size, start, num_ticks_str
-            )
+            df = load_data_as_frame(data_dir, exchange, pair, tick_size, start, num_ticks_str)
             if df is None:
                 continue
             df.rename(
@@ -167,26 +150,14 @@ def aggregate_data(data_dir, exchange_pairs, tick_size, start, num_ticks_str="al
                 inplace=True,
             )
             first_ts, last_ts = df.index[0], df.index[-1]
-            print(
-                "Loaded pair {} on {} ({} to {})".format(
-                    pair, exchange, first_ts, last_ts
-                )
-            )
+            print("Loaded pair {} on {} ({} to {})".format(pair, exchange, first_ts, last_ts))
             dfs.append(df)
 
-    return reduce(
-        lambda l, r: pd.merge(l, r, left_index=True, right_index=True, how="outer"), dfs
-    )
+    return reduce(lambda l, r: pd.merge(l, r, left_index=True, right_index=True, how="outer"), dfs)
 
 
 def resample_to(timeframe, df):
-    ohlcv_dict = {
-        "open": "first",
-        "high": "max",
-        "low": "min",
-        "close": "last",
-        "volume": "sum",
-    }
+    ohlcv_dict = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
     return df.resample(timeframe).agg(ohlcv_dict)
 
 
@@ -202,20 +173,14 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
         start_ms = exchange.parse8601(start)
         now = exchange.milliseconds()
         if start_ms > now:
-            raise ParamsError(
-                "Start time in the future for exchange {}.".format(exchange_id)
-            )
+            raise ParamsError("Start time in the future for exchange {}.".format(exchange_id))
         # Validate number of ticks.
         tick_size_ms = tick_size_to_ms(exchange, tick_size)
         if num_ticks is None:
             num_ticks = (now - start_ms) // tick_size_ms
             num_ticks_str = "all"
         elif start_ms + num_ticks * tick_size_ms > now:
-            print(
-                "End time in the future for exchange {}. Clamping ticks.".format(
-                    exchange_id
-                )
-            )
+            print("End time in the future for exchange {}. Clamping ticks.".format(exchange_id))
             num_ticks = (now - start_ms) // tick_size_ms
             num_ticks_str = str(num_ticks)
         else:
@@ -225,23 +190,10 @@ def populate(data_dir, exchanges, pairs, tick_size, start, num_ticks=None):
             if not pair in exchange.symbols:
                 print("Exchange {} does not trade {}.".format(exchange_id, pair))
                 continue
-            print(
-                "Downloading price history for {} on exchange {}.".format(
-                    pair, exchange_id
-                )
-            )
-            path = get_data_path(
-                data_dir, exchange_id, pair, tick_size, start, num_ticks_str
-            )
+            print("Downloading price history for {} on exchange {}.".format(pair, exchange_id))
+            path = get_data_path(data_dir, exchange_id, pair, tick_size, start, num_ticks_str)
             scrape_ohlcv_to_csv(
-                path,
-                MAX_ATTEMPTS,
-                exchange,
-                pair,
-                tick_size,
-                start_ms,
-                num_ticks,
-                batch_size_max,
+                path, MAX_ATTEMPTS, exchange, pair, tick_size, start_ms, num_ticks, batch_size_max
             )
 
 
@@ -251,8 +203,7 @@ def grab_all_pairs(data_dir, exchanges, tick_size):
         exchange.load_markets()
         good_symbols = list(
             filter(
-                lambda x: x.split("/")[0] in GOOD_COINS
-                and x.split("/")[1] in GOOD_COINS,
+                lambda x: x.split("/")[0] in GOOD_COINS and x.split("/")[1] in GOOD_COINS,
                 exchange.symbols,
             )
         )

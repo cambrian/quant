@@ -44,9 +44,7 @@ class CointegratorStrategy(Strategy):
             R /= np.diag(R)[:None]
             np.fill_diagonal(R, 0)
             synth_cointegrations = pd.DataFrame(df.values.dot(R), columns=df.columns)
-            fair_mean = (
-                prices + synth_cointegrations.iloc[-1] - synth_cointegrations.mean()
-            )
+            fair_mean = prices + synth_cointegrations.iloc[-1] - synth_cointegrations.mean()
             fair_variance = synth_cointegrations.var()
             fairs.append(Gaussian(fair_mean, fair_variance))
         if len(fairs) > 0:

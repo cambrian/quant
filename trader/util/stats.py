@@ -279,15 +279,10 @@ class Gaussian:
         sum_inv = np.linalg.inv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
             sum_inv = pd.DataFrame(
-                sum_inv,
-                index=self.__covariance.index,
-                columns=self.__covariance.columns,
+                sum_inv, index=self.__covariance.index, columns=self.__covariance.columns
             )
         covariance = self.__covariance @ sum_inv @ x.__covariance
-        mean = (
-            x.__covariance @ sum_inv @ self.__mean
-            + self.__covariance @ sum_inv @ x.__mean
-        )
+        mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
 
     def __add__(self, x):
@@ -397,6 +392,4 @@ class Gaussian:
         return Gaussian(mean, covariance)
 
     def __repr__(self):
-        return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(
-            self.mean, self.covariance
-        )
+        return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)

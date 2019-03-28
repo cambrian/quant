@@ -64,9 +64,7 @@ class Johansen(object):
 
         critical_values_str = critical_values.mapping[key]
 
-        select_critical_values = np.array(critical_values_str.split(), float).reshape(
-            -1, 3
-        )
+        select_critical_values = np.array(critical_values_str.split(), float).reshape(-1, 3)
 
         self.critical_values = select_critical_values[:, significance_level]
 
