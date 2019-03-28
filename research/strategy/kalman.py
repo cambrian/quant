@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numpy_ringbuffer import RingBuffer
 
-from strategy import Strategy
+from research.strategy.base import Strategy
 from trader.util.stats import Ema, Gaussian
 
 

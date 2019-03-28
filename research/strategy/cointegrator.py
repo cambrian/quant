@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 from numpy_ringbuffer import RingBuffer
 
-from strategy import Strategy
+from research.strategy.base import Strategy
+from research.strategy.johansen import Johansen
 from trader.util.stats import Gaussian
-
-from .johansen.johansen import Johansen
 
 
 def cointegrate(data):
