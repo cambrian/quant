@@ -5,6 +5,7 @@ from trader.util.stats import Gaussian
 
 # Note: Assumes all orders fill at last trade price. Attempting to simulate market-making would
 # require combing through book and trade data, which is too much work for us to do at the moment.
+BASE_CURRENCY = 'USDT'
 
 
 def data_currencies(data):
@@ -37,9 +38,9 @@ def get_orders(balances, prices, fairs, size, fees):
     return proposed_orders * good_direction
 
 
-def execute_orders(fees, prices, balances, orders):
+def execute_orders(fractional_fee, prices, balances, orders):
     for (pair, size) in orders.items():
-        currency = pair.partition("_")[0]
+        currency = pair.partition('_')[0]
         value = size * prices[pair]
         balances["usd"] -= value
         balances["usd"] -= abs(value) * fees
@@ -55,8 +56,9 @@ def run(strategy, data, size=1000, fees=0):
         volumes = data["volumes"].loc[date]
 
         fairs = strategy.step(prices, volumes)
-        orders = get_orders(balances, prices, fairs, size, fees)
-        execute_orders(fees, prices, balances, orders)
+        print('Fairs for {}:\n{}'.format(date, fairs))
+        orders = get_orders(balances, prices, fairs, size, fractional_fee)
+        execute_orders(fractional_fee, prices, balances, orders)
 
         fairs_.append(fairs)
         balances_.append(balances.copy())
