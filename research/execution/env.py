@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from trader.util.stats import Gaussian
+
 # Note: Assumes all orders fill at last trade price. Attempting to simulate market-making would
 # require combing through book and trade data, which is too much work for us to do at the moment.
 
@@ -16,16 +18,22 @@ def get_orders(balances, prices, fairs, size, fees):
     '''Given current balances, prices, and fair estimates, determine which orders to place.
     Assumes all pairs are XXX_USD.
     `fairs` should be a Gaussian type. '''
-    edges = (prices - fairs.mean) / fairs.stddev  # edges relative to the fair price
+    edges = (fairs / prices) - 1
+
+    def subtract_fees_toward_zero(x):
+        if abs(x) < fees:
+            return 0
+        if x > 0:
+            return x - fees
+        return x + fees
+    edges = Gaussian(edges.mean.apply(subtract_fees_toward_zero), edges.covariance)
     balances = balances.drop(['usd']).rename(lambda c: c + '_usd')
-    target_balance_values = edges * -size
+    target_balance_values = edges.mean / edges.stddev * size
 
     proposed_orders = (target_balance_values / prices - balances)
-    edge_better_than_fees = np.abs(fairs.mean / prices - 1) > fees
-    # only buy cheap and sell expensive even if it means we overshoot our target balance
-    good_direction = edges * proposed_orders < 0
+    good_direction = edges.mean * proposed_orders > 0
 
-    return proposed_orders * edge_better_than_fees * good_direction
+    return proposed_orders * good_direction
 
 
 def execute_orders(fees, prices, balances, orders):
