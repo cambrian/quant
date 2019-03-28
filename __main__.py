@@ -16,14 +16,14 @@ def main():
         bitfinex_data = bitfinex.prices([BTC_USD], '1m')
         dummy_fairs = dummy_strategy.tick(bitfinex_data)
         fairs = Gaussian.intersect([dummy_fairs])
-        dummy_executor.tick(fairs)
+        dummy_executor.tick_fairs(fairs)
 
 
-book_feed = bitfinex.book(BTC_USD)
-executor_feed_runner = book_feed.subscribe(dummy_executor.main)
+bitfinex_btc_usd_feed = bitfinex.book(BTC_USD)
+executor_book_runner = bitfinex_btc_usd_feed.subscribe(dummy_executor.tick_book)
 
 thread_manager = ThreadManager()
 thread_manager.attach('main', main)
-thread_manager.attach('book_feed', book_feed.run)
-thread_manager.attach('executor', executor_feed_runner)
+thread_manager.attach('bitfinex-btc-usd-feed', bitfinex_btc_usd_feed.run)
+thread_manager.attach('executor-book-runner', executor_book_runner)
 thread_manager.run()

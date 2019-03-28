@@ -26,7 +26,8 @@ class Exchange(ABC):
             pair (str): The pair to stream.
 
         Yields:
-            Orderbook (tuple): Tuple of (Exchange, pair, best bid, best ask)
+            tuple: Order book tuple of (exchange, pair, best bid, best ask). TODO: This can be
+                easily made to return more levels in the book (when we want that).
 
         """
         pass
@@ -37,8 +38,8 @@ class Exchange(ABC):
 
         Args:
             pairs (str): A list of pairs to query.
-            time_frame (type depends on exchange): granularity of pricing data, in
-            exchange's format.
+            time_frame (type depends on exchange): Granularity of pricing data, in the exchange's
+                format.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
@@ -49,10 +50,10 @@ class Exchange(ABC):
     @property
     @abstractmethod
     def fees(self):
-        """Queries exchange fees for the given pairs
+        """Queries exchange fees for the given pairs.
 
         Returns:
-            Dict: Map of maker/taker to fee set by exchange
+            dict: Map of maker/taker to fee set by exchange.
 
         """
         pass
