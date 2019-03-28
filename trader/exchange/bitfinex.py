@@ -12,7 +12,8 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 
 
 class Bitfinex(Exchange):
@@ -25,11 +26,11 @@ class Bitfinex(Exchange):
 
     def __init__(self):
         super().__init__()
-        self.__bfxv1 = ClientV1(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
-        self.__bfxv1 = ClientV2(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
-        self.__ws_client = WssClient(
-            os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
-        )
+        self.__api_key = os.getenv("BITFINEX_API_KEY", "")
+        self.__api_secret = os.getenv("BITFINEX_SECRET", "")
+        self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret)
+        self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
+        self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
         self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
@@ -63,7 +64,7 @@ class Bitfinex(Exchange):
 
         while True:
             # TODO: Change this to yield more information in the future if necessary.
-            yield (BITFINEX, pair, (order_book["bid"][0], order_book["ask"][0]))
+            yield (BITFINEX, pair, (order_book["bid"][0][0], order_book["ask"][0][0]))
             change = book_queue.get()
             delete = False
             if len(change) > 1 and isinstance(change[1], list):
@@ -84,13 +85,11 @@ class Bitfinex(Exchange):
         nonce = int(time.time() * 1000000)
         auth_payload = "AUTH{}".format(nonce)
         signature = hmac.new(
-            os.getenv("BITFINEX_SECRET", "").encode(),
-            msg=auth_payload.encode(),
-            digestmod=hashlib.sha384,
+            self.__api_secret.encode(), msg=auth_payload.encode(), digestmod=hashlib.sha384
         ).hexdigest()
 
         payload = {
-            "apiKey": os.getenv("BITFINEX_API_KEY", ""),
+            "apiKey": self.__api_key,
             "event": "auth",
             "authPayload": auth_payload,
             "authNonce": nonce,
@@ -122,6 +121,9 @@ class Bitfinex(Exchange):
         if len(update) >= 3 and update[0] == "exchange":
             self.__balances[self.__translate_from[update[1]]] = update[2]
 
+    def translate(self, pair):
+        return self.__translate_to[pair]
+
     def prices(self, pairs, time_frame):
         """
 
@@ -132,12 +134,15 @@ class Bitfinex(Exchange):
         for pair in pairs:
             pair = self.__translate_to[pair]
             # Ignore index [0] timestamp.
-            ochlv = self.__bfxv1.candles(time_frame, pair, "last")[1:]
+            ochlv = self.__bfxv2.candles(time_frame, pair, "last")[1:]
             data["close"].append(ochlv[1])
             data["volume"].append(ochlv[4])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
+        # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
+        # Strip "t"
+        pair = pair[1:]
         payload = {
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),

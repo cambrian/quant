@@ -15,17 +15,29 @@ class Dummy(Executor):
         (exchange_name, pair, (bid, ask)) = book
         exchange = Exchanges.get(exchange_name)
         balance = exchange.balances[base_currency(pair)]
+        pair = exchange.translate(pair)
         fees = exchange.fees
-        buy_size = self.order_size(BUY, fees, balance, self.__fairs, ask[0])
-        sell_size = self.order_size(SELL, fees, balance, self.__fairs, bid[0])
+        buy_size = self.order_size(BUY, fees, balance, self.__fairs, ask)
+        sell_size = self.order_size(SELL, fees, balance, self.__fairs, bid)
+        # TODO: Logging
+        # TODO: Uncomment when live, commented now so we don't buy/sell while testing
         if buy_size > 0:
-            # TODO: Try Immediate-or-cancel
-            # TODO: Fix add_order
-            print("BUY: {}".format(buy_size))
-            # exchange.add_order(pair, BUY, "exchange fill-or-kill", ask, buy_size)
+            print("Buy: {}".format(buy_size))
+            # buy_size = max(0.004, buy_size / 1000)
+            # print(
+            #     exchange.add_order(
+            #         pair, BUY, "exchange immediate-or-cancel", str(ask), str(buy_size)
+            #     )
+            # )
         if sell_size > 0:
-            print("SELL: {}".format(sell_size))
-            # exchange.add_order(pair, SELL, "exchange fill-or-kill", bid, sell_size)
+            print("Sell: {}".format(sell_size))
+            # # TODO: remove, in place now until strategy is implemented to so we don't sell all BTC
+            # sell_size = max(0.004, sell_size / 1000)
+            # print(
+            #     exchange.add_order(
+            #         pair, SELL, "exchange immediate-or-cancel", str(bid), str(sell_size)
+            #     )
+            # )
 
     def tick_fairs(self, fairs):
         # TODO: Have this run the order loop.
