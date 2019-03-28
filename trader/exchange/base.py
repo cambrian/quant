@@ -42,6 +42,16 @@ class Exchange(ABC):
         pass
 
     @abstractmethod
+    def translate(self, pair):
+        """Returns exchange's translation of pair argument
+
+        Args:
+            pair (str): The pair to translate.
+
+        """
+        pass
+
+    @abstractmethod
     def prices(self, pairs, time_frame):
         """Queries prices and volumes for the given pairs.
 

@@ -26,7 +26,7 @@ class Bitfinex(Exchange):
     def __init__(self):
         super().__init__()
         self.__bfxv1 = ClientV1(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
-        self.__bfxv1 = ClientV2(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
+        self.__bfxv2 = ClientV2(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
         self.__ws_client = WssClient(
             os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
         )
@@ -63,7 +63,7 @@ class Bitfinex(Exchange):
 
         while True:
             # TODO: Change this to yield more information in the future if necessary.
-            yield (BITFINEX, pair, (order_book["bid"][0], order_book["ask"][0]))
+            yield (BITFINEX, pair, (order_book["bid"][0][0], order_book["ask"][0][0]))
             change = book_queue.get()
             delete = False
             if len(change) > 1 and isinstance(change[1], list):
@@ -122,6 +122,9 @@ class Bitfinex(Exchange):
         if len(update) >= 3 and update[0] == "exchange":
             self.__balances[self.__translate_from[update[1]]] = update[2]
 
+    def translate(self, pair):
+        return self.__translate_to[pair]
+
     def prices(self, pairs, time_frame):
         """
 
@@ -132,12 +135,15 @@ class Bitfinex(Exchange):
         for pair in pairs:
             pair = self.__translate_to[pair]
             # Ignore index [0] timestamp.
-            ochlv = self.__bfxv1.candles(time_frame, pair, "last")[1:]
+            ochlv = self.__bfxv2.candles(time_frame, pair, "last")[1:]
             data["close"].append(ochlv[1])
             data["volume"].append(ochlv[4])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
+        # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
+        # Strip "t"
+        pair = pair[1:]
         payload = {
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),
