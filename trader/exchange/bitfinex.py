@@ -12,7 +12,8 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 
 
 class Bitfinex(Exchange):
@@ -25,11 +26,11 @@ class Bitfinex(Exchange):
 
     def __init__(self):
         super().__init__()
-        self.__bfxv1 = ClientV1(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
-        self.__bfxv2 = ClientV2(os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", ""))
-        self.__ws_client = WssClient(
-            os.getenv("BITFINEX_API_KEY", ""), os.getenv("BITFINEX_SECRET", "")
-        )
+        self.__api_key = os.getenv("BITFINEX_API_KEY", "")
+        self.__api_secret = os.getenv("BITFINEX_SECRET", "")
+        self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret)
+        self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
+        self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
         self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
@@ -84,13 +85,11 @@ class Bitfinex(Exchange):
         nonce = int(time.time() * 1000000)
         auth_payload = "AUTH{}".format(nonce)
         signature = hmac.new(
-            os.getenv("BITFINEX_SECRET", "").encode(),
-            msg=auth_payload.encode(),
-            digestmod=hashlib.sha384,
+            self.__api_secret.encode(), msg=auth_payload.encode(), digestmod=hashlib.sha384
         ).hexdigest()
 
         payload = {
-            "apiKey": os.getenv("BITFINEX_API_KEY", ""),
+            "apiKey": self.__api_key,
             "event": "auth",
             "authPayload": auth_payload,
             "authNonce": nonce,
