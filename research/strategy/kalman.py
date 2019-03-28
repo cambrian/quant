@@ -39,7 +39,7 @@ class KalmanFilterStrategy(Strategy):
 
         df = pd.DataFrame(np.array(self.moving_prices_history), columns=prices.index)
         diffs = df.diff().iloc[1:]
-        diff = Gaussian(diffs.iloc[-1], diffs.var())
+        diff = Gaussian(diffs.iloc[-1], diffs.cov())
         # Could also calculate diff from the raw price movements but using smoothed movements
         # for diff seems to improve RoR
 
@@ -61,6 +61,6 @@ class KalmanFilterStrategy(Strategy):
             ]
         )
 
-        new_prediction = Gaussian.sum([self.prev_prediction, diff]) & (predicted_deltas + df.mean())
+        new_prediction = (self.prev_prediction + diff) & (predicted_deltas + df.mean())
         self.prev_prediction = new_prediction
         return new_prediction
