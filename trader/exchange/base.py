@@ -58,6 +58,17 @@ class Exchange(ABC):
         """
         pass
 
+    @property
+    @abstractmethod
+    def balances(self):
+        """Queries exchange object for tracked balances.
+
+        Returns:
+            dict: Map of currency to held volume.
+
+        """
+        pass
+
     @abstractmethod
     def add_order(self, pair, side, order_type, price, volume):
         # Param side is buy/sell.
@@ -66,10 +77,6 @@ class Exchange(ABC):
 
     @abstractmethod
     def cancel_order(self, order_id):
-        pass
-
-    @abstractmethod
-    def get_balance(self):
         pass
 
     @abstractmethod

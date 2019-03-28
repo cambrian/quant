@@ -13,8 +13,7 @@ class Dummy(Executor):
     def tick_book(self, book):
         (exchange_name, pair, (bid, ask)) = book
         exchange = Exchanges.get(exchange_name)
-        # TODO: `get_balance` should return an internal value that is dynamically updated.
-        balance = exchange.get_balance()[base_currency(pair)]
+        balance = exchange.balances[base_currency(pair)]
         fees = exchange.fees
         buy_size = self.order_size("buy", fees, balance, self.__fairs, ask)
         sell_size = self.order_size("sell", fees, balance, self.__fairs, bid)
