@@ -168,7 +168,7 @@ class Gaussian:
 
     @staticmethod
     def sum(xs):
-        '''Sum of many i.i.d. Gaussian variables.
+        '''Sum of many i.i.d. Gaussian variables or scalars.
 
         Args:
             xs (list): A list of Gaussians.
@@ -195,12 +195,13 @@ class Gaussian:
         b  0  2
 
         '''
-        # See https://stackoverflow.com/a/32962838 for details on this Pandas workaround.
-        means = np.empty(len(xs), dtype=object)
-        covariances = np.empty(len(xs), dtype=object)
-        means[:] = [x.__mean for x in xs]
-        covariances[:] = [x.__covariance for x in xs]
-        return Gaussian(np.sum(means, axis=0), np.sum(covariances, axis=0))
+        if len(xs) == 0:
+            return Gaussian([], [])
+
+        acc = xs[0]
+        for x in xs[1:]:
+            acc = acc + x
+        return acc
 
     @staticmethod
     def intersect(xs):
@@ -283,8 +284,8 @@ class Gaussian:
         mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
 
-    def __add__(self, scalar):
-        '''Add a scalar to the Gaussian. For the sum of i.i.d. Gaussians see `sum`.
+    def __add__(self, x):
+        '''Add a scalar or another Gaussian to the Gaussian.
 
         >>> Gaussian([1, 1], [[1, 2], [3, 4]]) + 3
         Gaussian:
@@ -294,6 +295,21 @@ class Gaussian:
         [[1 2]
          [3 4]]
 
+        >>> Gaussian([1, 1], [[1, 2], [3, 4]]) + Gaussian([1, 1], [[1, 2], [3, 4]])
+        Gaussian:
+        mean:
+        [2 2]
+        covariance:
+        [[2 4]
+         [6 8]]
+
+        '''
+        if isinstance(x, Gaussian):
+            return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
+        return Gaussian(self.__mean + x, self.__covariance)
+
+    def __sub__(self, x):
+        '''
         >>> Gaussian([1, 1], [[1, 2], [3, 4]]) - 1
         Gaussian:
         mean:
@@ -301,11 +317,7 @@ class Gaussian:
         covariance:
         [[1 2]
          [3 4]]
-
         '''
-        return Gaussian(self.__mean + scalar, self.__covariance)
-
-    def __sub__(self, x):
         return self + -x
 
     def __mul__(self, s):
