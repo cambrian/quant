@@ -5,7 +5,7 @@ Quantitative trading for cryptocurrencies.
 Run `./setup.sh`.
 
 ## Testing
-Run `./test.sh` to watch test fixtures (functions prefixed with `test_`). To run doctests, ensure
-you have the VS Code extensions installed, then type `CMD-Shift-T`.
+Run `./dev.sh` to watch changes and re-run tests (any function prefixed with `test_`). To run
+doctests, ensure you have the VS Code extensions installed, then type `CMD-Shift-T`.
 
 Tests are only intended for the `trader` directory.
