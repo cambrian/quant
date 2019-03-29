@@ -168,8 +168,7 @@ class ThreadManager:
                 raise ThreadManagerError("ThreadManager is currently running")
             else:
                 raise ThreadManagerError("ThreadManager has finished")
-        else:
-            self.__state == ThreadManagerState.RUNNING
+        self.__state = ThreadManagerState.RUNNING
         for runner in self.__thread_runners:
             self.__run_daemon(runner)
         completed_threads = 0

@@ -43,6 +43,8 @@ class Bitfinex(Exchange):
         self.__prices = {}
         self.__balances = defaultdict(float)
         thread_manager.attach("bitfinex-balances", self.__track_balances)
+        # TODO: Maybe start this in a lazy way?
+        self.__ws_client.start()
 
     def book(self, pair):
         if pair not in self.__supported_pairs:
@@ -67,7 +69,6 @@ class Bitfinex(Exchange):
         self.__ws_client.subscribe_to_orderbook(
             trans_pair, precision="R0", callback=add_messages_to_queue
         )
-        self.__ws_client.start()
 
         # Current state of `order_book` is always first message.
         raw_book = book_queue.get()[1]
@@ -115,6 +116,7 @@ class Bitfinex(Exchange):
 
             pair = self.__translate_to[pair]
             # Ignore index [0] timestamp.
+            # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
             ochlv = self.__bfxv2.candles(time_frame, pair, "last")[1:]
             data["close"].append(pair_last_price.read())
             # TODO: Is this volume lagged?

@@ -30,8 +30,8 @@ class Dummy(Executor):
         """
         super().__init__(thread_manager)
         self.__trade_locks = defaultdict(Lock)
-        self.__books = {}
-        self.__fairs = None
+        self.__latest_books = defaultdict(None)
+        self.__latest_fairs = None
 
         # Set up book feeds for every pair.
         for exchange_id in exchange_pairs:
@@ -47,8 +47,14 @@ class Dummy(Executor):
                 )
 
     def __tick_book(self, exchange_pair, book):
-        self.__books[exchange_pair] = book
-        # TODO: There are a LOT of order book updates. Maybe don't trade on all of them?
+        # De-dupe order book ticks by bid and ask.
+        # Consider moving this logic elsewhere?
+        if exchange_pair in self.__latest_books:
+            current_book = self.__latest_books[exchange_pair]
+            if book.bid == current_book.bid and book.ask == current_book.ask:
+                self.__latest_books[exchange_pair] = book
+                return
+        self.__latest_books[exchange_pair] = book
         lock = self.__trade_locks[exchange_pair]
         lock_acquired = lock.acquire(False)
         if lock_acquired:
@@ -60,7 +66,7 @@ class Dummy(Executor):
         pair = book.pair
         ask = book.ask
         bid = book.bid
-        fairs = self.__fairs
+        fairs = self.__latest_fairs
         if fairs is None:
             return
         exchange = Exchanges.get(book.exchange)
@@ -85,8 +91,8 @@ class Dummy(Executor):
             # )
 
     def tick_fairs(self, fairs):
-        self.__fairs = fairs
-        for exchange_pair, book in self.__books.items():
+        self.__latest_fairs = fairs
+        for exchange_pair, book in self.__latest_books.items():
             lock = self.__trade_locks[exchange_pair]
             lock.acquire()
             self._trade_book(book)
