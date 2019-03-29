@@ -67,7 +67,7 @@ def run(strategy, data, size=1000, fractional_fee=0):
     # print('Starting balances:\n{}\n'.format(balances))
     balances_ = []
     fairs_ = []
-    for date in tqdm(data.index):
+    for date in data.index:
         prices = price_data.loc[date]
         volumes = volume_data.loc[date]
 
