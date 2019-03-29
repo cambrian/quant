@@ -44,7 +44,7 @@ class Executor:
 
     def __tick_book(self, exchange, pair, book):
         self.__books_lock.acquire()
-        self.__latest_books[(exchange, pair)] = book
+        self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)
 
@@ -61,7 +61,7 @@ class Executor:
             return
 
         self.__books_lock.acquire()
-        book = self.__latest_books[(exchange, pair)]
+        book = self.__latest_books[exchange, pair]
         self.__books_lock.release()
 
         fairs = self.__latest_fairs
