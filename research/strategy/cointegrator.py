@@ -23,7 +23,8 @@ class CointegratorStrategy(Strategy):
         self.cointegration_window = None
         self.cointegration_window_size = cointegration_window_size
 
-    def step(self, prices, _volumes):
+    def step(self, frame):
+        prices = frame["price"]
         if self.cointegration_window is None:
             self.cointegration_window = RingBuffer(
                 self.cointegration_window_size, dtype=(np.float, len(prices.index))

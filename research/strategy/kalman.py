@@ -17,7 +17,9 @@ class KalmanFilterStrategy(Strategy):
         self.moving_volumes = Ema(correlation_window_size / 2)
         self.prev_prediction = None
 
-    def step(self, prices, volumes):
+    def step(self, frame):
+        prices = frame["price"]
+        volumes = frame["volume"]
         if self.moving_prices_history is None:
             self.moving_prices_history = RingBuffer(
                 self.correlation_window_size, dtype=(np.float, len(prices.index))
