@@ -39,8 +39,9 @@ class Beat:
             delta = datetime.datetime.now() - self.__last_beat
             duration_to_sleep = (self.__interval / 1000.0) - delta.total_seconds()
             if duration_to_sleep < 0:
-                raise BeatError("loop body too slow for beat interval")
-            time.sleep(duration_to_sleep)
+                print("Warning: Loop body too slow for beat interval.")
+            else:
+                time.sleep(duration_to_sleep)
             self.__last_beat = None
 
         # Set a new last beat time for the next iteration.

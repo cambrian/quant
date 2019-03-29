@@ -12,23 +12,22 @@ SIZE_PARAMETER = 100
 class Executor:
     """Given fair updates, listens to book updates and places orders to optimize our portfolio.
 
-    NOTE: We lock `_trade_book` by exchange/pair such that calls to it are skipped if a lock cannot
+    NOTE: We lock `__trade` by exchange/pair such that calls to it are skipped if a lock cannot
     be acquired. However, this only applies to order ticks (new fairs prices should always run a
     cycle of orders).
+
+    Args:
+        thread_manager (ThreadManager): A thread manager to attach any child threads for this
+            executor object.
+        exchange_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
+            that exchange to execute on.
 
     """
 
     def __init__(self, thread_manager, exchange_pairs):
-        """Dummy-specific constructor.
-
-        Args:
-            exchange_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
-                that exchange to execute on.
-
-        """
         self.__books_lock = Lock()
         self.__trade_locks = defaultdict(Lock)
-        self.__latest_books = defaultdict(None)
+        self.__latest_books = {}
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
 
@@ -38,7 +37,11 @@ class Executor:
                 thread_manager.attach(
                     "executor-{}-{}".format(exchange.id, pair),
                     exchange.book(pair).subscribe(
-                        lambda book: self.__tick_book(exchange, pair, book)
+                        # Ugly but otherwise the values of exchange/pair will get overwritten in
+                        # the closure at every iteration...
+                        lambda book, exchange=exchange, pair=pair: self.__tick_book(
+                            exchange, pair, book
+                        )
                     ),
                 )
 
@@ -47,6 +50,7 @@ class Executor:
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)
+        print(book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):
         """
@@ -93,11 +97,14 @@ class Executor:
 
     def tick_fairs(self, fairs):
         self.__latest_fairs = fairs
+        self.__books_lock.acquire()
         for exchange, pair in self.__latest_books:
             self.__thread_manager.attach(
-                "executor-fair-tick-{}-{}".format(exchange.id, pair),
-                self.__trade(exchange, pair, wait_for_other_trade=True),
+                "executor-fairs-trade-{}-{}".format(exchange.id, pair),
+                lambda: self.__trade(exchange, pair, wait_for_other_trade=True),
+                should_terminate=True,
             )
+        self.__books_lock.release()
         print(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):
