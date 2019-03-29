@@ -6,7 +6,6 @@ from sklearn.preprocessing import StandardScaler
 
 # number of ticks to sum for price movements in risk calculation
 RISK_WINDOW = 10
-QUOTE_CURRENCY = 'USDT'
 
 
 def principal_market_movements(prices):
@@ -43,21 +42,26 @@ def analyze(results, plot=True):
 
     Note: RoRs are per-tick. They are NOT comparable across time scales."""
     # Balance values
-    prices_ = results["price_data"].rename(columns=lambda pair: pair.split("_")[0])
-    prices_[QUOTE_CURRENCY] = 1
+    price_data = results["data"].apply(lambda x: x["price"])
+    quote_currency = price_data.columns[0].partition("_")[2]
+    prices_ = price_data.rename(columns=lambda pair: pair.partition("_")[0])
+    prices_[quote_currency] = 1
     balance_values = results["balances"] * prices_
 
     pnls = balance_values.sum(axis=1)
     pnl = pnls.iloc[-1]
 
     # Market risk
-    (pmms, pmm_weights) = principal_market_movements(results["price_data"])
-    balances_ = results["balances"].drop(columns=[QUOTE_CURRENCY]).rename(
-        columns=lambda c: "{}_{}".format(c, QUOTE_CURRENCY))
+    (pmms, pmm_weights) = principal_market_movements(price_data)
+    balances_ = (
+        results["balances"]
+        .drop(columns=[quote_currency])
+        .rename(columns=lambda c: "{}_{}".format(c, quote_currency))
+    )
     component_risks = np.abs(balances_ @ pmms.T)
     risks = component_risks @ pmm_weights
 
-    total_positions = np.abs(balance_values.drop(columns=[QUOTE_CURRENCY]).values).sum()
+    total_positions = np.abs(balance_values.drop(columns=[quote_currency]).values).sum()
 
     if plot:
         fig, axs = plt.subplots(1, 2, figsize=(16, 4))
