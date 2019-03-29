@@ -12,8 +12,7 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BTC, BTC_USD, ETH, ETH_USD, USD, XRP,
-                                   XRP_USD, not_implemented)
+from trader.util.constants import BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD, not_implemented
 from trader.util.feed import Feed
 from trader.util.types import OrderBook
 
@@ -51,7 +50,7 @@ class DummyExchange(Exchange):
     def book(self, pair):
         if pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        price = data.loc[time]
+        price = self.__data.loc[time]
         book = OrderBook(self.id, pair, last_price=price, bid=price, ask=price)
         # TODO:
         not_implemented()
