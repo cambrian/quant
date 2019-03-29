@@ -1,2 +1,2 @@
 rm .testmondata
-ptw -- --testmon
+ptw -cwq -- --testmon --quiet --tb=short
