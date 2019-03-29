@@ -24,7 +24,8 @@ class Exchange(ABC):
     @property
     @abstractmethod
     def id(self):
-        """
+        """A canonical name for this exchange.
+
         Returns:
             string: Exchange id.
 

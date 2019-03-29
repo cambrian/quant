@@ -13,7 +13,7 @@ class OrderBook:
     TODO: Add actual levels to this book.
 
     Attributes:
-        exchange (Constant): The book's exchange.
+        exchange (Exchange): The book's exchange.
         pair (Constant): The pair being traded.
         last_price (float): The last trade price.
         bid (float): Best bid price.
@@ -28,9 +28,19 @@ class OrderBook:
         self.bid = bid
         self.ask = ask
 
+    def __eq__(self, other):
+        return (
+            type(self) == type(other)
+            and self.exchange == other.exchange
+            and self.pair == other.pair
+            and self.last_price == other.last_price
+            and self.bid == other.bid
+            and self.ask == other.ask
+        )
+
     def __repr__(self):
         return "({}, {}, Price: {}, Bid: {}, Ask: {})".format(
-            self.exchange, self.pair, self.last_price, self.bid, self.ask
+            self.exchange.id, self.pair, self.last_price, self.bid, self.ask
         )
 
 
