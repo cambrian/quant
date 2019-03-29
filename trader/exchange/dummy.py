@@ -12,7 +12,8 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD, not_implemented
+from trader.util.constants import (BTC, BTC_USD, ETH, ETH_USD, USD, XRP,
+                                   XRP_USD, not_implemented)
 from trader.util.feed import Feed
 from trader.util.types import OrderBook
 
@@ -26,16 +27,17 @@ class DummyExchange(Exchange):
     # making that change.
     __instance_exists = False
 
-    def __init__(self, thread_manager, data):
+    def __init__(self, thread_manager, data, fees):
         assert not DummyExchange.__instance_exists
         DummyExchange.__instance_exists = True
         super().__init__(thread_manager)
         self.__data = data
-        self.__supported_pairs = data.columns  # or similar
-        self.time = 0  # allow manual setting
+        self.__supported_pairs = data.iloc[0].index
+        # time is not private to allow manual adjustment.
+        self.time = 0
         # TODO:
         self.__fees = {"maker": 0.001, "taker": 0.002}
-        self.__books = {}
+        self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__prices = {}
         self.__balances = defaultdict(float)
 
@@ -44,6 +46,9 @@ class DummyExchange(Exchange):
         return "DUMMY_EXCHANGE"
 
     def step_time(self):
+        data = self.__data.iloc[self.time]
+        for pair, price_volume in data.items():
+            self.__book_queues[pair].put(price_volume)
         self.time += 1
         # TODO: also stream next book, price
 
