@@ -14,7 +14,14 @@ class Kraken(Exchange):
 
     """
 
+    # Allow only 1 instance. In the near future we should change the exchange classes to actually
+    # be singletons, but first we should extract common logic into the Exchange base class before
+    # making that change.
+    __instance_exists = False
+
     def __init__(self, thread_manager):
+        assert not Kraken.__instance_exists
+        Kraken.__instance_exists = True
         not_implemented()
         super().__init__(thread_manager)
         self.__kraken = krakenex.API()
@@ -22,6 +29,10 @@ class Kraken(Exchange):
         self.__translate = {BTC_USD: "XXBTZUSD", ETH_USD: "XETHZUSD", XRP_USD: "XXRPZUSD"}
         self.__fees = {"maker": 0.0016, "taker": 0.0026}
         self.__balances = defaultdict(float)
+
+    @property
+    def id(self):
+        return KRAKEN
 
     # TODO
     def book(self, pair):

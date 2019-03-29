@@ -121,3 +121,4 @@ dmypy.json
 *.key
 *.pkl
 *.h5
+*.testmon*
