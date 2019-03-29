@@ -99,6 +99,26 @@ class MVar:
         return read_value
 
 
+def test_mvar_simple():
+    """Tests MVar functionality (which is not very expansive)."""
+    var = MVar()
+    result = None
+
+    def writer():
+        var.swap(1)
+
+    def reader():
+        nonlocal result
+        result = var.read()
+
+    thread_manager = ThreadManager()
+    thread_manager.attach("writer", writer, should_terminate=True)
+    thread_manager.attach("reader", reader, should_terminate=True)
+
+    thread_manager.run()
+    assert result == 1
+
+
 class ThreadManagerError(Exception):
     pass
 
@@ -135,9 +155,8 @@ class ThreadManager:
             self.__termination_queue.put((name, traceback.format_exc()))
 
     def __run_daemon(self, fn):
-        thread = Thread(target=fn)
-        # Force-kill on KeyboardInterrupts.
-        thread.daemon = True
+        # Make daemon to force-kill on KeyboardInterrupts.
+        thread = Thread(target=fn, daemon=True)
         thread.start()
 
     def attach(self, name, fn, should_terminate=False):
