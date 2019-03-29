@@ -1,11 +1,10 @@
 #!/bin/bash
+python3 -m pip install -r requirements.txt
 
-python3 -m pip install -r requirements.txt --quiet
-
-# Grab test exchange data from S3
+# Grab test exchange data from S3.
 mkdir -p research/data/test
 echo 'Downloading exchange data from S3...'
-aws s3 cp --recursive --quiet s3://cambrianexchangedata/data/test/ research/data/test
+aws s3 cp --recursive s3://cambrianexchangedata/data/test/ research/data/test
 echo 'Done.'
 
 git config filter.nbstripout.clean 'nbstripout'
