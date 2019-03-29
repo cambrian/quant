@@ -1,29 +1,33 @@
+from collections import defaultdict
+
 import krakenex
 import pandas as pd
 
 from trader.exchange.base import Exchange
-from trader.util.constants import BTC_USD, ETH_USD, KRAKEN, XRP_USD
+from trader.util.constants import BTC_USD, ETH_USD, KRAKEN, XRP_USD, not_implemented
 
 
 class Kraken(Exchange):
     """The Kraken exchange.
 
-    TODO: Add required methods.
+    TODO: Complete this stub.
 
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, thread_manager):
+        not_implemented()
+        super().__init__(thread_manager)
         self.__kraken = krakenex.API()
         # self.__kraken.load_key('secret.key')
         self.__translate = {BTC_USD: "XXBTZUSD", ETH_USD: "XETHZUSD", XRP_USD: "XXRPZUSD"}
         self.__fees = {"maker": 0.0016, "taker": 0.0026}
+        self.__balances = defaultdict(float)
 
-    def _book(self, pair):
-        # The name `pair` should be translated from its value in `constants` to an exchange-specific
-        # identifier.
+    # TODO
+    def book(self, pair):
         pass
 
+    # TODO
     def prices(self, pairs, time_frame):
         """
 
@@ -42,6 +46,12 @@ class Kraken(Exchange):
             data["volume"].append(ohlcvv[5])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
+    # TODO
+    @property
+    def balances(self):
+        return self.__balances
+
+    # TODO
     @property
     def fees(self):
         # TODO: Update fees by pair schedule.

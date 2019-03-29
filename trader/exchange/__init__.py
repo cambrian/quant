@@ -10,13 +10,27 @@ from trader.exchange.kraken import Kraken
 from trader.util.constants import BITFINEX, KRAKEN
 
 
+class ExchangesError(Exception):
+    pass
+
+
 class Exchanges:
-    _exchanges = {}
-    _initializers = {KRAKEN: lambda: Kraken(), BITFINEX: lambda: Bitfinex()}
+    __exchanges = {}
+    __thread_manager = None
+    __initializers = {
+        KRAKEN: lambda: Kraken(Exchanges.__thread_manager),
+        BITFINEX: lambda: Bitfinex(Exchanges.__thread_manager),
+    }
+
+    @staticmethod
+    def set_thread_manager(thread_manager):
+        Exchanges.__thread_manager = thread_manager
 
     @staticmethod
     def get(exchange):
-        if exchange not in Exchanges._exchanges:
-            initializer = Exchanges._initializers[exchange]
-            Exchanges._exchanges[exchange] = initializer()
-        return Exchanges._exchanges[exchange]
+        if Exchanges.__thread_manager is None:
+            raise ExchangesError("static thread manager not set")
+        if exchange not in Exchanges.__exchanges:
+            initializer = Exchanges.__initializers[exchange]
+            Exchanges.__exchanges[exchange] = initializer()
+        return Exchanges.__exchanges[exchange]

@@ -16,7 +16,7 @@ class Strategy(ABC):
                 price data for each exchange you care about.
 
         Returns:
-            Gaussian: A multivariate Gaussian (over a DataFrame) with a variable per currency.
+            Gaussian: A multivariate Gaussian (over a DataFrame) with a variable per currency pair.
 
         """
         pass
