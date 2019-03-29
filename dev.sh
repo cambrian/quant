@@ -1,0 +1,2 @@
+rm .testmondata
+ptw -- --testmon
