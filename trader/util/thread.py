@@ -8,6 +8,7 @@ import datetime
 import os
 import time
 import traceback
+from enum import Enum
 from queue import Queue
 from threading import Condition, Lock, Thread
 
@@ -62,7 +63,6 @@ class MVar:
     def __init__(self):
         self.__lock = Lock()
         self.__condition = Condition(lock=self.__lock)
-        self.__changed = False
         self.__value = None
 
     def swap(self, new_value):
@@ -82,20 +82,29 @@ class MVar:
         self.__lock.release()
         return old_value
 
-    def read_on_write(self):
-        """Reads the current value of the `MVar` when it is written to.
+    def read(self):
+        """Reads the current value of the `MVar`. Blocks until a value is ready.
 
         Returns:
             The current value.
 
         """
         self.__lock.acquire()
-        if self.__changed == False:
+        if self.__value is None:
             self.__condition.wait()
         read_value = self.__value
-        self.__changed = False
         self.__lock.release()
         return read_value
+
+
+class ThreadManagerError(Exception):
+    pass
+
+
+class ThreadManagerState(Enum):
+    INITIALIZED = 1
+    RUNNING = 2
+    FINISHED = 3
 
 
 class ThreadManager:
@@ -109,6 +118,7 @@ class ThreadManager:
         self.__termination_queue = Queue()
         self.__finite_thread_count = 0
         self.__thread_runners = []
+        self.__state = ThreadManagerState.INITIALIZED
 
     def __propagate_error(self, name, fn, should_terminate):
         # Used to propagate unhandled errors to the main thread.
@@ -122,6 +132,12 @@ class ThreadManager:
         except Exception:
             self.__termination_queue.put((name, traceback.format_exc()))
 
+    def __run_daemon(self, fn):
+        thread = Thread(target=fn)
+        # Force-kill on KeyboardInterrupts.
+        thread.daemon = True
+        thread.start()
+
     def attach(self, name, fn, should_terminate=False):
         """Attaches a function to this thread manager as a new thread to be created.
 
@@ -131,21 +147,31 @@ class ThreadManager:
             should_terminate (bool): Whether we expect this function to terminate (or run forever).
 
         """
+        if self.__state == ThreadManagerState.FINISHED:
+            raise ThreadManagerError("ThreadManager has finished")
+
         if should_terminate:
             self.__finite_thread_count += 1
 
         def runner():
             self.__propagate_error(name, fn, should_terminate)
 
-        self.__thread_runners.append(runner)
+        if self.__state == ThreadManagerState.INITIALIZED:
+            self.__thread_runners.append(runner)
+        else:
+            self.__run_daemon(runner)
 
     def run(self):
         """Cannibalizes the current thread and runs any attached functions as children threads."""
+        if self.__state != ThreadManagerState.INITIALIZED:
+            if self.__state == ThreadManagerState.RUNNING:
+                raise ThreadManagerError("ThreadManager is currently running")
+            else:
+                raise ThreadManagerError("ThreadManager has finished")
+        else:
+            self.__state == ThreadManagerState.RUNNING
         for runner in self.__thread_runners:
-            thread = Thread(target=runner)
-            # Force-kill on KeyboardInterrupts.
-            thread.daemon = True
-            thread.start()
+            self.__run_daemon(runner)
         completed_threads = 0
         while True:
             (name, exc) = self.__termination_queue.get()
@@ -153,6 +179,7 @@ class ThreadManager:
             if exc is None:
                 print("Thread <{}> terminated.".format(name))
                 if completed_threads == self.__finite_thread_count:
+                    self.__state == ThreadManagerState.FINISHED
                     break
             else:
                 print("Thread <{}> terminated unexpectedly!".format(name))

@@ -1,37 +1,82 @@
+from collections import defaultdict
+from queue import Queue
+from threading import Lock
+
 from trader.exchange import Exchanges
 from trader.executor.base import Executor
 from trader.util import Feed
-from trader.util.constants import BUY, SELL, SIZE, base_currency
 from trader.util.stats import Gaussian
+from trader.util.types import Direction
+
+SIZE_PARAMETER = 100
 
 
 class Dummy(Executor):
-    """A shitty executor for testing purposes."""
+    """A shitty executor for testing purposes.
 
-    def __init__(self):
-        self.__fairs = Gaussian([0], [0])
+    NOTE: We lock `_trade_book` by exchange/pair such that calls to it are skipped if a lock cannot
+    be acquired. However, this only applies to order ticks (new fairs prices should always run a
+    cycle of orders).
 
-    def tick_book(self, book):
-        (exchange_name, pair, (bid, ask)) = book
-        exchange = Exchanges.get(exchange_name)
-        balance = exchange.balances[base_currency(pair)]
-        pair = exchange.translate(pair)
+    """
+
+    def __init__(self, thread_manager, exchange_pairs):
+        """Dummy-specific constructor.
+
+        Args:
+            exchange_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
+                that exchange to execute on.
+
+        """
+        super().__init__(thread_manager)
+        self.__trade_locks = defaultdict(Lock)
+        self.__books = {}
+        self.__fairs = None
+
+        # Set up book feeds for every pair.
+        for exchange_id in exchange_pairs:
+            exchange = Exchanges.get(exchange_id)
+            for pair in exchange_pairs[exchange_id]:
+                thread_manager.attach(
+                    "executor-{}-{}".format(exchange_id, pair),
+                    exchange.book(pair).subscribe(
+                        lambda book, exchange_pair=(exchange, pair): self.__tick_book(
+                            exchange_pair, book
+                        )
+                    ),
+                )
+
+    def __tick_book(self, exchange_pair, book):
+        self.__books[exchange_pair] = book
+        # TODO: There are a LOT of order book updates. Maybe don't trade on all of them?
+        lock = self.__trade_locks[exchange_pair]
+        lock_acquired = lock.acquire(False)
+        if lock_acquired:
+            self._trade_book(book)
+            lock.release()
+        print(book)
+
+    def _trade_book(self, book):
+        pair = book.pair
+        ask = book.ask
+        bid = book.bid
+        fairs = self.__fairs
+        if fairs is None:
+            return
+        exchange = Exchanges.get(book.exchange)
+        balance = exchange.balances[pair.base]
         fees = exchange.fees
-        buy_size = self.order_size(BUY, fees, balance, self.__fairs, ask)
-        sell_size = self.order_size(SELL, fees, balance, self.__fairs, bid)
-        # TODO: Logging
-        # TODO: Uncomment when live, commented now so we don't buy/sell while testing
+        # TODO: Change "buy" and "sell" to use the Direction enum.
+        buy_size = self.order_size("buy", fees, balance, fairs, ask)
+        sell_size = self.order_size("sell", fees, balance, fairs, bid)
         if buy_size > 0:
             print("Buy: {}".format(buy_size))
-            # buy_size = max(0.004, buy_size / 1000)
-            # print(
-            #     exchange.add_order(
-            #         pair, BUY, "exchange immediate-or-cancel", str(ask), str(buy_size)
-            #     )
-            # )
+            # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.
+            # exchange.add_order(pair, "buy", "exchange fill-or-kill", ask, buy_size)
+            # update_balances(balances, fill)
         if sell_size > 0:
             print("Sell: {}".format(sell_size))
-            # # TODO: remove, in place now until strategy is implemented to so we don't sell all BTC
+            # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
             # print(
             #     exchange.add_order(
@@ -40,15 +85,19 @@ class Dummy(Executor):
             # )
 
     def tick_fairs(self, fairs):
-        # TODO: Have this run the order loop.
         self.__fairs = fairs
+        for exchange_pair, book in self.__books.items():
+            lock = self.__trade_locks[exchange_pair]
+            lock.acquire()
+            self._trade_book(book)
+            lock.release()
+        print(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):
-        """Fair is a Gaussian. Returns order size in base currency"""
-        # TODO: Handle difference in maker/taker fee
-        dir_ = 1 if direction == BUY else -1
+        # TODO: Handle difference in maker/taker fee.
+        dir_ = 1 if direction == Direction.BUY else -1
         edge = ((fair.mean / price - 1) * dir_ - fees["taker"]) / fair.stddev
-        # positive edge --> profitable order
-        desired_balance_value = edge * SIZE * dir_
+        # Positive edge --> profitable order.
+        desired_balance_value = edge * SIZE_PARAMETER * dir_
         proposed_order_size = (desired_balance_value / price - balance) * dir_
         return max(0, proposed_order_size)

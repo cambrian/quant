@@ -1,52 +1,36 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from trader.util import Feed
 
 
-class Exchange(ABC):
-    """An abstract class for interacting with an exchange."""
+class ExchangeError(Exception):
+    pass
 
+
+class Exchange(ABC):
+    """An abstract class for interacting with an exchange.
+
+    Args:
+        thread_manager (ThreadManager): A thread manager to attach any child threads for this
+            exchange object.
+
+    """
+
+    @abstractmethod
+    def __init__(self, thread_manager):
+        self._thread_manager = thread_manager
+
+    @abstractmethod
     def book(self, pair):
-        """Returns a stream of order books for the given pair.
+        """Returns a `Feed` of order books for the given pair. If this is called twice with the same
+        pair, it should behave in an idempotent manner.
 
         Args:
-            pair (str): The pair to stream.
+            pair (Constant): The pair to stream.
 
         Returns:
-            Feed: A feed of book dataframes (see `_book`).
-
-        """
-        return Feed(self._book(pair))
-
-    @abstractmethod
-    def _book(self, pair):
-        """Generates a stream of order books for the given pair.
-
-        Args:
-            pair (str): The pair to stream.
-
-        Yields:
-            tuple: Order book tuple of (exchange, pair, best bid, best ask). TODO: This can be
-                easily made to return more levels in the book (when we want that).
-
-        """
-        pass
-
-    def track_balances(self, pair):
-        """Returns a function to dynamically track and update internal balance state.
-
-        Args:
-            pair (str): The pair to track.
-
-        """
-        pass
-
-    @abstractmethod
-    def translate(self, pair):
-        """Returns exchange's translation of pair argument
-
-        Args:
-            pair (str): The pair to translate.
+            Feed: A feed of `OrderBook`.
 
         """
         pass
@@ -56,23 +40,12 @@ class Exchange(ABC):
         """Queries prices and volumes for the given pairs.
 
         Args:
-            pairs (str): A list of pairs to query.
-            time_frame (type depends on exchange): Granularity of pricing data, in the exchange's
+            pairs (list): A list of pairs to query.
+            time_frame (type depends on exchange): Granularity of volume data, in the exchange's
                 format.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
-
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def fees(self):
-        """Queries exchange fees for the given pairs.
-
-        Returns:
-            dict: Map of maker/taker to fee set by exchange.
 
         """
         pass
@@ -88,10 +61,22 @@ class Exchange(ABC):
         """
         pass
 
+    @property
+    @abstractmethod
+    def fees(self):
+        """Queries exchange fees for the given pairs.
+
+        Returns:
+            dict: Map of maker/taker to fee set by exchange.
+
+        """
+        pass
+
     @abstractmethod
     def add_order(self, pair, side, order_type, price, volume):
         # Param side is buy/sell.
         # Param order_type is limit/market/other exchange specific options.
+        # TODO: Unify formats across exchanges.
         pass
 
     @abstractmethod

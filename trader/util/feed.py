@@ -4,8 +4,14 @@ from queue import Queue
 from trader.util.thread import MVar
 
 
+class PrivateError(Exception):
+    pass
+
+
 class Feed:
     """A multicast stream type for Python.
+
+    NOTE: The constructor is private. Use `Feed.of(iterable)` to construct a feed.
 
     Transformations of a feed (such as `map` or `filter`) return both a result and a function to run
     the transformation on a separate thread.
@@ -14,17 +20,31 @@ class Feed:
     less mistake-proof, since `feed.map(foo)` might have unexpected behavior if `feed.map_in_place`
     (for example) is called later on.
 
-    Args:
-        iterable: An iterable to initialize the feed from.
-        _initializer (Function): An initializer to run when the feed thread is started. NOTE: You
-            should NOT use this parameter.
-
     """
 
-    def __init__(self, iterable, _initializer=None):
+    # Hacky solution to prevent manual construction.
+    __private = object()
+
+    def __init__(self, private, iterable, initializer=None):
+        if private != Feed.__private:
+            raise PrivateError("constructor is private")
         self.__iterable = iterable
-        self.__initializer = _initializer
+        self.__initializer = initializer
         self.__sinks = []
+
+    @staticmethod
+    def of(iterable):
+        """Static constructor for Feed.
+
+        Args:
+            iterable: An iterable to initialize the feed from.
+
+        Returns:
+            (Feed, Function): The feed and a function to run the feed's iterable.
+
+        """
+        feed = Feed(Feed.__private, iterable)
+        return (feed, feed.run)
 
     def _sink(self, transform, buffer_size=256):
         """Creates a new feed by transforming the iterable of this feed.
@@ -45,7 +65,7 @@ class Feed:
         def initializer():
             self.__sinks.append(feed_queue.put_nowait)
 
-        feed = Feed(transform(iter(feed_queue.get, None)), initializer)
+        feed = Feed(Feed.__private, transform(iter(feed_queue.get, None)), initializer)
         return feed, feed.run
 
     def map(self, fn, **kwargs):
@@ -54,23 +74,20 @@ class Feed:
     def filter(self, fn, **kwargs):
         return self._sink(partial(filter, fn), **kwargs)
 
-    def fold(self, fn, acc, acc_var=None, **kwargs):
+    def fold(self, fn, acc, **kwargs):
         """Returns an `MVar` that tracks an accumulation of this feed.
 
         Args:
             fn (Function): An accumulating function that takes a feed item and the current
                 accumulator value at each tick.
             acc: An initial value for the accumulator.
-            acc_var: An optional argument to provide your own pre-existing `MVar`. This is useful in
-                certain scenarios, such as folding many feeds into a single `MVar`.
 
         Returns:
             (MVar, Function): The `MVar` and a function to run the accumulation.
 
         """
         current_acc = acc
-        if acc_var is None:
-            acc_var = MVar()
+        acc_var = MVar()
 
         def update(item):
             nonlocal current_acc
