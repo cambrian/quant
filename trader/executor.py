@@ -47,6 +47,12 @@ class Executor:
 
     def __tick_book(self, exchange, pair, book):
         self.__books_lock.acquire()
+        if (exchange, pair) in self.__latest_books:
+            latest_book = self.__latest_books[exchange, pair]
+            # Two order books can have the same bid/ask but different last trade price.
+            if latest_book.bid == book.bid and latest_book.ask == book.ask:
+                self.__books_lock.release()
+                return
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)

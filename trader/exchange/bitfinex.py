@@ -12,8 +12,7 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
 from trader.util.types import OrderBook
 
@@ -81,8 +80,9 @@ class Bitfinex(Exchange):
         self.__ws_client.subscribe_to_orderbook(
             trans_pair, precision="R0", callback=add_messages_to_queue
         )
+        last_trade_price = None
 
-        # Current state of `order_book` is always first message.
+        # Current snapshot of `order_book` is always first message.
         raw_book = book_queue.get()[1]
         order_book = {"bid": SortedList(key=lambda x: -x[0]), "ask": SortedList(key=lambda x: x[0])}
         for order in raw_book:
@@ -91,26 +91,21 @@ class Bitfinex(Exchange):
             else:
                 order_book["ask"].add((order[1], abs(order[2]), order[0]))
 
-        current_book = None
         while True:
-            # TODO: Use last price in place of None.
-            next_book = OrderBook(
-                self, pair, None, order_book["bid"][0][0], order_book["ask"][0][0]
+            yield OrderBook(
+                self, pair, last_trade_price, order_book["bid"][0][0], order_book["ask"][0][0]
             )
-            # De-duplicate order books (why is Bitfinex sending duplicates)?
-            if next_book != current_book:
-                current_book = next_book
-                yield current_book
             change = book_queue.get()
             delete = False
             if len(change) > 1 and isinstance(change[1], list):
                 side = "bid" if change[1][2] > 0 else "ask"
-                # Order was filled:
                 for order in order_book[side]:
                     if order[2] == change[1][0]:
-                        order_book[side].discard(order)
+                        # Order was filled:
                         if change[1][1] == 0:
                             delete = True
+                            last_trade_price = float(order[0])
+                        order_book[side].discard(order)
                         break
                 if not delete:
                     order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
