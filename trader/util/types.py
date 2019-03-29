@@ -49,3 +49,12 @@ class Direction(Enum):
 
     BUY = 1
     SELL = 2
+
+
+class OrderType(Enum):
+    """An enum to be translated by each exchange."""
+
+    MARKET = 1
+    LIMIT = 2
+    IOC = 3
+    FOK = 4

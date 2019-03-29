@@ -12,9 +12,10 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 from trader.util.feed import Feed
-from trader.util.types import OrderBook
+from trader.util.types import Direction, OrderBook, OrderType
 
 
 class Bitfinex(Exchange):
@@ -44,6 +45,12 @@ class Bitfinex(Exchange):
         self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
+        self.__order_types = {
+            OrderType.MARKET: "exchange market",
+            OrderType.LIMIT: "exchange limit",
+            OrderType.IOC: "exchange immediate-or-cancel",
+            OrderType.FOK: "exchange fill-or-kill",
+        }
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
         self.__books = {}
@@ -190,16 +197,16 @@ class Bitfinex(Exchange):
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
         # Strip "t"
-        pair = pair[1:]
+        pair = self.__translate_to[pair][1:]
         payload = {
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),
             "symbol": pair,
-            "amount": volume,
-            "price": price,
+            "amount": str(volume),
+            "price": str(price),
             "exchange": "bitfinex",
-            "side": side,
-            "type": order_type,
+            "side": "buy" if side == Direction.BUY else "sell",
+            "type": self.__order_types[order_type],
             "is_postonly": maker,
         }
         return self.__bfxv1._post("/order/new", payload=payload, verify=True)
