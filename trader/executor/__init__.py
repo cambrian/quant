@@ -2,7 +2,6 @@ from collections import defaultdict
 from queue import Queue
 from threading import Lock
 
-from trader.exchange import Exchanges
 from trader.util import Feed
 from trader.util.stats import Gaussian
 from trader.util.types import Direction
@@ -27,12 +26,11 @@ class Executor:
                 that exchange to execute on.
 
         """
-        super().__init__(thread_manager)
-        self.__fairs_lock = Lock()
         self.__books_lock = Lock()
         self.__trade_locks = defaultdict(Lock)
         self.__latest_books = defaultdict(None)
         self.__latest_fairs = None
+        self.__thread_manager = thread_manager
 
         # Set up book feeds for every pair.
         for exchange, pairs in exchange_pairs.items():
@@ -40,20 +38,22 @@ class Executor:
                 thread_manager.attach(
                     "executor-{}-{}".format(exchange.id, pair),
                     exchange.book(pair).subscribe(
-                        lambda book:
-                            self.__books_lock.acquire()
-                            self.__latest_books[exchange, pair] = book
-                            self.__books_lock.release()
-                            self.__trade(exchange, pair)
+                        lambda book: self.__tick_book(exchange, pair, book)
                     ),
                 )
 
+    def __tick_book(self, exchange, pair, book):
+        self.__books_lock.acquire()
+        self.__latest_books[(exchange, pair)] = book
+        self.__books_lock.release()
+        self.__trade(exchange, pair)
+
     def __trade(self, exchange, pair, wait_for_other_trade=False):
-        '''
+        """
         If `wait_for_other_trade` is false, doesn't try to trade if there is another thread trading
         this same exchange pair. If true, it will wait for the other thread to finish trading this
         pair and try immediately after.
-        '''
+        """
         trade_lock = self.__trade_locks[exchange, pair]
         if wait_for_other_trade:
             trade_lock.acquire()
@@ -61,13 +61,10 @@ class Executor:
             return
 
         self.__books_lock.acquire()
-        book = self.__latest_books[exchange, pair]
+        book = self.__latest_books[(exchange, pair)]
         self.__books_lock.release()
 
-        self.__fairs_lock.acquire()
         fairs = self.__latest_fairs
-        self.__fairs_lock.release()
-
         if fairs is None:
             return
 
@@ -76,8 +73,8 @@ class Executor:
         balance = exchange.balances[pair.base]
         fees = exchange.fees
         # TODO: Change "buy" and "sell" to use the Direction enum.
-        buy_size = self.order_size("buy", fees, balance, fairs, ask)
-        sell_size = self.order_size("sell", fees, balance, fairs, bid)
+        buy_size = self.order_size("buy", fees["taker"], balance, fairs, ask)
+        sell_size = self.order_size("sell", fees["taker"], balance, fairs, bid)
         if buy_size > 0:
             print("Buy: {}".format(buy_size))
             # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.
@@ -95,18 +92,17 @@ class Executor:
         trade_lock.release()
 
     def tick_fairs(self, fairs):
-        self.__fairs_lock.acquire()
         self.__latest_fairs = fairs
-        self.__fairs_lock.release()
         for exchange, pair in self.__latest_books:
-            # TODO: do this in a child thread
-            self.__trade(exchange, pair, wait_for_other_trade=True)
+            self.__thread_manager.attach(
+                "executor-fair-tick-{}-{}".format(exchange.id, pair),
+                self.__trade(exchange, pair, wait_for_other_trade=True),
+            )
         print(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):
-        # TODO: Handle difference in maker/taker fee.
         dir_ = 1 if direction == Direction.BUY else -1
-        edge = ((fair.mean / price - 1) * dir_ - fees["taker"]) / fair.stddev
+        edge = ((fair.mean / price - 1) * dir_ - fees) / fair.stddev
         # Positive edge --> profitable order.
         desired_balance_value = edge * SIZE_PARAMETER * dir_
         proposed_order_size = (desired_balance_value / price - balance) * dir_
