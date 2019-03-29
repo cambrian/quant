@@ -21,6 +21,17 @@ class Exchange(ABC):
     def __init__(self, thread_manager):
         self._thread_manager = thread_manager
 
+    @property
+    @abstractmethod
+    def id(self):
+        """
+        Returns:
+            string: Exchange id.
+
+        """
+        pass
+
+    # TODO: wrap a _book method and do deduplication
     @abstractmethod
     def book(self, pair):
         """Returns a `Feed` of order books for the given pair. If this is called twice with the same

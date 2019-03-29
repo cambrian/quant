@@ -25,7 +25,14 @@ class Bitfinex(Exchange):
 
     """
 
+    # Allow only 1 instance. In the near future we should change the exchange classes to actually
+    # be singletons, but first we should extract common logic into the Exchange base class before
+    # making that change.
+    __instance_exists = False
+
     def __init__(self, thread_manager):
+        assert not Bitfinex.__instance_exists
+        Bitfinex.__instance_exists = True
         super().__init__(thread_manager)
         self.__api_key = os.getenv("BITFINEX_API_KEY", "")
         self.__api_secret = os.getenv("BITFINEX_SECRET", "")
@@ -45,6 +52,10 @@ class Bitfinex(Exchange):
         thread_manager.attach("bitfinex-balances", self.__track_balances)
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
+
+    @property
+    def id(self):
+        return BITFINEX
 
     def book(self, pair):
         if pair not in self.__supported_pairs:
