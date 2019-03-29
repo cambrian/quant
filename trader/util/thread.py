@@ -6,6 +6,7 @@ Primitives and infrastructure for multithreading.
 
 import datetime
 import os
+import sys
 import time
 import traceback
 from enum import Enum
@@ -182,7 +183,7 @@ class ThreadManager:
                     self.__state == ThreadManagerState.FINISHED
                     break
             else:
-                print("Thread <{}> terminated unexpectedly!".format(name))
+                print("Thread <{}> terminated unexpectedly!".format(name), file=sys.stderr)
                 if exc is not None:
-                    print(exc[:-1])
-                os._exit(1)
+                    print(exc[:-1], file=sys.stderr)
+                raise ThreadManagerError("see stderr for details")

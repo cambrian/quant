@@ -1,7 +1,10 @@
+import itertools
+import time
 from functools import partial, reduce
-from queue import Queue
+from queue import Full, Queue
+from threading import Thread
 
-from trader.util.thread import MVar
+from trader.util.thread import MVar, ThreadManager
 
 
 class PrivateError(Exception):
@@ -25,12 +28,17 @@ class Feed:
     # Hacky solution to prevent manual construction.
     __private = object()
 
+    # Sentinel value for the end of items in a feed (None is more conventional, but may lead to
+    # unexpected results if people want to use None in their feeds).
+    __end = object()
+
     def __init__(self, private, iterable, initializer=None):
         if private != Feed.__private:
             raise PrivateError("constructor is private")
         self.__iterable = iterable
         self.__initializer = initializer
         self.__sinks = []
+        self.__done = False
 
     @staticmethod
     def of(iterable):
@@ -46,7 +54,7 @@ class Feed:
         feed = Feed(Feed.__private, iterable)
         return (feed, feed.run)
 
-    def _sink(self, transform, buffer_size=256):
+    def _sink(self, transform, buffer_size=None, attach_lazy=True):
         """Creates a new feed by transforming the iterable of this feed.
 
         Prefer calling `map`, `filter`, or any of the other specialized versions of this method.
@@ -55,17 +63,28 @@ class Feed:
             transform (Function): A function that transforms an iterable into a new iterable.
             buffer_size (int): An argument to bound the size of the sink queue. This is useful when
                 you do not want the parent writer feed to outpace the child reader feed.
+            attach_lazy (bool): When True, items will not be placed in the sink queue until the
+                transformed feed is actually run.
 
         Returns:
             (Feed, Function): The transformed result feed and a function to run the transformation.
 
         """
-        feed_queue = Queue(maxsize=buffer_size)
-        # Delay attachment to parent for stateless behavior.
-        def initializer():
-            self.__sinks.append(feed_queue.put_nowait)
+        feed_queue = Queue(maxsize=0 if buffer_size is None else buffer_size)
 
-        feed = Feed(Feed.__private, transform(iter(feed_queue.get, None)), initializer)
+        def initializer():
+            if self.__done:
+                feed_queue.put(Feed.__end)
+            else:
+                self.__sinks.append(feed_queue.put_nowait)
+
+        if attach_lazy:
+            initializer_fn = initializer
+        else:
+            initializer()
+            initializer_fn = None
+
+        feed = Feed(Feed.__private, transform(iter(feed_queue.get, Feed.__end)), initializer_fn)
         return feed, feed.run
 
     def map(self, fn, **kwargs):
@@ -113,3 +132,97 @@ class Feed:
         for item in self.__iterable:
             for sink in self.__sinks:
                 sink(item)
+        for sink in self.__sinks:
+            sink(Feed.__end)
+        self.__done = True
+
+
+def test_feed_simple():
+    """Tests the basic functions of `Feed`."""
+    thread_manager = ThreadManager()
+    feed, runner = Feed.of(range(1000))
+    thread_manager.attach("original", runner, should_terminate=True)
+
+    feed_even, runner = feed.filter(lambda x: x % 2 == 0, attach_lazy=False)
+    thread_manager.attach("filtered", runner, should_terminate=True)
+
+    aggregate, runner = feed_even.fold(lambda item, acc: acc + item, 0, attach_lazy=False)
+    thread_manager.attach("aggregate", runner, should_terminate=True)
+
+    feed_even_str, runner = feed_even.map(str, attach_lazy=False)
+    thread_manager.attach("filtered-mapped", runner, should_terminate=True)
+
+    results = []
+    runner = feed_even_str.subscribe(results.append, attach_lazy=False)
+    thread_manager.attach("results", runner, should_terminate=True)
+
+    thread_manager.run()
+    assert aggregate.read() == sum(range(0, 1000, 2))
+    assert results == [str(i) for i in range(0, 1000, 2)]
+
+
+def test_feed_lazy():
+    """Tests the difference between lazy and live attachment of children feeds.
+
+    TODO: Make this less jank by allowing the runner threads to be explicitly cancelled (this
+    requires some thread plumbing). For now the busy waiting strategy should work fine.
+
+    """
+    lazy_results = []
+    live_results = []
+
+    feed, runner = Feed.of(itertools.count())
+    runner_lazy = feed.subscribe(lazy_results.append)
+    runner_live = feed.subscribe(live_results.append, attach_lazy=False)
+
+    runner_thread = Thread(target=runner, daemon=True)
+    runner_lazy_thread = Thread(target=runner_lazy, daemon=True)
+    runner_live_thread = Thread(target=runner_live, daemon=True)
+
+    runner_thread.start()
+    runner_live_thread.start()
+
+    while len(live_results) == 0:
+        time.sleep(0.01)
+
+    runner_lazy_thread.start()
+
+    while len(lazy_results) == 0:
+        time.sleep(0.01)
+
+    assert live_results[0] == 0
+    assert lazy_results[0] > live_results[0]
+
+
+def test_feed_dead():
+    """Test lazy attachment to a dead feed and ensure immediate termination.
+
+    TODO: Make this test not hang if it fails.
+
+    """
+    feed, runner = Feed.of(range(1))
+    runner_thread = Thread(target=runner)
+    runner_thread.start()
+    runner_thread.join()
+
+    runner = feed.subscribe(lambda: None)
+    runner_thread = Thread(target=runner)
+    runner_thread.start()
+    runner_thread.join()
+
+
+def test_feed_buffer_size():
+    """Test the buffer size parameter on sinks."""
+    feed, runner = Feed.of(range(5))
+    feed.subscribe(lambda: None, buffer_size=5, attach_lazy=False)
+
+    def feed_runner():
+        try:
+            runner()
+        except Full:
+            return
+        raise Exception("expected Full exception")
+
+    thread_manager = ThreadManager()
+    thread_manager.attach("feed-runner", feed_runner, should_terminate=True)
+    thread_manager.run()
