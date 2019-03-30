@@ -82,7 +82,6 @@ class Executor:
         bid = book.bid
         balance = exchange.balances[pair.base]
         fees = exchange.fees
-        # TODO: Change "buy" and "sell" to use the Direction enum.
         buy_size = self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask)
         sell_size = self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
         if buy_size > 0:

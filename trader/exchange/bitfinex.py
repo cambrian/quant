@@ -9,11 +9,10 @@ from queue import Queue
 import pandas as pd
 from bitfinex import ClientV1, ClientV2, WssClient
 from sortedcontainers import SortedList
-from websocket import create_connection
+from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
 from trader.util.types import Direction, OrderBook, OrderType
 
@@ -150,45 +149,56 @@ class Bitfinex(Exchange):
 
     def __track_balances(self):
         """Thread function to constantly track exchange's balance."""
-        ws = create_connection("wss://api.bitfinex.com/ws/")
-        nonce = int(time.time() * 1000000)
-        auth_payload = "AUTH{}".format(nonce)
-        signature = hmac.new(
-            self.__api_secret.encode(), msg=auth_payload.encode(), digestmod=hashlib.sha384
-        ).hexdigest()
 
-        payload = {
-            "apiKey": self.__api_key,
-            "event": "auth",
-            "authPayload": auth_payload,
-            "authNonce": nonce,
-            "authSig": signature,
-            "filter": ["wallet"],
-        }
+        def on_open(ws):
+            nonce = int(time.time() * 1000000)
+            auth_payload = "AUTH{}".format(nonce)
+            signature = hmac.new(
+                self.__api_secret.encode(), msg=auth_payload.encode(), digestmod=hashlib.sha384
+            ).hexdigest()
 
-        def update_balances(update):
-            # Only track exchange (trading) wallet.
-            if len(update) >= 3 and update[0] == "exchange":
-                self.__balances[self.__translate_from[update[1]]] = update[2]
+            payload = {
+                "apiKey": self.__api_key,
+                "event": "auth",
+                "authPayload": auth_payload,
+                "authNonce": nonce,
+                "authSig": signature,
+                "filter": ["wallet"],
+            }
+            ws.send(json.dumps(payload))
 
-        ws.send(json.dumps(payload))
-        chan_id = 0
-        while True:
-            msg = json.loads(ws.recv())
-            if isinstance(msg, dict) and "event" in msg:
-                if msg["event"] == "auth":
-                    chan_id = msg["chanId"]
-                elif msg["event"] == "error":
-                    break
-            else:
-                # Ignore heartbeats and only listen on this chan_id.
-                if len(msg) > 1 and msg[0] == chan_id and msg[1] != "hb":
+        def on_message(ws, msg):
+            msg = json.loads(msg)
+
+            def update_balances(update):
+                # Only track exchange (trading) wallet.
+                if len(update) >= 3 and update[0] == "exchange":
+                    self.__balances[self.__translate_from[update[1]]] = update[2]
+
+            if isinstance(msg, list):
+                # Ignore heartbeats
+                if len(msg) > 1 and msg[1] != "hb":
                     # Disambiguate wallet snapshot/update:
                     if msg[1] == "ws":
                         for update in msg[2]:
                             update_balances(update)
                     elif msg[1] == "wu":
                         update_balances(msg[2])
+
+        def on_error(ws, error):
+            print(error)
+
+        def on_close(ws):
+            print("### closed ###")
+
+        ws = WebSocketApp(
+            "wss://api.bitfinex.com/ws/",
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close,
+        )
+        ws.on_open = on_open
+        ws.run_forever()
 
     @property
     def fees(self):
