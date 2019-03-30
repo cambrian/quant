@@ -13,6 +13,8 @@ from enum import Enum
 from queue import Queue
 from threading import Condition, Lock, Thread
 
+from trader.util.log import Log
+
 
 class BeatError(Exception):
     pass
@@ -40,7 +42,7 @@ class Beat:
             delta = datetime.datetime.now() - self.__last_beat
             duration_to_sleep = (self.__interval / 1000.0) - delta.total_seconds()
             if duration_to_sleep < 0:
-                print("Warning: Loop body too slow for beat interval.")
+                Log.warn("Warning: Loop body too slow for beat interval.")
             else:
                 time.sleep(duration_to_sleep)
             self.__last_beat = None
@@ -197,12 +199,12 @@ class ThreadManager:
             (name, exc) = self.__termination_queue.get()
             completed_threads += 1
             if exc is None:
-                print("Thread <{}> terminated.".format(name))
+                Log.info("Thread <{}> terminated.".format(name))
                 if completed_threads == self.__finite_thread_count:
                     self.__state == ThreadManagerState.FINISHED
                     break
             else:
-                print("Thread <{}> terminated unexpectedly!".format(name), file=sys.stderr)
+                Log.warn("Thread <{}> terminated unexpectedly!".format(name))
                 if exc is not None:
                     print(exc[:-1], file=sys.stderr)
                 raise ThreadManagerError("see stderr for details")

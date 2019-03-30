@@ -3,6 +3,7 @@ from queue import Queue
 from threading import Lock
 
 from trader.util import Feed
+from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, OrderType
 
@@ -56,7 +57,7 @@ class Executor:
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)
-        print(book)
+        Log.info(book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):
         """
@@ -85,15 +86,15 @@ class Executor:
         buy_size = self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask)
         sell_size = self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
         if buy_size > 0:
-            print("Buy: {}".format(buy_size))
+            Log.info("Buy: {}".format(buy_size))
             # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.
             # exchange.add_order(pair, Direction.SELL, OrderType.IOC, ask, buy_size)
             # update_balances(balances, fill)
         if sell_size > 0:
-            print("Sell: {}".format(sell_size))
+            Log.info("Sell: {}".format(sell_size))
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
-            # print(
+            # Log.info(
             # exchange.add_order(
             #     pair, Direction.SELL, OrderType.IOC, str(bid), str(sell_size)
             # )
@@ -110,7 +111,7 @@ class Executor:
                 should_terminate=True,
             )
         self.__books_lock.release()
-        print(fairs)
+        Log.info(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):
         dir_ = 1 if direction == Direction.BUY else -1
