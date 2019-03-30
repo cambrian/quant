@@ -186,10 +186,13 @@ class Bitfinex(Exchange):
                         update_balances(msg[2])
 
         def on_error(ws, error):
+            print("### WS error within __track_balances for exchange {} ###".format(self.id))
             print(error)
 
         def on_close(ws):
-            print("### closed ###")
+            print("### WS closed unexpectedly for exchange {} ###".format(self.id))
+            print("### Restarting WS for exchange {} ###".format(self.id))
+            self.__track_balances()
 
         ws = WebSocketApp(
             "wss://api.bitfinex.com/ws/",
@@ -199,6 +202,8 @@ class Bitfinex(Exchange):
         )
         ws.on_open = on_open
         ws.run_forever()
+        time.sleep(10)
+        ws.close()
 
     @property
     def fees(self):
