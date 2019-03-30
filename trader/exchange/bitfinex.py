@@ -14,6 +14,7 @@ from websocket import WebSocketApp
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
+from trader.util.log import Log
 from trader.util.types import Direction, OrderBook, OrderType
 
 
@@ -186,12 +187,11 @@ class Bitfinex(Exchange):
                         update_balances(msg[2])
 
         def on_error(ws, error):
-            print("### WS error within __track_balances for exchange {} ###".format(self.id))
-            print(error)
+            Log.warn("WS error within __track_balances for exchange {}: {}".format(self.id, error))
 
         def on_close(ws):
-            print("### WS closed unexpectedly for exchange {} ###".format(self.id))
-            print("### Restarting WS for exchange {} ###".format(self.id))
+            Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
+            Log.info("Restarting WS for exchange {}".format(self.id))
             self.__track_balances()
 
         ws = WebSocketApp(

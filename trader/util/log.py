@@ -53,6 +53,7 @@ class Log:
 
     @staticmethod
     def info(message):
+        """Logs messages that are part of normal program operation."""
         Log._log(
             "INFO",
             message,
@@ -64,6 +65,7 @@ class Log:
 
     @staticmethod
     def warn(message):
+        """Logs messages that indicate potential (non-fatal) issues."""
         Log._log(
             "WARN",
             message,
