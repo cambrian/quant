@@ -48,7 +48,7 @@ class Log:
     ):
         log_message = [color_level(log_level), color_time(_time())]
         log_message.append(color_context(context))
-        log_message.append(color_message(str(message).replace("\n", "\\n")))
+        log_message.append(color_message(str(message).replace("\n", "\\n").replace("\t", "\\t")))
         print("\t".join(str(x) for x in log_message), file=sys.stderr)
 
     @staticmethod
