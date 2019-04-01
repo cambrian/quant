@@ -204,7 +204,7 @@ class ThreadManager:
                     self.__state == ThreadManagerState.FINISHED
                     break
             else:
-                Log.warn("Thread <{}> terminated unexpectedly!".format(name))
+                print("Thread <{}> terminated unexpectedly!".format(name))
                 if exc is not None:
                     print(exc[:-1], file=sys.stderr)
                 raise ThreadManagerError("see stderr for details")
