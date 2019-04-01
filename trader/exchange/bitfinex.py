@@ -105,10 +105,11 @@ class Bitfinex(Exchange):
                 self, pair, last_trade_price, order_book["bid"][0][0], order_book["ask"][0][0]
             )
             change = book_queue.get()
-            # If WS has been reset, update order_book with current snapshot
+            # If WS has been reset (such that we are getting a snapshot back), update order_book
+            # with current snapshot:
             if len(change) > 2 and isinstance(change[0], list):
                 handle_snapshot(change)
-            # Else handle update
+            # Else handle update normally:
             else:
                 delete = False
                 if len(change) > 1 and isinstance(change[1], list):
@@ -184,7 +185,7 @@ class Bitfinex(Exchange):
                     self.__balances[self.__translate_from[update[1]]] = update[2]
 
             if isinstance(msg, list):
-                # Ignore heartbeats
+                # Ignore heartbeats.
                 if len(msg) > 1 and msg[1] != "hb":
                     # Disambiguate wallet snapshot/update:
                     if msg[1] == "ws":
@@ -217,8 +218,7 @@ class Bitfinex(Exchange):
         return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
-        # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
-        # Strip "t"
+        # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
         pair = self.__translate_to[pair][1:]
         payload = {
             "request": "/v1/order/new",
