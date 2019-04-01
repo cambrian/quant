@@ -83,8 +83,14 @@ class Executor:
         bid = book.bid
         balance = exchange.balances[pair.base]
         fees = exchange.fees
-        buy_size = self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask)
-        sell_size = self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
+        buy_size = (
+            self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask) if ask != None else 0
+        )
+        sell_size = (
+            self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
+            if bid != None
+            else 0
+        )
         if buy_size > 0:
             Log.info("Buy: {}".format(buy_size))
             # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.

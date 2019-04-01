@@ -12,8 +12,7 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BTC, BTC_USD, ETH, ETH_USD, USD, XRP,
-                                   XRP_USD, not_implemented)
+from trader.util.constants import BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD, not_implemented
 from trader.util.feed import Feed
 from trader.util.types import OrderBook
 
@@ -80,9 +79,6 @@ class DummyExchange(Exchange):
         return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
-        # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
-        # Strip "t"
-
         not_implemented()
 
     def cancel_order(self, order_id):

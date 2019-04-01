@@ -85,11 +85,16 @@ class Bitfinex(Exchange):
                 book_queue.put(message)
 
         def handle_snapshot(snapshot):
+            order_book = {
+                "bid": SortedList(key=lambda x: -x[0]),
+                "ask": SortedList(key=lambda x: x[0]),
+            }
             for order in snapshot:
                 if order[2] > 0:
                     order_book["bid"].add((order[1], abs(order[2]), order[0]))
                 else:
                     order_book["ask"].add((order[1], abs(order[2]), order[0]))
+            return order_book
 
         self.__ws_client.subscribe_to_orderbook(
             trans_pair, precision="R0", callback=add_messages_to_queue
@@ -97,33 +102,36 @@ class Bitfinex(Exchange):
         last_trade_price = None
 
         raw_book = book_queue.get()[1]
-        order_book = {"bid": SortedList(key=lambda x: -x[0]), "ask": SortedList(key=lambda x: x[0])}
-        handle_snapshot(raw_book)
+        order_book = handle_snapshot(raw_book)
 
         while True:
             yield OrderBook(
-                self, pair, last_trade_price, order_book["bid"][0][0], order_book["ask"][0][0]
+                self,
+                pair,
+                last_trade_price,
+                order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
+                order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
             )
             change = book_queue.get()
             # If WS has been reset (such that we are getting a snapshot back), update order_book
             # with current snapshot:
             if len(change) > 2 and isinstance(change[0], list):
-                handle_snapshot(change)
+                order_book = handle_snapshot(change)
             # Else handle update normally:
             else:
                 delete = False
                 if len(change) > 1 and isinstance(change[1], list):
-                    side = "bid" if change[1][2] > 0 else "ask"
-                    for order in order_book[side]:
-                        if order[2] == change[1][0]:
-                            # Order was filled:
-                            if change[1][1] == 0:
-                                delete = True
-                                last_trade_price = float(order[0])
-                            order_book[side].discard(order)
-                            break
-                    if not delete:
-                        order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
+                    for side in ["bid", "ask"]:
+                        for order in order_book[side]:
+                            if order[2] == change[1][0]:
+                                # Order was filled:
+                                if change[1][1] == 0:
+                                    delete = True
+                                    last_trade_price = float(order[0])
+                                order_book[side].discard(order)
+                                break
+                        if not delete:
+                            order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
     def prices(self, pairs, time_frame):
         """
