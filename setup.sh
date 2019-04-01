@@ -5,7 +5,7 @@ pip3 install -r requirements.txt --upgrade
 # Grab test exchange data from S3.
 # mkdir -p research/data/test
 # echo 'Downloading exchange data from S3...'
-# aws s3 cp --recursive s3://cambrianexchangedata/data/test/ research/data/test
+# aws s3 cp --no-sign-request --recursive s3://cambrianexchangedata/data/test/ research/data/test
 # echo 'Done.'
 
 git config filter.nbstripout.clean 'nbstripout'
