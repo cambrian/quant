@@ -38,9 +38,11 @@ class TradingPair:
         self.__base = base
         self.__quote = quote
 
+    @property
     def base(self):
         return self.__base
 
+    @property
     def quote(self):
         return self.__quote
 
