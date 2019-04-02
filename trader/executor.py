@@ -37,7 +37,7 @@ class Executor:
             for pair in pairs:
                 thread_manager.attach(
                     "executor-{}-{}".format(exchange.id, pair),
-                    exchange.book(pair).subscribe(
+                    exchange.book_feed(pair).subscribe(
                         # Ugly but otherwise the values of exchange/pair will get overwritten in
                         # the closure at every iteration...
                         lambda book, exchange=exchange, pair=pair: self.__tick_book(

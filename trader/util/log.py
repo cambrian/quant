@@ -71,7 +71,7 @@ class Log:
             Log.Level.INFO,
             message,
             context=_get_caller_context(),
-            color_level=_colorize.blue,
+            color_level=_colorize.green,
             color_time=_colorize.cyan,
             color_context=_colorize.violet,
         )
@@ -111,7 +111,7 @@ class Log:
             Log.Level.DATA,
             json.dumps({"key": key, "value": json_value}),
             context=_get_caller_context(),
-            color_level=_colorize.green,
+            color_level=_colorize.blue,
             color_time=_colorize.cyan,
             color_context=_colorize.violet,
         )

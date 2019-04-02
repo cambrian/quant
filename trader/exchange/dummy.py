@@ -69,6 +69,11 @@ class DummyExchange(Exchange):
         Log.data("dummy-debug", {"step": self.time, "prices": self.__prices})
         self.time += 1
 
+    # TODO
+    def book_feed(self, pair):
+        pass
+
+    # TODO: Remove.
     def book(self, pair):
         pair = self.translate[pair]
         if pair not in self.__supported_pairs:
@@ -106,6 +111,10 @@ class DummyExchange(Exchange):
             data["close"].append(val[0])
             data["volume"].append(val[1])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+
+    # TODO
+    def balances_feed(self):
+        pass
 
     @property
     def balances(self):
