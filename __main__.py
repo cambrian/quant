@@ -12,7 +12,7 @@ from trader.util.types import Direction, Order
 
 thread_manager = ThreadManager()
 bitfinex = Bitfinex(thread_manager)
-# If you don't have research/data/1min.h5, download 1min from S3 and run hd5.ipynb
+# If you don't have research/data/1min.h5, download 1min from S3 and run hd5.ipynb:
 # data_min = pd.read_hdf("research/data/1min.h5")
 # dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
@@ -30,17 +30,17 @@ def main():
         executor.tick_fairs(fairs)
 
 
-def dummy_main():
-    beat = Beat(60000)
-    # Need to set fairs, but don't want to run tick_fairs thread every minute
-    dummy_exchange.step_time()
-    dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
-    dummy_fairs = dummy_strategy.tick(dummy_data)
-    fairs = Gaussian.intersect([dummy_fairs])
-    executor.tick_fairs(fairs)
-    while beat.loop():
-        dummy_exchange.step_time()
-        dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+# def dummy_main():
+#     beat = Beat(60000)
+#     # Need to set fairs, but don't want to run tick_fairs thread every minute:
+#     dummy_exchange.step_time()
+#     dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+#     dummy_fairs = dummy_strategy.tick(dummy_data)
+#     fairs = Gaussian.intersect([dummy_fairs])
+#     executor.tick_fairs(fairs)
+#     while beat.loop():
+#         dummy_exchange.step_time()
+#         dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
 
 
 thread_manager.attach("main", main)

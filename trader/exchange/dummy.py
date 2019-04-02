@@ -13,19 +13,27 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BTC, BTC_USDT, ETH, ETH_USDT, USD, XRP,
-                                   XRP_USDT, not_implemented)
+from trader.util.constants import (
+    BTC,
+    BTC_USDT,
+    DUMMY,
+    ETH,
+    ETH_USDT,
+    USD,
+    XRP,
+    XRP_USDT,
+    not_implemented,
+)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
 
 
 class DummyExchange(Exchange):
-    """Dummy exchange. Uses historical data and executes orders at last trade price.
-    """
+    """Dummy exchange. Uses historical data and executes orders at last trade price."""
 
     # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the Exchange base class before
+    # be singletons, but first we should extract common logic into the `Exchange` base class before
     # making that change.
     __instance_exists = False
 
@@ -35,7 +43,7 @@ class DummyExchange(Exchange):
         super().__init__(thread_manager)
         self.__data = data
         self.__supported_pairs = data.iloc[0].index
-        # time is not private to allow manual adjustment.
+        # `time` is not private to allow manual adjustment.
         self.time = 0
         self.__fees = {"maker": 0.001, "taker": 0.002}
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
@@ -47,7 +55,7 @@ class DummyExchange(Exchange):
 
     @property
     def id(self):
-        return "DUMMY_EXCHANGE"
+        return DUMMY
 
     def step_time(self):
         data = self.__data.iloc[self.time]
@@ -75,7 +83,7 @@ class DummyExchange(Exchange):
 
     def __book(self, pair):
         while True:
-            (price, volume) = self.__book_queues[pair].get()
+            (price, _) = self.__book_queues[pair].get()
             spread = random.random()
             yield OrderBook(self, pair, price, price - spread, price + spread)
 
@@ -93,7 +101,7 @@ class DummyExchange(Exchange):
             if pair in self.__prices:
                 val = self.__prices[pair]
             else:
-                # Prices should be tracked in `step_time`
+                # Prices should be tracked in `step_time`.
                 val = (0, 0)
             data["close"].append(val[0])
             data["volume"].append(val[1])
@@ -123,10 +131,10 @@ class DummyExchange(Exchange):
         Log.info("Balance: {}".format(self.__balances))
         return order
 
-    # Unnecessary since orders are immediate
+    # Unnecessary since orders are immediate.
     def cancel_order(self, order_id):
         not_implemented()
 
-    # Unnecessary since orders are immediate
+    # Unnecessary since orders are immediate.
     def get_open_positions(self):
         not_implemented()

@@ -98,7 +98,7 @@ class MVar:
 
 
 def test_mvar_simple():
-    """Tests MVar functionality (which is not very expansive)."""
+    """Tests `MVar` functionality (which is not very expansive)."""
     var = MVar()
     result = None
 

@@ -27,7 +27,7 @@ class Bitfinex(Exchange):
     """
 
     # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the Exchange base class before
+    # be singletons, but first we should extract common logic into the `Exchange` base class before
     # making that change.
     __instance_exists = False
 

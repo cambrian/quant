@@ -6,6 +6,7 @@ Constants to identify common entities in the code.
 
 # Exchanges.
 BITFINEX = "bitfinex"
+DUMMY = "dummy"
 KRAKEN = "kraken"
 
 
