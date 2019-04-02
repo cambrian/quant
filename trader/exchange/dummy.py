@@ -66,7 +66,7 @@ class DummyExchange(Exchange):
         for i, pair in enumerate(self.__supported_pairs):
             self.__book_queues[pair].put(pair_data[i])
             self.__prices[pair] = pair_data[i]
-        Log.info("Dummy step {} prices {}".format(self.time, self.__prices))
+        Log.data("dummy-debug", {"step": self.time, "prices": self.__prices})
         self.time += 1
 
     def book(self, pair):
@@ -117,18 +117,16 @@ class DummyExchange(Exchange):
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         if side == Direction.BUY:
-            Log.info("Buying {} {} at price {} {}".format(volume, pair.base(), price, pair.quote()))
-            self.__balances[pair.base()] += volume
-            self.__balances[pair.quote()] -= volume * price
+            Log.data("dummy-buy", {"size": volume, "pair": pair, "price": price})
+            self.__balances[pair.base] += volume
+            self.__balances[pair.quote] -= volume * price
         else:
-            Log.info(
-                "Selling {} {} at price {} {}".format(volume, pair.base(), price, pair.quote())
-            )
-            self.__balances[pair.base()] -= volume
-            self.__balances[pair.quote()] += volume * price
+            Log.data("dummy-sell", {"size": volume, "pair": pair, "price": price})
+            self.__balances[pair.base] -= volume
+            self.__balances[pair.quote] += volume * price
         order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
         self.__order_id += 1
-        Log.info("Balance: {}".format(self.__balances))
+        Log.data("dummy-balances", self.__balances)
         return order
 
     # Unnecessary since orders are immediate.

@@ -193,7 +193,7 @@ class ThreadManager:
             (name, exc) = self.__termination_queue.get()
             completed_threads += 1
             if exc is None:
-                Log.info("Thread <{}> terminated.".format(name))
+                Log.info("thread <{}> terminated".format(name))
                 if completed_threads == self.__finite_thread_count:
                     self.__state == ThreadManager.State.FINISHED
                     break

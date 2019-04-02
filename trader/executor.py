@@ -57,7 +57,7 @@ class Executor:
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)
-        Log.info(book)
+        Log.data("executor-book", book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):
         """
@@ -81,7 +81,7 @@ class Executor:
 
         ask = book.ask
         bid = book.bid
-        balance = exchange.balances[pair.base()]
+        balance = exchange.balances[pair.base]
         fees = exchange.fees
         buy_size = (
             self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask) if ask != None else 0
@@ -92,11 +92,11 @@ class Executor:
             else 0
         )
         if buy_size > 0:
-            Log.info("Buy: {}".format(buy_size))
+            Log.data("executor-buy", {"pair": pair, "size": buy_size})
             # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
             # Log.info(order)
         if sell_size > 0:
-            Log.info("Sell: {}".format(sell_size))
+            Log.data("executor-sell", {"pair": pair, "size": sell_size})
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
             # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
@@ -113,6 +113,7 @@ class Executor:
                 should_terminate=True,
             )
         self.__books_lock.release()
+        # TODO: Make this a call to `Log.data`.
         Log.info(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):

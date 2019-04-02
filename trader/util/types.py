@@ -22,26 +22,53 @@ class OrderBook:
     """
 
     def __init__(self, exchange, pair, last_price, bid, ask):
-        self.exchange = exchange
-        self.pair = pair
-        self.last_price = last_price
-        self.bid = bid
-        self.ask = ask
+        self.__exchange = exchange
+        self.__pair = pair
+        self.__last_price = last_price
+        self.__bid = bid
+        self.__ask = ask
 
     def __eq__(self, other):
         return (
             type(self) == type(other)
-            and self.exchange == other.exchange
-            and self.pair == other.pair
-            and self.last_price == other.last_price
-            and self.bid == other.bid
-            and self.ask == other.ask
+            and self.__exchange == other.__exchange
+            and self.__pair == other.__pair
+            and self.__last_price == other.__last_price
+            and self.__bid == other.__bid
+            and self.__ask == other.__ask
         )
 
+    @property
+    def exchange(self):
+        return self.__exchange.id
+
+    @property
+    def pair(self):
+        return self.__pair
+
+    @property
+    def last_price(self):
+        return self.__last_price
+
+    @property
+    def bid(self):
+        return self.__bid
+
+    @property
+    def ask(self):
+        return self.__ask
+
     def __repr__(self):
-        return "({}, {}, Price: {}, Bid: {}, Ask: {})".format(
-            self.exchange.id, self.pair, self.last_price, self.bid, self.ask
-        )
+        return str(self.json_value())
+
+    def json_value(self):
+        return {
+            "exchange": self.exchange,
+            "pair": self.pair.json_value(),
+            "last_price": self.last_price,
+            "bid": self.bid,
+            "ask": self.ask,
+        }
 
 
 class Direction(Enum):

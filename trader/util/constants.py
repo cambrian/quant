@@ -19,6 +19,9 @@ class Currency:
     def __repr__(self):
         return self.__id
 
+    def json_value(self):
+        return repr(self)
+
 
 # Currencies.
 USD = Currency("USD")
@@ -39,14 +42,19 @@ class TradingPair:
         self.__base = base
         self.__quote = quote
 
+    @property
     def base(self):
         return self.__base
 
+    @property
     def quote(self):
         return self.__quote
 
     def __repr__(self):
         return "{}-{}".format(self.__base, self.__quote)
+
+    def json_value(self):
+        return (self.__base.json_value(), self.__quote.json_value())
 
 
 # USD quotes.
