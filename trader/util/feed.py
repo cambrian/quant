@@ -7,14 +7,10 @@ from threading import Thread
 from trader.util.thread import MVar, ThreadManager
 
 
-class PrivateError(Exception):
-    pass
-
-
 class Feed:
     """A multicast stream type for Python.
 
-    NOTE: The constructor is private. Use `Feed.of(iterable)` to construct a feed.
+    NOTE: The constructor is private. Use `Feed.of(iterable)` to construct a feed and its runner.
 
     Transformations of a feed (such as `map` or `filter`) return both a result and a function to run
     the transformation on a separate thread.
@@ -25,6 +21,9 @@ class Feed:
 
     """
 
+    class Error(Exception):
+        pass
+
     # Hacky solution to prevent manual construction.
     __private = object()
 
@@ -34,7 +33,7 @@ class Feed:
 
     def __init__(self, private, iterable, initializer=None):
         if private != Feed.__private:
-            raise PrivateError("constructor is private")
+            raise Feed.Error("constructor is private")
         self.__iterable = iterable
         self.__initializer = initializer
         self.__sinks = []
@@ -52,7 +51,7 @@ class Feed:
 
         """
         feed = Feed(Feed.__private, iterable)
-        return (feed, feed.run)
+        return (feed, feed._run)
 
     def _sink(self, transform, buffer_size=None, attach_lazy=True):
         """Creates a new feed by transforming the iterable of this feed.
@@ -85,7 +84,7 @@ class Feed:
             initializer_fn = None
 
         feed = Feed(Feed.__private, transform(iter(feed_queue.get, Feed.__end)), initializer_fn)
-        return feed, feed.run
+        return feed, feed._run
 
     def map(self, fn, **kwargs):
         return self._sink(partial(map, fn), **kwargs)
@@ -121,10 +120,11 @@ class Feed:
         _, runner = self.map(fn, **kwargs)
         return runner
 
-    def run(self):
+    def _run(self):
         """Runs this feed by pulling elements of the iterable.
 
-        NOTE: You should put `run` calls for each feed on separate threads.
+        NOTE: Do not call this function directly; the static constructor and every transformation
+        will return a feed alongside its runner. Simply place the runner on its own thread.
 
         """
         if self.__initializer is not None:

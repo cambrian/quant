@@ -15,7 +15,7 @@ from trader.exchange.base import Exchange, ExchangeError
 from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
 from trader.util.log import Log
-from trader.util.types import Direction, OrderBook, OrderType
+from trader.util.types import Direction, Order, OrderBook
 
 
 class Bitfinex(Exchange):
@@ -27,7 +27,7 @@ class Bitfinex(Exchange):
     """
 
     # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the Exchange base class before
+    # be singletons, but first we should extract common logic into the `Exchange` base class before
     # making that change.
     __instance_exists = False
 
@@ -46,10 +46,10 @@ class Bitfinex(Exchange):
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
         self.__order_types = {
-            OrderType.MARKET: "exchange market",
-            OrderType.LIMIT: "exchange limit",
-            OrderType.IOC: "exchange immediate-or-cancel",
-            OrderType.FOK: "exchange fill-or-kill",
+            Order.Type.MARKET: "exchange market",
+            Order.Type.LIMIT: "exchange limit",
+            Order.Type.IOC: "exchange immediate-or-cancel",
+            Order.Type.FOK: "exchange fill-or-kill",
         }
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
@@ -84,38 +84,54 @@ class Bitfinex(Exchange):
             if isinstance(message, list):
                 book_queue.put(message)
 
+        def handle_snapshot(snapshot):
+            order_book = {
+                "bid": SortedList(key=lambda x: -x[0]),
+                "ask": SortedList(key=lambda x: x[0]),
+            }
+            for order in snapshot:
+                if order[2] > 0:
+                    order_book["bid"].add((order[1], abs(order[2]), order[0]))
+                else:
+                    order_book["ask"].add((order[1], abs(order[2]), order[0]))
+            return order_book
+
         self.__ws_client.subscribe_to_orderbook(
             trans_pair, precision="R0", callback=add_messages_to_queue
         )
         last_trade_price = None
 
-        # Current snapshot of `order_book` is always first message.
         raw_book = book_queue.get()[1]
-        order_book = {"bid": SortedList(key=lambda x: -x[0]), "ask": SortedList(key=lambda x: x[0])}
-        for order in raw_book:
-            if order[2] > 0:
-                order_book["bid"].add((order[1], abs(order[2]), order[0]))
-            else:
-                order_book["ask"].add((order[1], abs(order[2]), order[0]))
+        order_book = handle_snapshot(raw_book)
 
         while True:
             yield OrderBook(
-                self, pair, last_trade_price, order_book["bid"][0][0], order_book["ask"][0][0]
+                self,
+                pair,
+                last_trade_price,
+                order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
+                order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
             )
             change = book_queue.get()
-            delete = False
-            if len(change) > 1 and isinstance(change[1], list):
-                side = "bid" if change[1][2] > 0 else "ask"
-                for order in order_book[side]:
-                    if order[2] == change[1][0]:
-                        # Order was filled:
-                        if change[1][1] == 0:
-                            delete = True
-                            last_trade_price = float(order[0])
-                        order_book[side].discard(order)
-                        break
-                if not delete:
-                    order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
+            # If WS has been reset (such that we are getting a snapshot back), update order_book
+            # with current snapshot:
+            if len(change) > 2 and isinstance(change[0], list):
+                order_book = handle_snapshot(change)
+            # Else handle update normally:
+            else:
+                delete = False
+                if len(change) > 1 and isinstance(change[1], list):
+                    for side in ["bid", "ask"]:
+                        for order in order_book[side]:
+                            if order[2] == change[1][0]:
+                                # Order was filled:
+                                if change[1][1] == 0:
+                                    delete = True
+                                    last_trade_price = float(order[0])
+                                order_book[side].discard(order)
+                                break
+                        if not delete:
+                            order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
     def prices(self, pairs, time_frame):
         """
@@ -177,7 +193,7 @@ class Bitfinex(Exchange):
                     self.__balances[self.__translate_from[update[1]]] = update[2]
 
             if isinstance(msg, list):
-                # Ignore heartbeats
+                # Ignore heartbeats.
                 if len(msg) > 1 and msg[1] != "hb":
                     # Disambiguate wallet snapshot/update:
                     if msg[1] == "ws":
@@ -191,7 +207,7 @@ class Bitfinex(Exchange):
 
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
-            Log.info("Restarting WS for exchange {}".format(self.id))
+            Log.info("restarting WS for exchange {}".format(self.id))
             self.__track_balances()
 
         ws = WebSocketApp(
@@ -210,8 +226,7 @@ class Bitfinex(Exchange):
         return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
-        # TODO: Formalize nicer way - v1 API expects "BTCUSD", v2 API expects "tBTCUSD"
-        # Strip "t"
+        # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
         pair = self.__translate_to[pair][1:]
         payload = {
             "request": "/v1/order/new",
@@ -224,10 +239,19 @@ class Bitfinex(Exchange):
             "type": self.__order_types[order_type],
             "is_postonly": maker,
         }
-        return self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        new_order = self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        order = Order(new_order["id"], self.id, pair, side, order_type, price, volume)
+        if new_order["is_live"] == False:
+            order.update_status(Order.Status.REJECTED)
+        elif new_order["is_cancelled"] == False:
+            order.update_status(Order.Status.CANCELLED)
+        return order
 
     def cancel_order(self, order_id):
         return self.__bfxv1.delete_order(order_id)
+
+    def order_status(self, order_id):
+        return self.__bfxv1.status_order(order_id)
 
     def get_open_positions(self):
         return self.__bfxv1.active_orders()

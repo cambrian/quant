@@ -6,6 +6,7 @@ Constants to identify common entities in the code.
 
 # Exchanges.
 BITFINEX = "bitfinex"
+DUMMY = "dummy"
 KRAKEN = "kraken"
 
 
@@ -17,6 +18,9 @@ class Currency:
 
     def __repr__(self):
         return self.__id
+
+    def json_value(self):
+        return repr(self)
 
 
 # Currencies.
@@ -48,6 +52,9 @@ class TradingPair:
 
     def __repr__(self):
         return "{}-{}".format(self.__base, self.__quote)
+
+    def json_value(self):
+        return (self.__base.json_value(), self.__quote.json_value())
 
 
 # USD quotes.
