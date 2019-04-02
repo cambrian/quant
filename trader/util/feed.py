@@ -7,10 +7,6 @@ from threading import Thread
 from trader.util.thread import MVar, ThreadManager
 
 
-class PrivateError(Exception):
-    pass
-
-
 class Feed:
     """A multicast stream type for Python.
 
@@ -25,6 +21,9 @@ class Feed:
 
     """
 
+    class Error(Exception):
+        pass
+
     # Hacky solution to prevent manual construction.
     __private = object()
 
@@ -34,7 +33,7 @@ class Feed:
 
     def __init__(self, private, iterable, initializer=None):
         if private != Feed.__private:
-            raise PrivateError("constructor is private")
+            raise Feed.Error("constructor is private")
         self.__iterable = iterable
         self.__initializer = initializer
         self.__sinks = []

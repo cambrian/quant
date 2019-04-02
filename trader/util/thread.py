@@ -16,10 +16,6 @@ from threading import Condition, Lock, Thread
 from trader.util.log import Log
 
 
-class BeatError(Exception):
-    pass
-
-
 class Beat:
     """A helper utility for running timed loops.
 
@@ -121,16 +117,6 @@ def test_mvar_simple():
     assert result == 1
 
 
-class ThreadManagerError(Exception):
-    pass
-
-
-class ThreadManagerState(Enum):
-    INITIALIZED = 1
-    RUNNING = 2
-    FINISHED = 3
-
-
 class ThreadManager:
     """A centralized runner for our Python threads.
 
@@ -138,11 +124,19 @@ class ThreadManager:
 
     """
 
+    class Error(Exception):
+        pass
+
+    class State(Enum):
+        INITIALIZED = 1
+        RUNNING = 2
+        FINISHED = 3
+
     def __init__(self):
         self.__termination_queue = Queue()
         self.__finite_thread_count = 0
         self.__thread_runners = []
-        self.__state = ThreadManagerState.INITIALIZED
+        self.__state = ThreadManager.State.INITIALIZED
 
     def __propagate_error(self, name, fn, should_terminate):
         # Used to propagate unhandled errors to the main thread.
@@ -170,8 +164,8 @@ class ThreadManager:
             should_terminate (bool): Whether we expect this function to terminate (or run forever).
 
         """
-        if self.__state == ThreadManagerState.FINISHED:
-            raise ThreadManagerError("ThreadManager has finished")
+        if self.__state == ThreadManager.State.FINISHED:
+            raise ThreadManager.Error("ThreadManager has finished")
 
         if should_terminate:
             self.__finite_thread_count += 1
@@ -179,19 +173,19 @@ class ThreadManager:
         def runner():
             self.__propagate_error(name, fn, should_terminate)
 
-        if self.__state == ThreadManagerState.INITIALIZED:
+        if self.__state == ThreadManager.State.INITIALIZED:
             self.__thread_runners.append(runner)
         else:
             self.__run_daemon(runner)
 
     def run(self):
         """Cannibalizes the current thread and runs any attached functions as children threads."""
-        if self.__state != ThreadManagerState.INITIALIZED:
-            if self.__state == ThreadManagerState.RUNNING:
-                raise ThreadManagerError("ThreadManager is currently running")
+        if self.__state != ThreadManager.State.INITIALIZED:
+            if self.__state == ThreadManager.State.RUNNING:
+                raise ThreadManager.Error("ThreadManager is currently running")
             else:
-                raise ThreadManagerError("ThreadManager has finished")
-        self.__state = ThreadManagerState.RUNNING
+                raise ThreadManager.Error("ThreadManager has finished")
+        self.__state = ThreadManager.State.RUNNING
         for runner in self.__thread_runners:
             self.__run_daemon(runner)
         completed_threads = 0
@@ -201,10 +195,10 @@ class ThreadManager:
             if exc is None:
                 Log.info("Thread <{}> terminated.".format(name))
                 if completed_threads == self.__finite_thread_count:
-                    self.__state == ThreadManagerState.FINISHED
+                    self.__state == ThreadManager.State.FINISHED
                     break
             else:
                 print("Thread <{}> terminated unexpectedly!".format(name))
                 if exc is not None:
                     print(exc[:-1], file=sys.stderr)
-                raise ThreadManagerError("see stderr for details")
+                raise ThreadManager.Error("see stderr for details")
