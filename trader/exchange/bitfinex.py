@@ -207,7 +207,7 @@ class Bitfinex(Exchange):
 
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
-            Log.info("Restarting WS for exchange {}".format(self.id))
+            Log.info("restarting WS for exchange {}".format(self.id))
             self.__track_balances()
 
         ws = WebSocketApp(
