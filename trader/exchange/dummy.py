@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import time
 from collections import defaultdict
 from queue import Queue
@@ -12,7 +13,7 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD, not_implemented
+from trader.util.constants import BTC, BTC_USDT, ETH, ETH_USDT, USD, XRP, XRP_USDT, not_implemented
 from trader.util.feed import Feed
 from trader.util.types import OrderBook
 
@@ -37,8 +38,10 @@ class DummyExchange(Exchange):
         # TODO:
         self.__fees = {"maker": 0.001, "taker": 0.002}
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
-        self.__prices = {}
+        self.__books = {}
+        self.__prices = {pair: (0, 0) for pair in self.__supported_pairs}
         self.__balances = defaultdict(float)
+        self.translate = {BTC_USDT: "BTC_USDT", ETH_USDT: "ETH_USDT", XRP_USDT: "XRP_USDT"}
 
     @property
     def id(self):
@@ -46,26 +49,52 @@ class DummyExchange(Exchange):
 
     def step_time(self):
         data = self.__data.iloc[self.time]
-        for pair, price_volume in data.items():
-            self.__book_queues[pair].put(price_volume)
+        data_list = list(data.items())
+        prices = list(data_list[0][1].items())
+        volumes = list(data_list[1][1].items())
+        pair_data = list(map(lambda x: (x[0][1], x[1][1]), list(zip(prices, volumes))))
+        for i, pair in enumerate(self.__supported_pairs):
+            self.__book_queues[pair].put(pair_data[i])
+            self.__prices[pair] = pair_data[i]
         self.time += 1
-        # TODO: also stream next book, price
 
     def book(self, pair):
+        pair = self.translate[pair]
         if pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        price = self.__data.loc[time]
-        book = OrderBook(self.id, pair, last_price=price, bid=price, ask=price)
-        # TODO:
-        not_implemented()
+        if pair in self.__books:
+            return self.__books[pair]
+        else:
+            pair_feed, runner = Feed.of(self.__book(pair))
+            self._thread_manager.attach("dummy-{}-book".format(pair), runner)
+            self.__books[pair] = pair_feed
+            return pair_feed
 
-    def prices(self, pairs, time_frame):
+    def __book(self, pair):
+        while True:
+            (price, volume) = self.__book_queues[pair].get()
+            spread = random.random()
+            yield OrderBook(self, pair, price, price - spread, price + spread)
+
+    def prices(self, pairs, time_frame=None):
         """
 
         NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
-        not_implemented()
+        data = {"close": [], "volume": []}
+        for pair in pairs:
+            pair = self.translate[pair]
+            if pair not in self.__supported_pairs:
+                raise ExchangeError("pair not supported by Bitfinex")
+            if pair in self.__prices:
+                val = self.__prices[pair]
+            else:
+                # Prices should be tracked in `step_time`
+                val = (0, 0)
+            data["close"].append(val[0])
+            data["volume"].append(val[1])
+        return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
     @property
     def balances(self):
