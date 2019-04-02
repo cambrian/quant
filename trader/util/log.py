@@ -104,12 +104,17 @@ class Log:
                     warning = "json_value for type {} has a bad signature"
                 else:
                     warning = "object of type {} has no json_value method"
+        try:
+            json_message = json.dumps({"key": key, "value": json_value})
+        except TypeError:
+            # Unfortunately the `json_value` hack is not recursive by default.
+            warning = "inner fields of this object are JSON-incompatible"
         if warning is not None:
             json_value = repr(value)
             Log.warn(warning.format(type(value).__name__) + " (falling back to repr)")
         Log._log(
             Log.Level.DATA,
-            json.dumps({"key": key, "value": json_value}),
+            json_message,
             context=_get_caller_context(),
             color_level=_colorize.blue,
             color_time=_colorize.cyan,
