@@ -29,6 +29,7 @@ from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
 
 
+# TODO (remove this when the Exchange interface is stable and changes are complete)
 class DummyExchange(Exchange):
     """Dummy exchange. Uses historical data and executes orders at last trade price."""
 

@@ -44,7 +44,14 @@ class Bitfinex(Exchange):
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
-        self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
+        self.__translate_to = {
+            BTC: "tBTCUSD",
+            ETH: "tETHUSD",
+            XRP: "tXRPUSD",
+            BTC_USD: "tBTCUSD",
+            ETH_USD: "tETHUSD",
+            XRP_USD: "tXRPUSD",
+        }
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
         self.__order_types = {
@@ -134,10 +141,10 @@ class Bitfinex(Exchange):
                         if not delete:
                             order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
-    def prices(self, pairs, time_frame):
+    def prices(self, pairs, volume_time_frame=None):
         """
 
-        NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
+        NOTE: `volume_time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
         data = {"close": [], "volume": []}
@@ -146,12 +153,15 @@ class Bitfinex(Exchange):
                 raise ExchangeError("pair not supported by Bitfinex")
             book = self.book_feed(pair).latest
             pair = self.__translate_to[pair]
-            # Ignore index [0] timestamp.
-            # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
-            ochlv = self.__bfxv2.candles(time_frame, pair, "last")[1:]
             data["close"].append(book.last_price)
-            # TODO: Is this volume lagged?
-            data["volume"].append(ochlv[4])
+            if volume_time_frame is not None:
+                # Ignore index [0] timestamp.
+                # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
+                ochlv = self.__bfxv2.candles(volume_time_frame, pair, "last")[1:]
+                # TODO: Is this volume lagged?
+                data["volume"].append(ochlv[4])
+        if volume_time_frame is None:
+            del data["volume"]
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
     def balances_feed(self):
@@ -163,7 +173,7 @@ class Bitfinex(Exchange):
 
     def __track_balances(self):
         """Thread function to constantly track exchange's balance."""
-        balances = {}
+        balances = defaultdict(float)
 
         def on_open(ws):
             nonce = int(time.time() * 1000000)
