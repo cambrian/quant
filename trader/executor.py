@@ -81,7 +81,7 @@ class Executor:
 
         ask = book.ask
         bid = book.bid
-        balance = exchange.balances[pair.base]
+        balance = exchange.balances[pair.base()]
         fees = exchange.fees
         buy_size = (
             self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask) if ask != None else 0
@@ -93,16 +93,13 @@ class Executor:
         )
         if buy_size > 0:
             Log.info("Buy: {}".format(buy_size))
-            # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.
             # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
             # Log.info(order)
         if sell_size > 0:
             Log.info("Sell: {}".format(sell_size))
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
-            # order = exchange.add_order(
-            #     pair, Direction.SELL, Order.Type.IOC, str(bid), str(sell_size)
-            # )
+            # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
             # Log.info(order)
         trade_lock.release()
 

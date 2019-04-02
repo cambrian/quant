@@ -127,7 +127,7 @@ class Order:
         self.__status = status
 
     def __repr__(self):
-        return "({}, {}, Order #: {}, Side: {}, Order Type: {}, Price: {}, Volume: {}, Status: {})".format(
+        return "({}, {}, Order: #{}, Side: {}, Order Type: {}, Price: {}, Volume: {}, Status: {})".format(
             self.__exchange,
             self.__pair,
             self.__id,

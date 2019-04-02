@@ -5,8 +5,10 @@ from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
 from trader.util.constants import BITFINEX, BTC_USD, BTC_USDT, ETH_USD
 from trader.util.feed import Feed
+from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.thread import Beat, ThreadManager
+from trader.util.types import Direction, Order
 
 thread_manager = ThreadManager()
 bitfinex = Bitfinex(thread_manager)
@@ -16,6 +18,7 @@ bitfinex = Bitfinex(thread_manager)
 
 dummy_strategy = strategy.Dummy()
 executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
+# executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT]})
 
 
 def main():
@@ -25,10 +28,21 @@ def main():
         dummy_fairs = dummy_strategy.tick(bitfinex_data)
         fairs = Gaussian.intersect([dummy_fairs])
         executor.tick_fairs(fairs)
-        # dummy_Data = dummy_exchange.prices([BTC_USDT], "1m")
-        # dummy_exchange.step_time()
 
 
-# book_feed = dummy_exchange.book(BTC_USDT)
+def dummy_main():
+    beat = Beat(60000)
+    # Need to set fairs, but don't want to run tick_fairs thread every minute
+    dummy_exchange.step_time()
+    dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+    dummy_fairs = dummy_strategy.tick(dummy_data)
+    fairs = Gaussian.intersect([dummy_fairs])
+    executor.tick_fairs(fairs)
+    while beat.loop():
+        dummy_exchange.step_time()
+        dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+
+
 thread_manager.attach("main", main)
+# thread_manager.attach("dummy_main", dummy_main)
 thread_manager.run()

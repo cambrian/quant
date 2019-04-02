@@ -13,9 +13,11 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import BTC, BTC_USDT, ETH, ETH_USDT, USD, XRP, XRP_USDT, not_implemented
+from trader.util.constants import (BTC, BTC_USDT, ETH, ETH_USDT, USD, XRP,
+                                   XRP_USDT, not_implemented)
 from trader.util.feed import Feed
-from trader.util.types import OrderBook
+from trader.util.log import Log
+from trader.util.types import Direction, Order, OrderBook
 
 
 class DummyExchange(Exchange):
@@ -35,13 +37,13 @@ class DummyExchange(Exchange):
         self.__supported_pairs = data.iloc[0].index
         # time is not private to allow manual adjustment.
         self.time = 0
-        # TODO:
         self.__fees = {"maker": 0.001, "taker": 0.002}
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__books = {}
         self.__prices = {pair: (0, 0) for pair in self.__supported_pairs}
         self.__balances = defaultdict(float)
         self.translate = {BTC_USDT: "BTC_USDT", ETH_USDT: "ETH_USDT", XRP_USDT: "XRP_USDT"}
+        self.__order_id = 0
 
     @property
     def id(self):
@@ -56,6 +58,7 @@ class DummyExchange(Exchange):
         for i, pair in enumerate(self.__supported_pairs):
             self.__book_queues[pair].put(pair_data[i])
             self.__prices[pair] = pair_data[i]
+        Log.info("Dummy step {} prices {}".format(self.time, self.__prices))
         self.time += 1
 
     def book(self, pair):
@@ -100,18 +103,30 @@ class DummyExchange(Exchange):
     def balances(self):
         return self.__balances
 
-    def __track_balances(self):
-        not_implemented()
-
     @property
     def fees(self):
         return self.__fees
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
-        not_implemented()
+        if side == Direction.BUY:
+            Log.info("Buying {} {} at price {} {}".format(volume, pair.base(), price, pair.quote()))
+            self.__balances[pair.base()] += volume
+            self.__balances[pair.quote()] -= volume * price
+        else:
+            Log.info(
+                "Selling {} {} at price {} {}".format(volume, pair.base(), price, pair.quote())
+            )
+            self.__balances[pair.base()] -= volume
+            self.__balances[pair.quote()] += volume * price
+        order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
+        self.__order_id += 1
+        Log.info("Balance: {}".format(self.__balances))
+        return order
 
+    # Unnecessary since orders are immediate
     def cancel_order(self, order_id):
         not_implemented()
 
+    # Unnecessary since orders are immediate
     def get_open_positions(self):
         not_implemented()
