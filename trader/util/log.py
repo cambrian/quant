@@ -158,11 +158,14 @@ class Log:
         def parse(line):
             """Parses a log line into a log entry."""
             lines = line.split("\n")
-            if len(lines) != 1:
+            if len(lines) != 2 or lines[1] != "":
                 raise Log.Entry.Error("expected a single log line")
+            line = lines[0]
 
             fields = line.split("\t")
             if len(fields) != 4:
+                # TODO: Remove print.
+                print(fields)
                 raise Log.Entry.Error("malformed log entry")
 
             try:
