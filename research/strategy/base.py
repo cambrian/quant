@@ -31,4 +31,4 @@ class HoldStrategy(Strategy):
     """Always returns null estimate."""
 
     def step(self, frame):
-        return self.null_estimate(frame["prices"])
+        return self.null_estimate(frame["price"])
