@@ -34,15 +34,12 @@ def main():
 
 # def dummy_main():
 #     beat = Beat(60000)
-#     # Need to set fairs, but don't want to run tick_fairs thread every minute:
-#     dummy_exchange.step_time()
-#     dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
-#     dummy_fairs = dummy_strategy.tick(dummy_data)
-#     fairs = Gaussian.intersect([dummy_fairs])
-#     executor.tick_fairs(fairs)
 #     while beat.loop():
 #         dummy_exchange.step_time()
 #         dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+#         dummy_fairs = dummy_strategy.tick(dummy_data)
+#         fairs = Gaussian.intersect([dummy_fairs])
+#         executor.tick_fairs(fairs)
 
 
 thread_manager.attach("main", main)

@@ -13,17 +13,8 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (
-    BTC,
-    BTC_USDT,
-    DUMMY,
-    ETH,
-    ETH_USDT,
-    USD,
-    XRP,
-    XRP_USDT,
-    not_implemented,
-)
+from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT, USD,
+                                   XRP, XRP_USDT, not_implemented)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
@@ -70,26 +61,22 @@ class DummyExchange(Exchange):
         Log.data("dummy-debug", {"step": self.time, "prices": self.__prices})
         self.time += 1
 
-    # TODO
     def book_feed(self, pair):
-        pass
-
-    # TODO: Remove.
-    def book(self, pair):
-        pair = self.translate[pair]
-        if pair not in self.__supported_pairs:
+        trans_pair = self.translate[pair]
+        if trans_pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        if pair in self.__books:
-            return self.__books[pair]
+        if trans_pair in self.__books:
+            return self.__books[trans_pair]
         else:
             pair_feed, runner = Feed.of(self.__book(pair))
             self._thread_manager.attach("dummy-{}-book".format(pair), runner)
-            self.__books[pair] = pair_feed
+            self.__books[trans_pair] = pair_feed
             return pair_feed
 
     def __book(self, pair):
         while True:
-            (price, _) = self.__book_queues[pair].get()
+            trans_pair = self.translate[pair]
+            (price, _) = self.__book_queues[trans_pair].get()
             spread = random.random()
             yield OrderBook(self, pair, price, price - spread, price + spread)
 
@@ -103,7 +90,7 @@ class DummyExchange(Exchange):
         for pair in pairs:
             pair = self.translate[pair]
             if pair not in self.__supported_pairs:
-                raise ExchangeError("pair not supported by Bitfinex")
+                raise ExchangeError("pair not supported by Dummy")
             if pair in self.__prices:
                 val = self.__prices[pair]
             else:
@@ -111,6 +98,7 @@ class DummyExchange(Exchange):
                 val = (0, 0)
             data["close"].append(val[0])
             data["volume"].append(val[1])
+        Log.data("Dummy-prices", {"data": data})
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
     # TODO
@@ -127,16 +115,16 @@ class DummyExchange(Exchange):
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         if side == Direction.BUY:
-            Log.data("dummy-buy", {"size": volume, "pair": pair, "price": price})
+            Log.data("dummy-buy", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] += volume
             self.__balances[pair.quote] -= volume * price
         else:
-            Log.data("dummy-sell", {"size": volume, "pair": pair, "price": price})
+            Log.data("dummy-sell", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] -= volume
             self.__balances[pair.quote] += volume * price
         order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
         self.__order_id += 1
-        Log.data("dummy-balances", self.__balances)
+        Log.info("dummy-balances {}".format(self.__balances))
         return order
 
     # Unnecessary since orders are immediate.

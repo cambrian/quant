@@ -232,6 +232,8 @@ class Bitfinex(Exchange):
 
     @property
     def balances(self):
+        if self.__balances_feed is None:
+            return self.balances_feed().latest
         return self.__balances_feed.latest
 
     @property

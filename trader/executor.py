@@ -5,6 +5,7 @@ from threading import Lock
 from trader.util import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
+from trader.util.thread import Beat
 from trader.util.types import Direction, Order
 
 SIZE_PARAMETER = 100
@@ -46,6 +47,13 @@ class Executor:
                     ),
                 )
 
+        def do_nothing():
+            beat = Beat(600000)
+            while beat.loop():
+                Log.info("Dummy exchange is still running.")
+
+        thread_manager.attach("dummy-runner-queue", do_nothing, should_terminate=True)
+
     def __tick_book(self, exchange, pair, book):
         self.__books_lock.acquire()
         if (exchange, pair) in self.__latest_books:
@@ -77,6 +85,7 @@ class Executor:
 
         fairs = self.__latest_fairs
         if fairs is None:
+            trade_lock.release()
             return
 
         ask = book.ask
@@ -91,12 +100,23 @@ class Executor:
             if bid != None
             else 0
         )
+        Log.data(
+            "executor-trade",
+            {
+                "pair": pair.json_value(),
+                "balance": balance,
+                "buy_size": buy_size,
+                "sell_size": sell_size,
+                "bid": bid,
+                "ask": ask,
+            },
+        )
         if buy_size > 0:
-            Log.data("executor-buy", {"pair": pair, "size": buy_size})
+            Log.data("executor-buy", {"pair": pair.json_value(), "size": buy_size})
             # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
             # Log.info(order)
         if sell_size > 0:
-            Log.data("executor-sell", {"pair": pair, "size": sell_size})
+            Log.data("executor-sell", {"pair": pair.json_value(), "size": sell_size})
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
             # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
