@@ -5,7 +5,8 @@ from threading import Lock
 from trader.util import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
-from trader.util.types import Direction, OrderType
+from trader.util.thread import Beat
+from trader.util.types import Direction, Order
 
 SIZE_PARAMETER = 100
 
@@ -37,7 +38,7 @@ class Executor:
             for pair in pairs:
                 thread_manager.attach(
                     "executor-{}-{}".format(exchange.id, pair),
-                    exchange.book(pair).subscribe(
+                    exchange.book_feed(pair).subscribe(
                         # Ugly but otherwise the values of exchange/pair will get overwritten in
                         # the closure at every iteration...
                         lambda book, exchange=exchange, pair=pair: self.__tick_book(
@@ -45,6 +46,13 @@ class Executor:
                         )
                     ),
                 )
+
+        def do_nothing():
+            beat = Beat(600000)
+            while beat.loop():
+                Log.info("Dummy exchange is still running.")
+
+        thread_manager.attach("dummy-runner-queue", do_nothing, should_terminate=True)
 
     def __tick_book(self, exchange, pair, book):
         self.__books_lock.acquire()
@@ -57,7 +65,7 @@ class Executor:
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
         self.__trade(exchange, pair)
-        Log.info(book)
+        Log.data("executor-book", book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):
         """
@@ -77,28 +85,42 @@ class Executor:
 
         fairs = self.__latest_fairs
         if fairs is None:
+            trade_lock.release()
             return
 
         ask = book.ask
         bid = book.bid
         balance = exchange.balances[pair.base]
         fees = exchange.fees
-        buy_size = self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask)
-        sell_size = self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
+        buy_size = (
+            self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask) if ask != None else 0
+        )
+        sell_size = (
+            self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
+            if bid != None
+            else 0
+        )
+        Log.data(
+            "executor-trade",
+            {
+                "pair": pair.json_value(),
+                "balance": balance,
+                "buy_size": buy_size,
+                "sell_size": sell_size,
+                "bid": bid,
+                "ask": ask,
+            },
+        )
         if buy_size > 0:
-            Log.info("Buy: {}".format(buy_size))
-            # TODO: Write custom Bitfinex infra to use their immediate-or-cancel type.
-            # exchange.add_order(pair, Direction.SELL, OrderType.IOC, ask, buy_size)
-            # update_balances(balances, fill)
+            Log.data("executor-buy", {"pair": pair.json_value(), "size": buy_size})
+            # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
+            # Log.info(order)
         if sell_size > 0:
-            Log.info("Sell: {}".format(sell_size))
+            Log.data("executor-sell", {"pair": pair.json_value(), "size": sell_size})
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
-            # Log.info(
-            # exchange.add_order(
-            #     pair, Direction.SELL, OrderType.IOC, str(bid), str(sell_size)
-            # )
-            # )
+            # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
+            # Log.info(order)
         trade_lock.release()
 
     def tick_fairs(self, fairs):
@@ -111,6 +133,7 @@ class Executor:
                 should_terminate=True,
             )
         self.__books_lock.release()
+        # TODO: Make this a call to `Log.data`.
         Log.info(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):

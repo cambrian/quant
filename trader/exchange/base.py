@@ -32,11 +32,10 @@ class Exchange(ABC):
         """
         pass
 
-    # TODO: wrap a _book method and do deduplication
     @abstractmethod
-    def book(self, pair):
-        """Returns a `Feed` of order books for the given pair. If this is called twice with the same
-        pair, it should behave in an idempotent manner.
+    def book_feed(self, pair):
+        """Runs and returns a `Feed` of order books for the given pair. If this function is called
+        twice with the same pair, it should behave in an idempotent manner.
 
         Args:
             pair (Constant): The pair to stream.
@@ -48,13 +47,17 @@ class Exchange(ABC):
         pass
 
     @abstractmethod
-    def prices(self, pairs, time_frame):
-        """Queries prices and volumes for the given pairs.
+    def prices(self, pairs, volume_time_frame):
+        """Queries prices and volumes for the given pairs. Reads the latest tracked prices from the
+        exchange object.
+
+        NOTE: If a currency (rather than a pair) is passed in, this function should make a best
+        effort to price the currency in USD (or a USD equivalent).
 
         Args:
             pairs (list): A list of pairs to query.
-            time_frame (type depends on exchange): Granularity of volume data, in the exchange's
-                format.
+            volume_time_frame (type depends on exchange): Granularity of volume data, in the
+                exchange's format. If None is passed, volume is not included.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
@@ -62,13 +65,24 @@ class Exchange(ABC):
         """
         pass
 
+    @abstractmethod
+    def balances_feed(self):
+        """Runs and returns a `Feed` of balances for the exchange account. This function should
+        behave in an idempotent manner.
+
+        Returns:
+            Feed: A feed of maps from currency to held size.
+
+        """
+        pass
+
     @property
     @abstractmethod
     def balances(self):
-        """Queries exchange object for tracked balances.
+        """Reads the latest tracked balances from the exchange object.
 
         Returns:
-            dict: Map of currency to held volume.
+            dict: Map of currency to held size.
 
         """
         pass

@@ -7,14 +7,10 @@ from threading import Thread
 from trader.util.thread import MVar, ThreadManager
 
 
-class PrivateError(Exception):
-    pass
-
-
 class Feed:
     """A multicast stream type for Python.
 
-    NOTE: The constructor is private. Use `Feed.of(iterable)` to construct a feed.
+    NOTE: The constructor is private. Use `Feed.of(iterable)` to construct a feed and its runner.
 
     Transformations of a feed (such as `map` or `filter`) return both a result and a function to run
     the transformation on a separate thread.
@@ -25,6 +21,9 @@ class Feed:
 
     """
 
+    class Error(Exception):
+        pass
+
     # Hacky solution to prevent manual construction.
     __private = object()
 
@@ -34,9 +33,10 @@ class Feed:
 
     def __init__(self, private, iterable, initializer=None):
         if private != Feed.__private:
-            raise PrivateError("constructor is private")
+            raise Feed.Error("constructor is private")
         self.__iterable = iterable
         self.__initializer = initializer
+        self.__latest = MVar()
         self.__sinks = []
         self.__done = False
 
@@ -52,7 +52,7 @@ class Feed:
 
         """
         feed = Feed(Feed.__private, iterable)
-        return (feed, feed.run)
+        return (feed, feed._run)
 
     def _sink(self, transform, buffer_size=None, attach_lazy=True):
         """Creates a new feed by transforming the iterable of this feed.
@@ -85,7 +85,7 @@ class Feed:
             initializer_fn = None
 
         feed = Feed(Feed.__private, transform(iter(feed_queue.get, Feed.__end)), initializer_fn)
-        return feed, feed.run
+        return feed, feed._run
 
     def map(self, fn, **kwargs):
         return self._sink(partial(map, fn), **kwargs)
@@ -94,7 +94,8 @@ class Feed:
         return self._sink(partial(filter, fn), **kwargs)
 
     def fold(self, fn, acc, **kwargs):
-        """Returns an `MVar` that tracks an accumulation of this feed.
+        """Returns an `MVar` that tracks an accumulation of this feed. If you just want the latest
+        accumulator value, prefer the `latest` method.
 
         Args:
             fn (Function): An accumulating function that takes a feed item and the current
@@ -121,15 +122,23 @@ class Feed:
         _, runner = self.map(fn, **kwargs)
         return runner
 
-    def run(self):
+    @property
+    def latest(self):
+        """Returns the most recent value produced by the iterable. Blocks if no values have been
+        produced yet."""
+        return self.__latest.read()
+
+    def _run(self):
         """Runs this feed by pulling elements of the iterable.
 
-        NOTE: You should put `run` calls for each feed on separate threads.
+        NOTE: Do not call this function directly; the static constructor and every transformation
+        will return a feed alongside its runner. Simply place the runner on its own thread.
 
         """
         if self.__initializer is not None:
             self.__initializer()
         for item in self.__iterable:
+            self.__latest.swap(item)
             for sink in self.__sinks:
                 sink(item)
         for sink in self.__sinks:
@@ -159,6 +168,7 @@ def test_feed_simple():
     thread_manager.run()
     assert aggregate.read() == sum(range(0, 1000, 2))
     assert results == [str(i) for i in range(0, 1000, 2)]
+    assert feed_even.latest == 998
 
 
 def test_feed_lazy():

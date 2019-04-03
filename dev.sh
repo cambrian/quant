@@ -1,3 +1,3 @@
 #!/bin/bash
-rm .testmondata
+rm -f .testmondata
 ptw -cwq -- --testmon --quiet --tb=short

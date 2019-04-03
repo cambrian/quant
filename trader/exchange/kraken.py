@@ -15,7 +15,7 @@ class Kraken(Exchange):
     """
 
     # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the Exchange base class before
+    # be singletons, but first we should extract common logic into the `Exchange` base class before
     # making that change.
     __instance_exists = False
 
@@ -35,7 +35,7 @@ class Kraken(Exchange):
         return KRAKEN
 
     # TODO
-    def book(self, pair):
+    def book_feed(self, pair):
         pass
 
     # TODO
@@ -56,6 +56,10 @@ class Kraken(Exchange):
             data["close"].append(ohlcvv[3])
             data["volume"].append(ohlcvv[5])
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+
+    # TODO
+    def balances_feed(self):
+        pass
 
     # TODO
     @property
