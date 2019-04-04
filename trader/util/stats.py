@@ -6,6 +6,7 @@ Helpful statistical models and indicators.
 
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import mahalanobis
 from scipy.stats import multivariate_normal
 
 
@@ -296,7 +297,7 @@ class Gaussian:
         return Gaussian(mean, covariance)
 
     def __add__(self, x):
-        """Add a scalar or another Gaussian to the Gaussian.
+        """Adds a scalar or another Gaussian to the Gaussian.
 
         >>> Gaussian([1, 1], [[1, 2], [3, 4]]) + 3
         Gaussian:
@@ -328,6 +329,7 @@ class Gaussian:
         covariance:
         [[1 2]
          [3 4]]
+
         """
         return self + -x
 
@@ -364,7 +366,8 @@ class Gaussian:
         [[1 0]
          [0 4]]
 
-        >>> Gaussian(pd.Series([1, 1], index=['a','b']), [[1, 1],[1,1]]) * pd.Series([1, 2], index=['a','b'])
+        >>> Gaussian(pd.Series([1, 1], index=['a','b']), [[1, 1],[1,1]]) * pd.Series([1, 2], \
+            index=['a','b'])
         Gaussian:
         mean:
         a    1
@@ -430,11 +433,10 @@ class Gaussian:
         ) - (self.__mean * self.__mean * x.__mean * x.__mean)
         return Gaussian(mean, covariance)
 
-    def __repr__(self):
-        return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
-
     def pdf(self, x):
         """Evaluates the PDF of this Gaussian at `x`.
+
+        NOTE: Ensure that `x` is the same dimension as the Gaussian mean.
 
         >>> Gaussian(1,1).pdf(1)
         0.3989422804014327
@@ -452,8 +454,79 @@ class Gaussian:
         0.15915494309189535
 
         """
-        v = multivariate_normal(self.mean, self.covariance, allow_singular=True)
-        result = v.pdf(x)
+        # Consider pre-computing and storing this distribution on the Gaussian.
+        distribution = multivariate_normal(self.mean, self.covariance, allow_singular=True)
+        result = distribution.pdf(x)
+
         if isinstance(x, pd.DataFrame):
             return pd.Series(result, index=x.index)
         return result
+
+    def cdf(self, a, b=None):
+        """Computes P(X < `a`) for X distributed like this Gaussian.
+
+        If `b` is also specified, this function will compute P(`a` < X < `b`).
+
+        >>> Gaussian(1, 9).cdf(4)
+        0.841344746068543
+
+        >>> Gaussian(0, 1).cdf(-1, 1)
+        0.6826894921370861
+
+        >>> Gaussian(0, 1).cdf([-1, -2], [1, 2])
+        array([0.68268949, 0.95449974])
+
+        >>> round(Gaussian(pd.Series([0, 0, 0]), pd.DataFrame([ \
+                [ 2, -1,  0], \
+                [-1,  2, -1], \
+                [ 0, -1,  2] \
+            ])).cdf([1,2,3], [2,2,2]), 4)
+        0.0996
+
+        """
+        # Consider pre-computing and storing this distribution on the Gaussian.
+        distribution = multivariate_normal(self.mean, self.covariance, allow_singular=True)
+        if b is None:
+            result = distribution.cdf(a)
+        else:
+            result = distribution.cdf(b) - distribution.cdf(a)
+
+        if isinstance(a, pd.DataFrame):
+            return pd.Series(result, index=a.index)
+        return result
+
+    def z_score(self, x):
+        """Computes the Mahalanobis distance of `x` from the center of this Gaussian. In the 1D case
+        this reduces to computing an absolute z-score.
+
+        NOTE: Ensure that `x` is the same dimension as the Gaussian mean.
+
+        >>> Gaussian(2, 4).z_score(6)
+        2.0
+
+        >>> Gaussian(2, 4).z_score([0, 3, 6])
+        array([1. , 0.5, 2. ])
+
+        >>> Gaussian(pd.Series([2, 0, 0]), pd.DataFrame([ \
+                [ 1.5, -0.5, -0.5], \
+                [-0.5,  1.5, -0.5], \
+                [-0.5, -0.5,  1.5] \
+            ])).z_score([[0, 1, 0], [1, 0, 0]])
+        array([1.73205081, 1.        ])
+
+        """
+        x_array = np.array(x)
+        is_scalar_array = len(x_array.shape) == 1 and len(x_array) > 1
+
+        # Vectorize if `x` contains multiple points OR if mean is a scalar but `x` is not.
+        if len(x_array.shape) > 1 or (is_scalar_array and len(self.__mean) == 1):
+            result = np.array([self.z_score(x_i) for x_i in x])
+        else:
+            result = mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
+
+        if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
+            return pd.Series(result, index=x.index)
+        return result
+
+    def __repr__(self):
+        return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
