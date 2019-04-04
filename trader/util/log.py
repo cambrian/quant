@@ -71,7 +71,7 @@ class Log:
             Log.Level.INFO,
             message,
             context=_get_caller_context(),
-            color_level=_colorize.blue,
+            color_level=_colorize.green,
             color_time=_colorize.cyan,
             color_context=_colorize.violet,
         )
@@ -104,14 +104,19 @@ class Log:
                     warning = "json_value for type {} has a bad signature"
                 else:
                     warning = "object of type {} has no json_value method"
+        try:
+            json_message = json.dumps({"key": key, "value": json_value})
+        except TypeError:
+            # Unfortunately the `json_value` hack is not recursive by default.
+            warning = "inner fields of this object are JSON-incompatible"
         if warning is not None:
             json_value = repr(value)
             Log.warn(warning.format(type(value).__name__) + " (falling back to repr)")
         Log._log(
             Log.Level.DATA,
-            json.dumps({"key": key, "value": json_value}),
+            json_message,
             context=_get_caller_context(),
-            color_level=_colorize.green,
+            color_level=_colorize.blue,
             color_time=_colorize.cyan,
             color_context=_colorize.violet,
         )
@@ -153,11 +158,14 @@ class Log:
         def parse(line):
             """Parses a log line into a log entry."""
             lines = line.split("\n")
-            if len(lines) != 1:
+            if len(lines) != 2 or lines[1] != "":
                 raise Log.Entry.Error("expected a single log line")
+            line = lines[0]
 
             fields = line.split("\t")
             if len(fields) != 4:
+                # TODO: Remove print.
+                print(fields)
                 raise Log.Entry.Error("malformed log entry")
 
             try:

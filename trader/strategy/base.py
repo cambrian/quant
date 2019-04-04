@@ -1,22 +1,36 @@
 from abc import ABC, abstractmethod
 
+from trader.util.stats import Gaussian
+
 
 class Strategy(ABC):
     """An abstract class for writing strategies."""
 
+    # TODO: possibly do more during initialization, such as passing in the set of pairs/exchanges
+
     @abstractmethod
-    def tick(self, *args):
+    def tick(self, frame):
         """The actual implementation of a strategy.
 
         Strategies should take the feed data received at each tick and incorporate it into their
         running models of the market.
 
         Args:
-            *args: Any arguments to your strategy. These will typically be Pandas dataframes with
-                price data for each exchange you care about.
+            frame: Pandas dataframe with the following structure
+                    price   volume
+            AAA_XXX 1       100
+            BBB_XXX 2       200
+            ...
+            ZZZ_XXX p       v
 
         Returns:
             Gaussian: A multivariate Gaussian (over a DataFrame) with a variable per currency pair.
 
         """
         pass
+
+    def null_estimate(self, frame):
+        """Return fair estimates centered at the current prices with very low confidence."""
+        mean = frame["price"]
+        variance = frame["price"].replace(frame["price"], 1e100)
+        return Gaussian(mean, variance)

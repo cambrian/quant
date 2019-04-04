@@ -3,6 +3,7 @@ import pandas as pd
 import trader.strategy as strategy
 from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
+from trader.metrics import Metrics
 from trader.util.constants import BITFINEX, BTC_USD, BTC_USDT, ETH_USD
 from trader.util.feed import Feed
 from trader.util.log import Log
@@ -19,6 +20,7 @@ bitfinex = Bitfinex(thread_manager)
 dummy_strategy = strategy.Dummy()
 executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT]})
+metrics = Metrics(thread_manager, {bitfinex})
 
 
 def main():
@@ -32,17 +34,14 @@ def main():
 
 # def dummy_main():
 #     beat = Beat(60000)
-#     # Need to set fairs, but don't want to run tick_fairs thread every minute:
-#     dummy_exchange.step_time()
-#     dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
-#     dummy_fairs = dummy_strategy.tick(dummy_data)
-#     fairs = Gaussian.intersect([dummy_fairs])
-#     executor.tick_fairs(fairs)
 #     while beat.loop():
 #         dummy_exchange.step_time()
 #         dummy_data = dummy_exchange.prices([BTC_USDT], "1m")
+#         dummy_fairs = dummy_strategy.tick(dummy_data)
+#         fairs = Gaussian.intersect([dummy_fairs])
+#         executor.tick_fairs(fairs)
 
 
 thread_manager.attach("main", main)
-# thread_manager.attach("dummy_main", dummy_main)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

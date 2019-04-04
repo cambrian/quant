@@ -4,6 +4,7 @@ import json
 import os
 import time
 from collections import defaultdict
+from copy import deepcopy
 from queue import Queue
 
 import pandas as pd
@@ -15,6 +16,7 @@ from trader.exchange.base import Exchange, ExchangeError
 from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
 from trader.util.log import Log
+from trader.util.thread import MVar
 from trader.util.types import Direction, Order, OrderBook
 
 
@@ -42,7 +44,14 @@ class Bitfinex(Exchange):
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
-        self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
+        self.__translate_to = {
+            BTC: "tBTCUSD",
+            ETH: "tETHUSD",
+            XRP: "tXRPUSD",
+            BTC_USD: "tBTCUSD",
+            ETH_USD: "tETHUSD",
+            XRP_USD: "tXRPUSD",
+        }
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
         self.__order_types = {
@@ -51,12 +60,12 @@ class Bitfinex(Exchange):
             Order.Type.IOC: "exchange immediate-or-cancel",
             Order.Type.FOK: "exchange fill-or-kill",
         }
+        self.__book_feeds = {}
+        self.__balances_queue = Queue()
+        self.__balances_feed = None
+        thread_manager.attach("bitfinex-balances-queue", self.__track_balances)
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
-        self.__books = {}
-        self.__prices = {}
-        self.__balances = defaultdict(float)
-        thread_manager.attach("bitfinex-balances", self.__track_balances)
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
 
@@ -64,18 +73,16 @@ class Bitfinex(Exchange):
     def id(self):
         return BITFINEX
 
-    def book(self, pair):
+    def book_feed(self, pair):
         if pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by Bitfinex")
-        if pair in self.__books:
-            return self.__books[pair]
-        else:
-            pair_feed, runner = Feed.of(self.__book(pair))
+        if pair not in self.__book_feeds:
+            pair_feed, runner = Feed.of(self.__generate_book_feed(pair))
             self._thread_manager.attach("bitfinex-{}-book".format(pair), runner)
-            self.__books[pair] = pair_feed
-            return pair_feed
+            self.__book_feeds[pair] = pair_feed
+        return self.__book_feeds[pair]
 
-    def __book(self, pair):
+    def __generate_book_feed(self, pair):
         trans_pair = self.__translate_to[pair]
         book_queue = Queue()
 
@@ -105,13 +112,14 @@ class Bitfinex(Exchange):
         order_book = handle_snapshot(raw_book)
 
         while True:
-            yield OrderBook(
-                self,
-                pair,
-                last_trade_price,
-                order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
-                order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
-            )
+            if last_trade_price is not None:
+                yield OrderBook(
+                    self,
+                    pair,
+                    last_trade_price,
+                    order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
+                    order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
+                )
             change = book_queue.get()
             # If WS has been reset (such that we are getting a snapshot back), update order_book
             # with current snapshot:
@@ -133,39 +141,39 @@ class Bitfinex(Exchange):
                         if not delete:
                             order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
-    def prices(self, pairs, time_frame):
+    def prices(self, pairs, volume_time_frame=None):
         """
 
-        NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
+        NOTE: `volume_time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
         data = {"close": [], "volume": []}
         for pair in pairs:
             if pair not in self.__supported_pairs:
                 raise ExchangeError("pair not supported by Bitfinex")
-            if pair in self.__prices:
-                pair_last_price = self.__prices[pair]
-            else:
-                pair_feed = self.book(pair)
-                pair_last_price, runner = pair_feed.fold(lambda book, _: book.last_price, None)
-                self.__prices[pair] = pair_last_price
-                self._thread_manager.attach("bitfinex-{}-last-price".format(pair), runner)
-
+            book = self.book_feed(pair).latest
             pair = self.__translate_to[pair]
-            # Ignore index [0] timestamp.
-            # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
-            ochlv = self.__bfxv2.candles(time_frame, pair, "last")[1:]
-            data["close"].append(pair_last_price.read())
-            # TODO: Is this volume lagged?
-            data["volume"].append(ochlv[4])
+            data["close"].append(book.last_price)
+            if volume_time_frame is not None:
+                # Ignore index [0] timestamp.
+                # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
+                ochlv = self.__bfxv2.candles(volume_time_frame, pair, "last")[1:]
+                # TODO: Is this volume lagged?
+                data["volume"].append(ochlv[4])
+        if volume_time_frame is None:
+            del data["volume"]
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
 
-    @property
-    def balances(self):
-        return self.__balances
+    def balances_feed(self):
+        if self.__balances_feed is None:
+            balances_feed, runner = Feed.of(iter(self.__balances_queue.get, None))
+            self._thread_manager.attach("bitfinex-balances-feed", runner)
+            self.__balances_feed = balances_feed
+        return self.__balances_feed
 
     def __track_balances(self):
         """Thread function to constantly track exchange's balance."""
+        balances = defaultdict(float)
 
         def on_open(ws):
             nonce = int(time.time() * 1000000)
@@ -190,7 +198,8 @@ class Bitfinex(Exchange):
             def update_balances(update):
                 # Only track exchange (trading) wallet.
                 if len(update) >= 3 and update[0] == "exchange":
-                    self.__balances[self.__translate_from[update[1]]] = update[2]
+                    balances[self.__translate_from[update[1]]] = update[2]
+                    self.__balances_queue.put(deepcopy(balances))
 
             if isinstance(msg, list):
                 # Ignore heartbeats.
@@ -220,6 +229,12 @@ class Bitfinex(Exchange):
         ws.run_forever()
         time.sleep(10)
         ws.close()
+
+    @property
+    def balances(self):
+        if self.__balances_feed is None:
+            return self.balances_feed().latest
+        return self.__balances_feed.latest
 
     @property
     def fees(self):

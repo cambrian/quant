@@ -4,10 +4,9 @@ Helpful statistical models and indicators.
 
 """
 
-from math import sqrt
-
 import numpy as np
 import pandas as pd
+from scipy.stats import multivariate_normal
 
 
 class Ema:
@@ -47,63 +46,74 @@ class GaussianError(Exception):
 
 
 class Gaussian:
-    """Single or multi-variate Gaussian.
-
-    For multi-variate Gaussians, set the mean and variance to NumPy arrays or Pandas series. The
-    dimension/type of mean and variance should match.
-
-    Args:
-        mean: The mean of the Gaussian. Should be a numerical scalar, list, NumPy array, or Pandas
-            series. Scalars and lists are marshalled to/from NumPy as necessary, and integers are
-            treated as floats.
-        covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case or
-            a list/array/series of variances in the uncorrelated case).
-
-    >>> Gaussian(1, 1)
-    Gaussian:
-    mean:
-    1
-    covariance:
-    1
-
-    >>> Gaussian([1, 1], [1, 1])
-    Gaussian:
-    mean:
-    [1 1]
-    covariance:
-    [[1 0]
-     [0 1]]
-
-    >>> Gaussian([1, 1], [[1, 0], [0, 1]])
-    Gaussian:
-    mean:
-    [1 1]
-    covariance:
-    [[1 0]
-     [0 1]]
-
-    >>> Gaussian([1, 1], np.array([[1, 0], [0, 1]]))
-    Gaussian:
-    mean:
-    [1 1]
-    covariance:
-    [[1 0]
-     [0 1]]
-
-    >>> Gaussian(pd.Series([1, 1]), pd.Series([1, 1]))
-    Gaussian:
-    mean:
-    0    1
-    1    1
-    dtype: int64
-    covariance:
-       0  1
-    0  1  0
-    1  0  1
-
-    """
+    """Single or multi-variate Gaussian."""
 
     def __init__(self, mean, covariance):
+        """
+        For multi-variate Gaussians, set the mean and variance to NumPy arrays or Pandas series. The
+        dimension/type of mean and variance should match.
+
+        Args:
+            mean: The mean of the Gaussian. Should be a numerical scalar, list, NumPy array, or
+                Pandas series. Scalars and lists are marshalled to/from NumPy as necessary, and
+                integers are treated as floats.
+            covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case
+                or a list/array/series of variances in the uncorrelated case).
+
+        >>> Gaussian(1, 1)
+        Gaussian:
+        mean:
+        1
+        covariance:
+        1
+
+        >>> Gaussian([1, 1], [1, 1])
+        Gaussian:
+        mean:
+        [1 1]
+        covariance:
+        [[1 0]
+         [0 1]]
+
+        >>> Gaussian([1, 1], [[1, 0], [0, 1]])
+        Gaussian:
+        mean:
+        [1 1]
+        covariance:
+        [[1 0]
+         [0 1]]
+
+        >>> Gaussian([1, 1], np.array([[1, 0], [0, 1]]))
+        Gaussian:
+        mean:
+        [1 1]
+        covariance:
+        [[1 0]
+         [0 1]]
+
+        >>> Gaussian(pd.Series([1, 1]), pd.Series([1, 1]))
+        Gaussian:
+        mean:
+        0    1
+        1    1
+        dtype: int64
+        covariance:
+           0  1
+        0  1  0
+        1  0  1
+
+        >>> Gaussian(pd.Series([1, 1]), [1, 1])
+        Gaussian:
+        mean:
+        0    1
+        1    1
+        dtype: int64
+        covariance:
+           0  1
+        0  1  0
+        1  0  1
+
+        """
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(mean)) == 0:
             mean = np.array([mean])
@@ -113,7 +123,7 @@ class Gaussian:
             covariance = np.array(covariance)
 
         # Convert a vector of variances into a covariance matrix.
-        if len(covariance.shape) == 1:
+        if len(np.shape(covariance)) == 1:
             covariance = np.diag(covariance)
 
         # Keep index names in covariance if using Pandas.
@@ -276,7 +286,7 @@ class Gaussian:
         1  0.0  0.5
 
         """
-        sum_inv = np.linalg.inv(self.__covariance + x.__covariance)
+        sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
             sum_inv = pd.DataFrame(
                 sum_inv, index=self.__covariance.index, columns=self.__covariance.columns
@@ -327,6 +337,25 @@ class Gaussian:
         For the product of two PDFs see `__and__`, and for the product of two i.i.d. variables
         see `__matmul__`.
 
+        >>> Gaussian([1, 1], [1, 1]) * 2
+        Gaussian:
+        mean:
+        [2 2]
+        covariance:
+        [[4 0]
+         [0 4]]
+
+        >>> Gaussian(pd.Series([1, 1]), [1, 1]) * 2
+        Gaussian:
+        mean:
+        0    2
+        1    2
+        dtype: int64
+        covariance:
+           0  1
+        0  4  0
+        1  0  4
+
         >>> Gaussian([1, 1], [1, 1]) * [1, 2]
         Gaussian:
         mean:
@@ -335,14 +364,27 @@ class Gaussian:
         [[1 0]
          [0 4]]
 
+        >>> Gaussian(pd.Series([1, 1], index=['a','b']), [[1, 1],[1,1]]) * pd.Series([1, 2], index=['a','b'])
+        Gaussian:
+        mean:
+        a    1
+        b    2
+        dtype: int64
+        covariance:
+           a  b
+        a  1  4
+        b  1  4
+
         """
-        # Marshal non-NumPy/Pandas types into NumPy.
-        if len(np.shape(s)) == 0:
-            s = np.array([s])
-        elif type(s) == list:
+        if type(s) == list:
             s = np.array(s)
-        s_diag = np.diag(s)
-        return Gaussian(self.__mean * s, self.__covariance * s_diag * s_diag)
+        if len(np.shape(s)) == 1:
+            s2_diag = np.diag(s * s)
+            if isinstance(self.__mean, pd.Series):
+                s2_diag = pd.DataFrame(s2_diag, index=self.__mean.index, columns=self.__mean.index)
+            cov = self.__covariance @ s2_diag
+            return Gaussian(self.__mean * s, cov)
+        return Gaussian(self.__mean * s, self.__covariance * s * s)
 
     def __truediv__(self, s):
         """Scalar division. `s` may be a scalar or 1D vector.
@@ -364,10 +406,7 @@ class Gaussian:
          [0.  0.5]]
 
         """
-        # Marshal non-NumPy/Pandas types into NumPy.
-        if len(np.shape(s)) == 0:
-            s = np.array([s])
-        elif type(s) == list:
+        if type(s) == list:
             s = np.array(s)
         return self * (1 / s)
 
@@ -393,3 +432,28 @@ class Gaussian:
 
     def __repr__(self):
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
+
+    def pdf(self, x):
+        """Evaluates the PDF of this Gaussian at `x`.
+
+        >>> Gaussian(1,1).pdf(1)
+        0.3989422804014327
+
+        >>> Gaussian(1,1).pdf([1,2,3])
+        array([0.39894228, 0.24197072, 0.05399097])
+
+        >>> Gaussian(1,1).pdf(pd.DataFrame([1,2,3]))
+        0    0.398942
+        1    0.241971
+        2    0.053991
+        dtype: float64
+
+        >>> Gaussian([1,1],[[1,0],[0,1]]).pdf([1,1])
+        0.15915494309189535
+
+        """
+        v = multivariate_normal(self.mean, self.covariance, allow_singular=True)
+        result = v.pdf(x)
+        if isinstance(x, pd.DataFrame):
+            return pd.Series(result, index=x.index)
+        return result

@@ -29,6 +29,7 @@ USDT = Currency("USDT")
 BTC = Currency("BTC")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
+STABLECOINS = {USD, USDT}
 
 
 class TradingPair:

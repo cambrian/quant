@@ -3,8 +3,7 @@ from trader.util.stats import Gaussian
 
 
 class Dummy(Strategy):
-    """A shitty strategy for testing purposes."""
+    """A strategy that always returns a null prediction."""
 
-    def tick(self, prices):
-        # TODO
-        return Gaussian([1], [1])
+    def tick(self, frame):
+        return self.null_estimate(frame)

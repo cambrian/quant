@@ -29,6 +29,7 @@ from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
 
 
+# TODO (remove this when the Exchange interface is stable and changes are complete)
 class DummyExchange(Exchange):
     """Dummy exchange. Uses historical data and executes orders at last trade price."""
 
@@ -48,6 +49,7 @@ class DummyExchange(Exchange):
         self.__fees = {"maker": 0.001, "taker": 0.002}
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__books = {}
+        self.__latest_books = {}
         self.__prices = {pair: (0, 0) for pair in self.__supported_pairs}
         self.__balances = defaultdict(float)
         self.translate = {BTC_USDT: "BTC_USDT", ETH_USDT: "ETH_USDT", XRP_USDT: "XRP_USDT"}
@@ -69,23 +71,27 @@ class DummyExchange(Exchange):
         Log.data("dummy-debug", {"step": self.time, "prices": self.__prices})
         self.time += 1
 
-    def book(self, pair):
-        pair = self.translate[pair]
-        if pair not in self.__supported_pairs:
+    def book_feed(self, pair):
+        trans_pair = self.translate[pair]
+        if trans_pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        if pair in self.__books:
-            return self.__books[pair]
+        if trans_pair in self.__books:
+            return self.__books[trans_pair]
         else:
             pair_feed, runner = Feed.of(self.__book(pair))
             self._thread_manager.attach("dummy-{}-book".format(pair), runner)
-            self.__books[pair] = pair_feed
+            self.__books[trans_pair] = pair_feed
             return pair_feed
 
     def __book(self, pair):
         while True:
-            (price, _) = self.__book_queues[pair].get()
-            spread = random.random()
-            yield OrderBook(self, pair, price, price - spread, price + spread)
+            trans_pair = self.translate[pair]
+            (price, _) = self.__book_queues[trans_pair].get()
+            # Spread is hard to manage generally across currencies
+            spread = 0  # random.random()
+            book = OrderBook(self, pair, price, price - spread, price + spread)
+            self.__latest_books[pair] = book
+            yield book
 
     def prices(self, pairs, time_frame=None):
         """
@@ -97,7 +103,7 @@ class DummyExchange(Exchange):
         for pair in pairs:
             pair = self.translate[pair]
             if pair not in self.__supported_pairs:
-                raise ExchangeError("pair not supported by Bitfinex")
+                raise ExchangeError("pair not supported by Dummy")
             if pair in self.__prices:
                 val = self.__prices[pair]
             else:
@@ -105,7 +111,12 @@ class DummyExchange(Exchange):
                 val = (0, 0)
             data["close"].append(val[0])
             data["volume"].append(val[1])
+        Log.data("Dummy-prices", {"data": data})
         return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+
+    # TODO
+    def balances_feed(self):
+        pass
 
     @property
     def balances(self):
@@ -117,16 +128,22 @@ class DummyExchange(Exchange):
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         if side == Direction.BUY:
-            Log.data("dummy-buy", {"size": volume, "pair": pair, "price": price})
+            if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
+                Log.info("dummy-buy - order not filled because price is not most recent.")
+                return None
+            Log.data("dummy-buy", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] += volume
             self.__balances[pair.quote] -= volume * price
         else:
-            Log.data("dummy-sell", {"size": volume, "pair": pair, "price": price})
+            if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
+                Log.info("dummy-sell - order not filled because price is not most recent.")
+                return None
+            Log.data("dummy-sell", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] -= volume
             self.__balances[pair.quote] += volume * price
         order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
         self.__order_id += 1
-        Log.data("dummy-balances", self.__balances)
+        Log.info("dummy-balances {}".format(self.__balances))
         return order
 
     # Unnecessary since orders are immediate.

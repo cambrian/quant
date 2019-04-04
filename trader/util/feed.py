@@ -36,6 +36,7 @@ class Feed:
             raise Feed.Error("constructor is private")
         self.__iterable = iterable
         self.__initializer = initializer
+        self.__latest = MVar()
         self.__sinks = []
         self.__done = False
 
@@ -93,7 +94,8 @@ class Feed:
         return self._sink(partial(filter, fn), **kwargs)
 
     def fold(self, fn, acc, **kwargs):
-        """Returns an `MVar` that tracks an accumulation of this feed.
+        """Returns an `MVar` that tracks an accumulation of this feed. If you just want the latest
+        accumulator value, prefer the `latest` method.
 
         Args:
             fn (Function): An accumulating function that takes a feed item and the current
@@ -120,6 +122,12 @@ class Feed:
         _, runner = self.map(fn, **kwargs)
         return runner
 
+    @property
+    def latest(self):
+        """Returns the most recent value produced by the iterable. Blocks if no values have been
+        produced yet."""
+        return self.__latest.read()
+
     def _run(self):
         """Runs this feed by pulling elements of the iterable.
 
@@ -130,6 +138,7 @@ class Feed:
         if self.__initializer is not None:
             self.__initializer()
         for item in self.__iterable:
+            self.__latest.swap(item)
             for sink in self.__sinks:
                 sink(item)
         for sink in self.__sinks:
@@ -159,6 +168,7 @@ def test_feed_simple():
     thread_manager.run()
     assert aggregate.read() == sum(range(0, 1000, 2))
     assert results == [str(i) for i in range(0, 1000, 2)]
+    assert feed_even.latest == 998
 
 
 def test_feed_lazy():
