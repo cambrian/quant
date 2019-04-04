@@ -499,7 +499,7 @@ class Gaussian:
         """Computes the Mahalanobis distance of `x` from the center of this Gaussian. In the 1D case
         this reduces to computing an absolute z-score.
 
-        NOTE: Ensure that `x` is the same dimension as the Gaussian mean.
+        NOTE: This function is vectorized if you pass multiple points as `x`.
 
         >>> Gaussian(2, 4).z_score(6)
         2.0
