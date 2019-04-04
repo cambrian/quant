@@ -54,11 +54,11 @@ class Gaussian:
         dimension/type of mean and variance should match.
 
         Args:
-            mean: The mean of the Gaussian. Should be a numerical scalar, list, NumPy array, or Pandas
-                series. Scalars and lists are marshalled to/from NumPy as necessary, and integers are
-                treated as floats.
-            covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case or
-                a list/array/series of variances in the uncorrelated case).
+            mean: The mean of the Gaussian. Should be a numerical scalar, list, NumPy array, or
+                Pandas series. Scalars and lists are marshalled to/from NumPy as necessary, and
+                integers are treated as floats.
+            covariance: The covariance matrix of the Gaussian (can also be a scalar in the 1D case
+                or a list/array/series of variances in the uncorrelated case).
 
         >>> Gaussian(1, 1)
         Gaussian:
@@ -434,18 +434,23 @@ class Gaussian:
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
 
     def pdf(self, x):
-        """evaluate the PDF of this gaussian at `x`.
+        """Evaluates the PDF of this Gaussian at `x`.
+
         >>> Gaussian(1,1).pdf(1)
         0.3989422804014327
+
         >>> Gaussian(1,1).pdf([1,2,3])
         array([0.39894228, 0.24197072, 0.05399097])
+
         >>> Gaussian(1,1).pdf(pd.DataFrame([1,2,3]))
         0    0.398942
         1    0.241971
         2    0.053991
         dtype: float64
+
         >>> Gaussian([1,1],[[1,0],[0,1]]).pdf([1,1])
         0.15915494309189535
+
         """
         v = multivariate_normal(self.mean, self.covariance, allow_singular=True)
         result = v.pdf(x)
