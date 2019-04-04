@@ -4,9 +4,12 @@ Helpful statistical models and indicators.
 
 """
 
+import itertools
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import mahalanobis
+from scipy.special import binom as choose
 from scipy.stats import multivariate_normal
 
 
@@ -436,21 +439,21 @@ class Gaussian:
     def pdf(self, x):
         """Evaluates the PDF of this Gaussian at `x`.
 
-        NOTE: Ensure that `x` is the same dimension as the Gaussian mean.
+        NOTE: Ensure that the Gaussian covariance is positive semi-definite.
 
-        >>> Gaussian(1,1).pdf(1)
+        >>> Gaussian(1, 1).pdf(1)
         0.3989422804014327
 
-        >>> Gaussian(1,1).pdf([1,2,3])
+        >>> Gaussian(1, 1).pdf([1, 2, 3])
         array([0.39894228, 0.24197072, 0.05399097])
 
-        >>> Gaussian(1,1).pdf(pd.DataFrame([1,2,3]))
+        >>> Gaussian(1, 1).pdf(pd.DataFrame([1, 2, 3]))
         0    0.398942
         1    0.241971
         2    0.053991
         dtype: float64
 
-        >>> Gaussian([1,1],[[1,0],[0,1]]).pdf([1,1])
+        >>> Gaussian([1, 1], [[1, 0], [0, 1]]).pdf([1, 1])
         0.15915494309189535
 
         """
@@ -465,10 +468,19 @@ class Gaussian:
     def cdf(self, a, b=None):
         """Computes P(X < `a`) for X distributed like this Gaussian.
 
-        If `b` is also specified, this function will compute P(`a` < X < `b`).
+        If `b` is also specified, this function will compute P(`a` < X < `b`). For multivariate
+        Gaussians, this function performs inclusion-exclusion on (2 ^ N) CDF results.
+
+        NOTE: Ensure that the Gaussian covariance is positive semi-definite.
+
+        TODO: Figure out how to use `mvnormcdf` from `statsmodels` for more efficient multivariate
+        CDF intervals via sampling. Although their code looks sus...
 
         >>> Gaussian(1, 9).cdf(4)
         0.841344746068543
+
+        >>> Gaussian(1, 9).cdf([4, 1])
+        array([0.84134475, 0.5       ])
 
         >>> Gaussian(0, 1).cdf(-1, 1)
         0.6826894921370861
@@ -476,22 +488,55 @@ class Gaussian:
         >>> Gaussian(0, 1).cdf([-1, -2], [1, 2])
         array([0.68268949, 0.95449974])
 
-        >>> round(Gaussian(pd.Series([0, 0, 0]), pd.DataFrame([ \
+        Output is slightly non-deterministic:
+        >>> Gaussian(pd.Series([0, 0, 0]), pd.DataFrame([ \
                 [ 2, -1,  0], \
                 [-1,  2, -1], \
                 [ 0, -1,  2] \
-            ])).cdf([1,2,3], [2,2,2]), 4)
-        0.0996
+            ])).cdf([ \
+                [0, 0, 0], \
+                [-4, -2, -3] \
+            ], [ \
+                [1, 1, 1], \
+                [1, 2, 4] \
+            ]).round(3)
+        array([0.017, 0.644])
 
         """
         # Consider pre-computing and storing this distribution on the Gaussian.
         distribution = multivariate_normal(self.mean, self.covariance, allow_singular=True)
-        if b is None:
-            result = distribution.cdf(a)
-        else:
-            result = distribution.cdf(b) - distribution.cdf(a)
 
-        if isinstance(a, pd.DataFrame):
+        if self.__should_vectorize(a):
+            if b is None:
+                b = np.empty(np.shape(a), dtype=object)
+            result = np.array([self.cdf(a[i], b[i]) for i in range(len(a))])
+        elif b is None:
+            result = distribution.cdf(a)
+        elif np.any(np.array(b) - np.array(a) < 0):
+            result = np.zeros(np.shape(a))
+        else:
+            num_vars = len(self.__mean)
+            inclusion_bits = np.array(
+                sorted(list(itertools.product([0, 1], repeat=num_vars)), key=sum)
+            ).astype(
+                bool
+            )  # Returns e.g. [[1, 1], [1, 0], [0, 1], [0, 0]] for 2 variables.
+            i = 0  # Current position in `inclusion_bits`.
+
+            result = 0
+            multiplier = 1  # 1 or -1 for each element in an inclusion-exclusion sum.
+            # `num_lower` is the number of ones in an element of `inclusion_bits`.
+            # If `num_lower` is `x`, each CDF value will be calculated using `x` limits from the
+            # lower end of the interval, and `num_vars` - `x` limits from the upper end.
+            for num_lower in range(num_vars + 1):
+                # There are `num_vars` choose `num_lower` such limits.
+                for _ in range(int(choose(num_vars, num_lower))):
+                    inclusion_exclusion = np.where(inclusion_bits[i], a, b)
+                    result += multiplier * distribution.cdf(inclusion_exclusion)
+                    i += 1
+                multiplier *= -1
+
+        if isinstance(a, pd.DataFrame) or isinstance(a, pd.Series):
             return pd.Series(result, index=a.index)
         return result
 
@@ -515,11 +560,7 @@ class Gaussian:
         array([1.73205081, 1.        ])
 
         """
-        x_array = np.array(x)
-        is_scalar_array = len(x_array.shape) == 1 and len(x_array) > 1
-
-        # Vectorize if `x` contains multiple points OR if mean is a scalar but `x` is not.
-        if len(x_array.shape) > 1 or (is_scalar_array and len(self.__mean) == 1):
+        if self.__should_vectorize(x):
             result = np.array([self.z_score(x_i) for x_i in x])
         else:
             result = mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
@@ -527,6 +568,11 @@ class Gaussian:
         if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
             return pd.Series(result, index=x.index)
         return result
+
+    def __should_vectorize(self, points):
+        is_scalar_array = len(np.shape(points)) == 1 and len(points) > 1
+        # Vectorize if `points` contains multiple points OR if mean is a scalar but `points` is not.
+        return len(np.shape(points)) > 1 or (is_scalar_array and len(self.__mean) == 1)
 
     def __repr__(self):
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
