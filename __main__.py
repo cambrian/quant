@@ -43,5 +43,5 @@ def main():
 
 
 thread_manager.attach("main", main)
-# thread_manager.attach("dummy_main", dummy_main)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

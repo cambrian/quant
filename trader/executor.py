@@ -5,7 +5,6 @@ from threading import Lock
 from trader.util import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
-from trader.util.thread import Beat
 from trader.util.types import Direction, Order
 
 SIZE_PARAMETER = 100
@@ -46,13 +45,6 @@ class Executor:
                         )
                     ),
                 )
-
-        def do_nothing():
-            beat = Beat(600000)
-            while beat.loop():
-                Log.info("Dummy exchange is still running.")
-
-        thread_manager.attach("dummy-runner-queue", do_nothing, should_terminate=True)
 
     def __tick_book(self, exchange, pair, book):
         self.__books_lock.acquire()
