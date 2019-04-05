@@ -468,8 +468,12 @@ class Gaussian:
     def cdf(self, a, b=None):
         """Computes P(X < `a`) for X distributed like this Gaussian.
 
-        If `b` is also specified, this function will compute P(`a` < X < `b`). For multivariate
-        Gaussians, this function performs inclusion-exclusion on (2 ^ N) CDF results.
+        If `b` is also specified, this function will compute P(`a` < X < `b`).
+
+        For multivariate Gaussians, this function performs inclusion-exclusion on (2 ^ N) CDF
+        results, which computes the hypercubic intersection between CDF(upper limit) and CDF(lower
+        limit). In the 2D case between points (a, b) and (c, d), where a < c and b < d, this works
+        out to CDF(c, d) - CDF(b, d) - CDF(a, c) + CDF(a, b).
 
         NOTE: Ensure that the Gaussian covariance is positive semi-definite.
 
@@ -512,28 +516,35 @@ class Gaussian:
             result = np.array([self.cdf(a[i], b[i]) for i in range(len(a))])
         elif b is None:
             result = distribution.cdf(a)
-        elif np.any(np.array(b) - np.array(a) < 0):
-            result = np.zeros(np.shape(a))
+        # Multivariate intervals require a non-degenerate hypercube.
+        elif np.any(np.array(b) - np.array(a) <= 0):
+            result = 0
+        # Apply inclusion-exclusion (see function header) to compute multivariate intervals.
         else:
             num_vars = len(self.__mean)
+            # Returns e.g. [[0, 0], [0, 1], [1, 0], [1, 1]] for 2 variables. More generally, this
+            # returns the (2 ^ N) bit vectors of length N, sorted ascending by the number of ones.
             inclusion_bits = np.array(
                 sorted(list(itertools.product([0, 1], repeat=num_vars)), key=sum)
-            ).astype(
-                bool
-            )  # Returns e.g. [[1, 1], [1, 0], [0, 1], [0, 0]] for 2 variables.
-            i = 0  # Current position in `inclusion_bits`.
+            ).astype(bool)
 
+            i = 0
             result = 0
-            multiplier = 1  # 1 or -1 for each element in an inclusion-exclusion sum.
-            # `num_lower` is the number of ones in an element of `inclusion_bits`.
-            # If `num_lower` is `x`, each CDF value will be calculated using `x` limits from the
-            # lower end of the interval, and `num_vars` - `x` limits from the upper end.
+            multiplier = 1
+
+            # Iterates through `inclusion_bits` grouped by the number of ones `num_lower` in the bit
+            # vector. At each value of `num_lower`, there are (`num_vars` choose `num_lower`) such
+            # elements in `inclusion_bits`.
             for num_lower in range(num_vars + 1):
-                # There are `num_vars` choose `num_lower` such limits.
                 for _ in range(int(choose(num_vars, num_lower))):
+                    # If `inclusion_bits[i]` is e.g. 1001, we will construct a CDF limit by taking
+                    # the first variable from `b`, the second and third variables from `a`, and the
+                    # fourth variable from `b`.
                     inclusion_exclusion = np.where(inclusion_bits[i], a, b)
                     result += multiplier * distribution.cdf(inclusion_exclusion)
                     i += 1
+                # This corresponds to switching the power of (-1) in the standard formula for
+                # computing inclusion-exclusion.
                 multiplier *= -1
 
         if isinstance(a, pd.DataFrame) or isinstance(a, pd.Series):
