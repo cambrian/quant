@@ -36,8 +36,15 @@ class Cointegrator(Strategy):
 
             c = coint_johansen(P_norm, det_order=-1, k_ar_diff=1)
 
+            # only use cointegration result if the most recent data remains cointegrated
+            tail = P.tail(self.cointegration_period)
+            c_tail = coint_johansen(tail - tail.mean(), det_order=-1, k_ar_diff=1)
+            tail_cointegrated = np.any(
+                (c_tail.lr1 > c_tail.cvt[:, 1]) * (c_tail.lr2 < c_tail.cvm[:, 2])
+            )
+
             significant_results = (c.lr1 > c.cvt[:, 1]) * (c.lr2 < c.cvm[:, 2])
-            if np.any(significant_results):
+            if np.any(significant_results) and tail_cointegrated:
                 self.A = pd.DataFrame(c.evec[:, significant_results].T, columns=prices.index)
                 self.covs = [
                     hyperplane_projection(P_norm, a).cov() * 2 + P.cov() for a in self.A.values
