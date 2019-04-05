@@ -8,6 +8,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
+from pandas.core.indexes.range import RangeIndex
 from scipy.spatial.distance import mahalanobis
 from scipy.special import binom as choose
 from scipy.stats import multivariate_normal
@@ -128,12 +129,38 @@ class Gaussian:
 
         # Convert a vector of variances into a covariance matrix.
         if len(np.shape(covariance)) == 1:
-            covariance = np.diag(covariance)
+            covariance_matrix = np.diag(covariance)
+            if isinstance(covariance, pd.Series):
+                covariance = pd.DataFrame(
+                    covariance_matrix, index=covariance.index, columns=covariance.index
+                )
+            else:
+                covariance = covariance_matrix
 
-        # Keep index names in covariance if using Pandas.
+        # Ensure that:
+        # 1. Both mean and covariance are in Pandas if either is in Pandas.
+        # 2. Column labels and index labels match for a covariance matrix.
+        # 3. Index labels match between a covariance matrix and a mean vector.
+        # 4. All labels are unique and sorted.
+        if isinstance(covariance, pd.DataFrame):
+            covariance = covariance.sort_index().sort_index(axis=1)
+            if list(covariance.columns) != list(covariance.index):
+                raise GaussianError("covariance column labels and index labels do not match")
+            if len(covariance.index) != len(np.unique(covariance.index)):
+                raise GaussianError("covariance label names must be unique")
         if isinstance(mean, pd.Series):
-            covariance = pd.DataFrame(covariance, index=mean.index, columns=mean.index)
+            mean = mean.sort_index()
+            if isinstance(covariance, pd.DataFrame):
+                if list(mean.index) != list(covariance.index):
+                    raise GaussianError("mean labels and covariance labels do not match")
+            else:
+                if len(mean.index) != len(np.unique(mean.index)):
+                    raise GaussianError("mean label names must be unique")
+                covariance = pd.DataFrame(covariance, index=mean.index, columns=mean.index)
+        elif isinstance(covariance, pd.DataFrame):
+            mean = pd.Series(mean, index=covariance.index)
 
+        # Sanity check dimensions after pre-processing.
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
             raise GaussianError("mean and covariance have mismatched dimension")
 
@@ -265,18 +292,6 @@ class Gaussian:
 
         Requires only one inverse via formula here: https://math.stackexchange.com/a/964103.
 
-        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b'])) \
-            & Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b']))
-        Gaussian:
-        mean:
-        a    1.0
-        b    1.0
-        dtype: float64
-        covariance:
-             a    b
-        a  0.5  0.0
-        b  0.0  0.5
-
         >>> Gaussian(pd.Series([1, 1]), pd.Series([1, 1])) \
             & Gaussian(pd.Series([1, 1]), pd.Series([1, 1]))
         Gaussian:
@@ -289,7 +304,97 @@ class Gaussian:
         0  0.5  0.0
         1  0.0  0.5
 
+        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b'])) \
+            & Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b']))
+        Gaussian:
+        mean:
+        a    1.0
+        b    1.0
+        dtype: float64
+        covariance:
+             a    b
+        a  0.5  0.0
+        b  0.0  0.5
+
+        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.DataFrame([ \
+                [2, -1], \
+                [-1, 2] \
+            ], index=['a', 'b'], columns=['a', 'b'])) \
+            & Gaussian(pd.Series([3, 3], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b']))
+        Gaussian:
+        mean:
+        a    2.0
+        b    2.0
+        dtype: float64
+        covariance:
+               a      b
+        a  0.625 -0.125
+        b -0.125  0.625
+
+        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.DataFrame([ \
+                [2, -1], \
+                [-1, 2] \
+            ], index=['a', 'b'], columns=['a', 'b'])) \
+            & Gaussian(pd.Series([3, 3], index=['b', 'c']), pd.Series([1, 1], index=['b', 'c']))
+        Gaussian:
+        mean:
+        a    1.000000
+        b    2.333333
+        c    3.000000
+        dtype: float64
+        covariance:
+           a         b  c
+        a  2 -1.000000  0
+        b -1  0.666667  0
+        c  0  0.000000  1
+
         """
+        # TODO: This could maybe get cleaned up and vectorized with some effort.
+        # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
+        if isinstance(self.__covariance, pd.DataFrame) and isinstance(x.__covariance, pd.DataFrame):
+            s_columns = self.__covariance.columns
+            x_columns = x.__covariance.columns
+
+            # Ensure that the disjoint intersection procedure is not carried out by accident (e.g.
+            # on DataFrames with no explicit indexing, which use the default RangeIndex).
+            if not isinstance(s_columns, RangeIndex) and not isinstance(x_columns, RangeIndex):
+                common_vars = s_columns.intersection(x_columns)
+                s_disjoint = s_columns.difference(common_vars)
+                x_disjoint = x_columns.difference(common_vars)
+
+                # Some variables are disjoint. Filter indexes to the common variables, compute the
+                # Gaussian intersection, then interpolate disjoint variables back in.
+                if len(common_vars) != len(s_columns):
+                    s_mean = self.__mean.filter(common_vars)
+                    x_mean = x.__mean.filter(common_vars)
+                    s_cov = self.__covariance.filter(common_vars).filter(common_vars, axis="index")
+                    x_cov = x.__covariance.filter(common_vars).filter(common_vars, axis="index")
+                    intersection = Gaussian(s_mean, s_cov) & Gaussian(x_mean, x_cov)
+
+                    # Initialize interpolations.
+                    int_mean = intersection.__mean
+                    int_cov = intersection.__covariance
+                    for var in s_disjoint.union(x_disjoint):
+                        int_mean[var] = np.nan
+                        int_cov[var] = 0
+                        int_cov.loc[var] = 0
+
+                    # Interpolate disjoint variables from `self`.
+                    for var in s_disjoint:
+                        int_mean[var] = self.__mean[var]
+                        for var_2 in self.__covariance[var].index:
+                            int_cov.loc[var, var_2] = self.__covariance[var][var_2]
+                            int_cov.loc[var_2, var] = self.__covariance[var_2][var]
+
+                    # Interpolate disjoint variables from `x`.
+                    for var in x_disjoint:
+                        int_mean[var] = x.__mean[var]
+                        for var_2 in x.__covariance[var].index:
+                            int_cov.loc[var, var_2] = x.__covariance[var][var_2]
+                            int_cov.loc[var_2, var] = x.__covariance[var_2][var]
+
+                    return Gaussian(int_mean, int_cov)
+
         sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
             sum_inv = pd.DataFrame(
