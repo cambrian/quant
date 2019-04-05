@@ -4,7 +4,7 @@ from numpy_ringbuffer import RingBuffer
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 from research.strategy.base import Strategy
-from trader.util.linalg import orthogonal_projection
+from trader.util.linalg import hyperplane_projection, orthogonal_projection
 from trader.util.stats import Gaussian
 
 
@@ -40,7 +40,7 @@ class Cointegrator(Strategy):
             if np.any(significant_results):
                 self.A = pd.DataFrame(c.evec[:, significant_results].T, columns=prices.index)
                 self.covs = [
-                    orthogonal_projection(P_norm, a).cov() + P_norm.cov() for a in self.A.values
+                    hyperplane_projection(P_norm, a).cov() + P_norm.cov() for a in self.A.values
                 ]
             else:
                 self.A = None
