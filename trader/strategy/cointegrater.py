@@ -40,7 +40,7 @@ class Cointegrator(Strategy):
             if np.any(significant_results):
                 self.A = pd.DataFrame(c.evec[:, significant_results].T, columns=prices.index)
                 self.covs = [
-                    hyperplane_projection(P_norm, a).cov() + P_norm.cov() for a in self.A.values
+                    hyperplane_projection(P_norm, a).cov() * 2 + P.cov() for a in self.A.values
                 ]
             else:
                 self.A = None
