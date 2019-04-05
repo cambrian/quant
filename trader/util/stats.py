@@ -46,6 +46,22 @@ class Ema:
         return self.__samples_needed == 0
 
 
+def _is_default_index(x):
+    return isinstance(x, RangeIndex)
+
+
+def _reindex(x, index, coerce):
+    assert coerce in [pd.DataFrame, pd.Series]
+    if coerce == pd.DataFrame:
+        x_new = pd.DataFrame(x)
+        x_new.columns = index
+        x_new.index = index
+    elif coerce == pd.Series:
+        x_new = pd.Series(x)
+        x_new.index = index
+    return x_new
+
+
 class GaussianError(Exception):
     pass
 
@@ -131,34 +147,40 @@ class Gaussian:
         if len(np.shape(covariance)) == 1:
             covariance_matrix = np.diag(covariance)
             if isinstance(covariance, pd.Series):
-                covariance = pd.DataFrame(
-                    covariance_matrix, index=covariance.index, columns=covariance.index
-                )
+                index = covariance.index
+                covariance = _reindex(covariance_matrix, index, pd.DataFrame)
             else:
                 covariance = covariance_matrix
 
-        # Ensure that:
-        # 1. Both mean and covariance are in Pandas if either is in Pandas.
-        # 2. Column labels and index labels match for a covariance matrix.
-        # 3. Index labels match between a covariance matrix and a mean vector.
-        # 4. All labels are unique and sorted.
+        # Ensure covariance index labels and column labels are consistent.
         if isinstance(covariance, pd.DataFrame):
-            covariance = covariance.sort_index().sort_index(axis=1)
-            if list(covariance.columns) != list(covariance.index):
+            if set(covariance.columns) != set(covariance.index):
                 raise GaussianError("covariance column labels and index labels do not match")
             if len(covariance.index) != len(np.unique(covariance.index)):
                 raise GaussianError("covariance label names must be unique")
+
+        # Ensure that mean and covariance are both Pandas datatypes.
+        # Ensure that mean labels are consistent with covariance labels.
         if isinstance(mean, pd.Series):
-            mean = mean.sort_index()
-            if isinstance(covariance, pd.DataFrame):
-                if list(mean.index) != list(covariance.index):
-                    raise GaussianError("mean labels and covariance labels do not match")
-            else:
-                if len(mean.index) != len(np.unique(mean.index)):
-                    raise GaussianError("mean label names must be unique")
-                covariance = pd.DataFrame(covariance, index=mean.index, columns=mean.index)
+            if len(mean.index) != len(np.unique(mean.index)):
+                raise GaussianError("mean label names must be unique")
+            # Case 1: Copy covariance labels from mean (and force covariance into Pandas).
+            if not isinstance(covariance, pd.DataFrame) or _is_default_index(covariance.index):
+                covariance = _reindex(covariance, mean.index, pd.DataFrame)
+            # Case 2: Copy mean labels from covariance.
+            elif _is_default_index(mean.index):
+                mean = _reindex(mean, covariance.index, pd.Series)
+            # Case 3: Verify equality of mean and covariance labels.
+            elif set(mean.index) != set(covariance.index):
+                raise GaussianError("mean labels and covariance labels do not match")
         elif isinstance(covariance, pd.DataFrame):
-            mean = pd.Series(mean, index=covariance.index)
+            # Case 4: Copy mean labels from covariance (and force mean into Pandas).
+            mean = _reindex(mean, covariance.index, pd.Series)
+
+        # Ensure that mean labels and covariance labels are sorted.
+        if isinstance(covariance, pd.DataFrame):
+            mean = mean.sort_index()
+            covariance = covariance.sort_index().sort_index(axis=1)
 
         # Sanity check dimensions after pre-processing.
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
@@ -331,22 +353,26 @@ class Gaussian:
         a  0.625 -0.125
         b -0.125  0.625
 
-        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.DataFrame([ \
-                [2, -1], \
-                [-1, 2] \
-            ], index=['a', 'b'], columns=['a', 'b'])) \
-            & Gaussian(pd.Series([3, 3], index=['b', 'c']), pd.Series([1, 1], index=['b', 'c']))
+        >>> Gaussian(pd.Series([1, 2, 1], index=['a', 'd', 'b']), pd.DataFrame([ \
+                [2, 1, -1], \
+                [1, 2, 1], \
+                [-1, 1, 2] \
+            ], index=['a', 'd', 'b'], columns=['a', 'd', 'b'])) \
+            & Gaussian(pd.Series([3, 2, 3], index=['a', 'd', 'c']), \
+                pd.Series([1, 1, 1]))
         Gaussian:
         mean:
-        a    1.000000
-        b    2.333333
-        c    3.000000
+        a    2.25
+        b    1.00
+        c    3.00
+        d    2.25
         dtype: float64
         covariance:
-           a         b  c
-        a  2 -1.000000  0
-        b -1  0.666667  0
-        c  0  0.000000  1
+               a  b  c      d
+        a  0.625 -1  0  0.125
+        b -1.000  2  0  1.000
+        c  0.000  0  1  0.000
+        d  0.125  1  0  0.625
 
         """
         # TODO: This could maybe get cleaned up and vectorized with some effort.
@@ -357,7 +383,7 @@ class Gaussian:
 
             # Ensure that the disjoint intersection procedure is not carried out by accident (e.g.
             # on DataFrames with no explicit indexing, which use the default RangeIndex).
-            if not isinstance(s_columns, RangeIndex) and not isinstance(x_columns, RangeIndex):
+            if not _is_default_index(s_columns) and not _is_default_index(x_columns):
                 common_vars = s_columns.intersection(x_columns)
                 s_disjoint = s_columns.difference(common_vars)
                 x_disjoint = x_columns.difference(common_vars)
@@ -397,9 +423,7 @@ class Gaussian:
 
         sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
-            sum_inv = pd.DataFrame(
-                sum_inv, index=self.__covariance.index, columns=self.__covariance.columns
-            )
+            sum_inv = _reindex(sum_inv, self.__covariance.index, pd.DataFrame)
         covariance = self.__covariance @ sum_inv @ x.__covariance
         mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
@@ -492,7 +516,7 @@ class Gaussian:
         if len(np.shape(s)) == 1:
             s2_diag = np.diag(s * s)
             if isinstance(self.__mean, pd.Series):
-                s2_diag = pd.DataFrame(s2_diag, index=self.__mean.index, columns=self.__mean.index)
+                s2_diag = _reindex(s2_diag, self.__mean.index, pd.DataFrame)
             cov = self.__covariance @ s2_diag
             return Gaussian(self.__mean * s, cov)
         return Gaussian(self.__mean * s, self.__covariance * s * s)
@@ -567,7 +591,7 @@ class Gaussian:
         result = distribution.pdf(x)
 
         if isinstance(x, pd.DataFrame):
-            return pd.Series(result, index=x.index)
+            return _reindex(result, x.index, pd.Series)
         return result
 
     def cdf(self, a, b=None):
@@ -653,7 +677,7 @@ class Gaussian:
                 multiplier *= -1
 
         if isinstance(a, pd.DataFrame) or isinstance(a, pd.Series):
-            return pd.Series(result, index=a.index)
+            return _reindex(result, a.index, pd.Series)
         return result
 
     def z_score(self, x):
@@ -682,7 +706,7 @@ class Gaussian:
             result = mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
 
         if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
-            return pd.Series(result, index=x.index)
+            return _reindex(result, x.index, pd.Series)
         return result
 
     def __should_vectorize(self, points):
