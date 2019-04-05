@@ -532,11 +532,11 @@ class Gaussian:
             result = 0
             multiplier = 1
 
-            # Iterates through `inclusion_bits` grouped by the number of ones `num_lower` in the bit
-            # vector. At each value of `num_lower`, there are (`num_vars` choose `num_lower`) such
+            # Iterates through `inclusion_bits` grouped by the number of ones `num_upper` in the bit
+            # vector. At each value of `num_upper`, there are (`num_vars` choose `num_upper`) such
             # elements in `inclusion_bits`.
-            for num_lower in range(num_vars + 1):
-                for _ in range(int(choose(num_vars, num_lower))):
+            for num_upper in range(num_vars + 1):
+                for _ in range(int(choose(num_vars, num_upper))):
                     # If `inclusion_bits[i]` is e.g. 1001, we will construct a CDF limit by taking
                     # the first variable from `b`, the second and third variables from `a`, and the
                     # fourth variable from `b`.
