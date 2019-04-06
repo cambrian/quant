@@ -375,7 +375,6 @@ class Gaussian:
         d  0.125  1.0  0.0  0.625
 
         """
-        # TODO: This could maybe get cleaned up and vectorized with some effort.
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
         if (
             isinstance(self.__covariance, pd.DataFrame)
