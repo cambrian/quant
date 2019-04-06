@@ -368,11 +368,11 @@ class Gaussian:
         d    2.25
         dtype: float64
         covariance:
-               a  b  c      d
-        a  0.625 -1  0  0.125
-        b -1.000  2  0  1.000
-        c  0.000  0  1  0.000
-        d  0.125  1  0  0.625
+               a    b    c      d
+        a  0.625 -1.0  0.0  0.125
+        b -1.000  2.0  0.0  1.000
+        c  0.000  0.0  1.0  0.000
+        d  0.125  1.0  0.0  0.625
 
         """
         # TODO: This could maybe get cleaned up and vectorized with some effort.
@@ -390,36 +390,22 @@ class Gaussian:
 
                 # Some variables are disjoint. Filter indexes to the common variables, compute the
                 # Gaussian intersection, then interpolate disjoint variables back in.
-                if len(common_vars) != len(s_columns):
-                    s_mean = self.__mean.filter(common_vars)
-                    x_mean = x.__mean.filter(common_vars)
-                    s_cov = self.__covariance.filter(common_vars).filter(common_vars, axis="index")
-                    x_cov = x.__covariance.filter(common_vars).filter(common_vars, axis="index")
-                    intersection = Gaussian(s_mean, s_cov) & Gaussian(x_mean, x_cov)
+                if not (s_disjoint.empty and x_disjoint.empty):
+                    s_mean = self.__mean[common_vars]
+                    x_mean = x.__mean[common_vars]
+                    s_cov = self.__covariance.loc[common_vars, common_vars]
+                    x_cov = x.__covariance.loc[common_vars, common_vars]
+                    common = Gaussian(s_mean, s_cov) & Gaussian(x_mean, x_cov)
 
-                    # Initialize interpolations.
-                    int_mean = intersection.__mean
-                    int_cov = intersection.__covariance
-                    for var in s_disjoint.union(x_disjoint):
-                        int_mean[var] = np.nan
-                        int_cov[var] = 0
-                        int_cov.loc[var] = 0
+                    mean = pd.concat([common.__mean, self.__mean[s_disjoint], x.__mean[x_disjoint]])
+                    s_cov_disjoint = self.__covariance.sub(s_cov, fill_value=0)
+                    x_cov_disjoint = x.__covariance.sub(x_cov, fill_value=0)
+                    covariance = common.__covariance.add(s_cov_disjoint, fill_value=0).add(
+                        x_cov_disjoint, fill_value=0
+                    )
+                    covariance.fillna(0, inplace=True)
 
-                    # Interpolate disjoint variables from `self`.
-                    for var in s_disjoint:
-                        int_mean[var] = self.__mean[var]
-                        for var_2 in self.__covariance[var].index:
-                            int_cov.loc[var, var_2] = self.__covariance[var][var_2]
-                            int_cov.loc[var_2, var] = self.__covariance[var_2][var]
-
-                    # Interpolate disjoint variables from `x`.
-                    for var in x_disjoint:
-                        int_mean[var] = x.__mean[var]
-                        for var_2 in x.__covariance[var].index:
-                            int_cov.loc[var, var_2] = x.__covariance[var][var_2]
-                            int_cov.loc[var_2, var] = x.__covariance[var_2][var]
-
-                    return Gaussian(int_mean, int_cov)
+                    return Gaussian(mean, covariance)
 
         sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
         if isinstance(x.__covariance, pd.DataFrame):
