@@ -398,10 +398,10 @@ class Gaussian:
                 x_cov = x.__covariance.loc[common_vars, common_vars]
                 common = Gaussian(s_mean, s_cov) & Gaussian(x_mean, x_cov)
 
-                mean = pd.concat([common.__mean, self.__mean[s_disjoint], x.__mean[x_disjoint]])
+                mean = pd.concat([self.__mean[s_disjoint], common.__mean, x.__mean[x_disjoint]])
                 s_cov_disjoint = self.__covariance.sub(s_cov, fill_value=0)
                 x_cov_disjoint = x.__covariance.sub(x_cov, fill_value=0)
-                covariance = common.__covariance.add(s_cov_disjoint, fill_value=0).add(
+                covariance = s_cov_disjoint.add(common.__covariance, fill_value=0).add(
                     x_cov_disjoint, fill_value=0
                 )
                 covariance.fillna(0, inplace=True)
