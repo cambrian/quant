@@ -2,6 +2,8 @@ from collections import defaultdict
 from queue import Queue
 from threading import Lock
 
+import numpy as np
+
 from trader.util import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
@@ -75,7 +77,19 @@ class Executor:
         book = self.__latest_books[exchange, pair]
         self.__books_lock.release()
 
-        fairs = self.__latest_fairs
+        # TODO Maybe change Gaussian type to handle singular vs multiple tracked pairs the same
+        # Multiple pairs' fairs, strategy tracks multiple pairs
+        if (
+            isinstance(self.__latest_fairs, dict)
+            and self.__latest_fairs is not None
+            and pair in self.__latest_fairs
+        ):
+            fairs = self.__latest_fairs[pair]
+        elif self.__latest_fairs is not None:
+            fairs = self.__latest_fairs
+        else:
+            fairs = None
+
         if fairs is None:
             trade_lock.release()
             return
@@ -105,18 +119,25 @@ class Executor:
         )
         if buy_size > 0:
             Log.data("executor-buy", {"pair": pair.json_value(), "size": buy_size})
-            # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
-            # Log.info(order)
+            order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
+            Log.info("dummy-executor Order: {}".format(order))
         if sell_size > 0:
             Log.data("executor-sell", {"pair": pair.json_value(), "size": sell_size})
             # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
             # sell_size = max(0.004, sell_size / 1000)
-            # order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
-            # Log.info(order)
+            order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
+            Log.info("dummy-executor Order: {}".format(order))
         trade_lock.release()
 
     def tick_fairs(self, fairs):
-        self.__latest_fairs = fairs
+        if isinstance(fairs.mean, float):
+            self.__latest_fairs = fairs
+        else:
+            if self.__latest_fairs is None:
+                self.__latest_fairs = {}
+            for i, pair in enumerate(fairs.mean.index):
+                self.__latest_fairs[pair] = Gaussian([fairs.mean[i]], [fairs.stddev[i]])
+
         self.__books_lock.acquire()
         for exchange, pair in self.__latest_books:
             self.__thread_manager.attach(

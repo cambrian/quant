@@ -13,17 +13,8 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (
-    BTC,
-    BTC_USDT,
-    DUMMY,
-    ETH,
-    ETH_USDT,
-    USD,
-    XRP,
-    XRP_USDT,
-    not_implemented,
-)
+from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT, USD,
+                                   XRP, XRP_USDT, not_implemented)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
@@ -99,20 +90,20 @@ class DummyExchange(Exchange):
         NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
-        data = {"close": [], "volume": []}
+        data = {}
         for pair in pairs:
-            pair = self.translate[pair]
-            if pair not in self.__supported_pairs:
+            trans_pair = self.translate[pair]
+            if trans_pair not in self.__supported_pairs:
                 raise ExchangeError("pair not supported by Dummy")
-            if pair in self.__prices:
-                val = self.__prices[pair]
+            if trans_pair in self.__prices:
+                val = self.__prices[trans_pair]
             else:
                 # Prices should be tracked in `step_time`.
                 val = (0, 0)
-            data["close"].append(val[0])
-            data["volume"].append(val[1])
-        Log.data("Dummy-prices", {"data": data})
-        return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+            data[pair] = val
+        Log.info("Dummy-prices {}".format(data))
+        # Log.data("Dummy-prices", {"data": data})
+        return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     # TODO
     def balances_feed(self):

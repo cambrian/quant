@@ -1,12 +1,7 @@
-### SCRIPTS SETUP BLOCK ###
-# Needed to run this from outside the directory.
-import sys  # isort:skip
-import os  # isort:skip
+# Setup the module environment to run this script.
+from setup import ROOT_DIRECTORY  # isort:skip, pylint: disable=import-error
 
-ROOT_DIRECTORY = os.path.join(os.path.dirname(__file__), "..")
-sys.path.append(ROOT_DIRECTORY)
-### END SCRIPTS SETUP BLOCK ###
-
+import os
 import time
 
 import pandas as pd
