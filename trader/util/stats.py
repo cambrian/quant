@@ -123,6 +123,17 @@ class Gaussian:
         Traceback (most recent call last):
         stats.GaussianError: mean labels and covariance labels do not match
 
+        >>> Gaussian(pd.Series([1, 1], index=['b','a']), [1, 1])
+        Gaussian:
+        mean:
+        b    1
+        a    1
+        dtype: int64
+        covariance:
+           b  a
+        b  1  0
+        a  0  1
+
         """
         # Marshal non-NumPy/Pandas types into NumPy.
         if len(np.shape(mean)) == 0:
@@ -169,11 +180,6 @@ class Gaussian:
         elif isinstance(covariance, pd.DataFrame):
             # Case 4: Copy mean labels from covariance (and force mean into Pandas).
             mean = _reindex(mean, covariance.index, pd.Series)
-
-        # Ensure that mean labels and covariance labels are sorted.
-        if isinstance(covariance, pd.DataFrame):
-            mean = mean.sort_index()
-            covariance = covariance.sort_index().sort_index(axis=1)
 
         # Sanity check dimensions after pre-processing.
         if np.shape(covariance) != (np.size(mean), np.size(mean)):
@@ -331,15 +337,15 @@ class Gaussian:
         a  0.5  0.0
         b  0.0  0.5
 
-        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.DataFrame([ \
+        >>> Gaussian(pd.Series([1, 2], index=['a', 'b']), pd.DataFrame([ \
                 [2, -1], \
                 [-1, 2] \
             ], index=['a', 'b'], columns=['a', 'b'])) \
-            & Gaussian(pd.Series([3, 3], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b']))
+            & Gaussian(pd.Series([4, 3], index=['b', 'a']), pd.Series([1, 1], index=['b', 'a']))
         Gaussian:
         mean:
         a    2.0
-        b    2.0
+        b    3.0
         dtype: float64
         covariance:
                a      b
@@ -398,8 +404,12 @@ class Gaussian:
                 )
                 covariance.fillna(0, inplace=True)
 
-                return Gaussian(mean, covariance)
+                mean = mean.sort_index()
+                covariance = covariance.sort_index().sort_index(axis=1)
 
+                return Gaussian(mean, covariance)
+        if isinstance(self.__mean, pd.Series):
+            x = x[self.__mean.index]
         sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
         if isinstance(self.__mean, pd.Series):
             sum_inv = pd.DataFrame(sum_inv, index=self.__mean.index, columns=self.__mean.index)
