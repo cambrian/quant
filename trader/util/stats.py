@@ -703,6 +703,8 @@ class Gaussian:
                 result = _reindex(result, x.index, pd.Series)
             return result
         else:
+            if isinstance(self.__mean, pd.Series):
+                x = x[self.__mean.index]
             return mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
 
     def __should_vectorize(self, points):
