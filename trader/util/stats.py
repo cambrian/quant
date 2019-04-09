@@ -50,16 +50,12 @@ def _is_default_index(x):
     return isinstance(x, RangeIndex)
 
 
-def _reindex(x, index, coerce):
-    assert coerce in [pd.DataFrame, pd.Series]
-    if coerce == pd.DataFrame:
-        x_new = pd.DataFrame(x)
-        x_new.columns = index
-        x_new.index = index
-    elif coerce == pd.Series:
-        x_new = pd.Series(x)
-        x_new.index = index
-    return x_new
+def _reindex(x, index, t):
+    assert t in [pd.DataFrame, pd.Series]
+    if t == pd.DataFrame:
+        return pd.DataFrame(x, index=index, columns=index)
+    elif t == pd.Series:
+        return pd.Series(x, index=index)
 
 
 class GaussianError(Exception):
@@ -112,17 +108,6 @@ class Gaussian:
         [[1 0]
          [0 1]]
 
-        >>> Gaussian(pd.Series([1, 1]), pd.Series([1, 1]))
-        Gaussian:
-        mean:
-        0    1
-        1    1
-        dtype: int64
-        covariance:
-           0  1
-        0  1  0
-        1  0  1
-
         >>> Gaussian(pd.Series([1, 1]), [1, 1])
         Gaussian:
         mean:
@@ -133,6 +118,10 @@ class Gaussian:
            0  1
         0  1  0
         1  0  1
+
+        >>> Gaussian(pd.Series([1, 1], index=['a','b']), pd.Series([1, 1]))
+        Traceback (most recent call last):
+        stats.GaussianError: mean labels and covariance labels do not match
 
         """
         # Marshal non-NumPy/Pandas types into NumPy.
@@ -147,6 +136,10 @@ class Gaussian:
         if len(np.shape(covariance)) == 1:
             covariance_matrix = np.diag(covariance)
             if isinstance(covariance, pd.Series):
+                # TODO: restructure to clean up input validation
+                if isinstance(mean, pd.Series) and not set(mean.index) == set(covariance.index):
+                    raise GaussianError("mean labels and covariance labels do not match")
+
                 index = covariance.index
                 covariance = _reindex(covariance_matrix, index, pd.DataFrame)
             else:
@@ -359,7 +352,7 @@ class Gaussian:
                 [-1, 1, 2] \
             ], index=['a', 'd', 'b'], columns=['a', 'd', 'b'])) \
             & Gaussian(pd.Series([3, 2, 3], index=['a', 'd', 'c']), \
-                pd.Series([1, 1, 1]))
+                pd.Series([1, 1, 1], index=['a','d','c']))
         Gaussian:
         mean:
         a    2.25
@@ -377,8 +370,8 @@ class Gaussian:
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
         if (
-            isinstance(self.__covariance, pd.DataFrame)
-            and isinstance(x.__covariance, pd.DataFrame)
+            isinstance(self.__mean, pd.Series)
+            and isinstance(x.__mean, pd.Series)
             # Ensure that the disjoint intersection procedure is not carried out by accident (e.g.
             # on DataFrames with no explicit indexing, which use the default RangeIndex).
             and not _is_default_index(self.__mean.index)
@@ -408,8 +401,8 @@ class Gaussian:
                 return Gaussian(mean, covariance)
 
         sum_inv = np.linalg.pinv(self.__covariance + x.__covariance)
-        if isinstance(x.__covariance, pd.DataFrame):
-            sum_inv = _reindex(sum_inv, self.__covariance.index, pd.DataFrame)
+        if isinstance(self.__mean, pd.Series):
+            sum_inv = pd.DataFrame(sum_inv, index=self.__mean.index, columns=self.__mean.index)
         covariance = self.__covariance @ sum_inv @ x.__covariance
         mean = x.__covariance @ sum_inv @ self.__mean + self.__covariance @ sum_inv @ x.__mean
         return Gaussian(mean, covariance)
@@ -682,23 +675,28 @@ class Gaussian:
                 [ 1.5, -0.5, -0.5], \
                 [-0.5,  1.5, -0.5], \
                 [-0.5, -0.5,  1.5] \
+            ])).z_score(pd.Series([0, 1, 0]))
+        1.7320508075688763
+
+        >>> Gaussian(pd.Series([2, 0, 0]), pd.DataFrame([ \
+                [ 1.5, -0.5, -0.5], \
+                [-0.5,  1.5, -0.5], \
+                [-0.5, -0.5,  1.5] \
             ])).z_score([[0, 1, 0], [1, 0, 0]])
         array([1.73205081, 1.        ])
 
         """
         if self.__should_vectorize(x):
-            result = np.array([self.z_score(x_i) for x_i in x])
+            cov_inv = np.linalg.pinv(self.__covariance)
+            result = np.array([mahalanobis(self.__mean, x_i, cov_inv) for x_i in x])
+            if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
+                result = _reindex(result, x.index, pd.Series)
+            return result
         else:
-            result = mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
-
-        if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
-            return _reindex(result, x.index, pd.Series)
-        return result
+            return mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
 
     def __should_vectorize(self, points):
-        is_scalar_array = len(np.shape(points)) == 1 and len(points) > 1
-        # Vectorize if `points` contains multiple points OR if mean is a scalar but `points` is not.
-        return len(np.shape(points)) > 1 or (is_scalar_array and len(self.__mean) == 1)
+        return len(np.shape(points)) > len(np.shape(self.mean))
 
     def __repr__(self):
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
@@ -710,9 +708,10 @@ class Gaussian:
         """
         >>> Gaussian([1,1],[1,1]).gradient([0,0])
         array([0.05854983, 0.05854983])
-        >>> Gaussian(pd.Series([1,1]),[1,1]).gradient(pd.Series([0,0]))
-        0    0.05855
-        1    0.05855
+
+        >>> Gaussian(pd.Series([1,1]),[1,2]).gradient([0,0])
+        0    0.05316
+        1    0.02658
         dtype: float64
         """
         cov_inv = np.linalg.pinv(self.__covariance)
