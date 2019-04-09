@@ -702,3 +702,22 @@ class Gaussian:
 
     def __repr__(self):
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
+
+    def __getitem__(self, x):
+        return Gaussian(self.__mean[x], self.__covariance.loc[x, x])
+
+    def gradient(self, x):
+        """
+        >>> Gaussian([1,1],[1,1]).gradient([0,0])
+        array([0.05854983, 0.05854983])
+        >>> Gaussian(pd.Series([1,1]),[1,1]).gradient(pd.Series([0,0]))
+        0    0.05855
+        1    0.05855
+        dtype: float64
+        """
+        cov_inv = np.linalg.pinv(self.__covariance)
+        if isinstance(self.__covariance, pd.DataFrame):
+            cov_inv = pd.DataFrame(
+                cov_inv, index=self.__covariance.index, columns=self.__covariance.columns
+            )
+        return -self.pdf(x) * cov_inv @ (x - self.__mean)
