@@ -33,6 +33,7 @@ class Executor:
         self.__latest_books = {}
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
+        self.window_count = 0
 
         # Set up book feeds for every pair.
         for exchange, pairs in exchange_pairs.items():
@@ -67,6 +68,8 @@ class Executor:
         this same exchange pair. If true, it will wait for the other thread to finish trading this
         pair and try immediately after.
         """
+        if self.window_count < 6000:
+            return
         trade_lock = self.__trade_locks[exchange, pair]
         if wait_for_other_trade:
             trade_lock.acquire()

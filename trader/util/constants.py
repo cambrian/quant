@@ -60,6 +60,7 @@ class TradingPair:
     def json_value(self):
         return (self.__base.json_value(), self.__quote.json_value())
 
+<<<<<<< HEAD
     # Make TradingPair instances sortable
     def __lt__(self, other):
         if self.__base < other.__base:
@@ -67,6 +68,10 @@ class TradingPair:
         if self.__base == other.__base and self.__quote < other.__quote:
             return True
         return False
+=======
+    def __lt__(self, other):
+        return self.base.json_value() < other.base.json_value()
+>>>>>>> Adding window warming up
 
 
 # USD quotes.

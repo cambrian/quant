@@ -4,8 +4,7 @@ import trader.strategy as strategy
 from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
 from trader.metrics import Metrics
-from trader.util.constants import (BITFINEX, BTC_USD, BTC_USDT, ETH_USD,
-                                   ETH_USDT)
+from trader.util.constants import BITFINEX, BTC_USD, BTC_USDT, ETH_USD, ETH_USDT
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
@@ -19,7 +18,7 @@ data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
-cointegrator_strategy = strategy.Cointegrator(3)
+cointegrator_strategy = strategy.Cointegrator(6000)
 # executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
 executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT]})
 # metrics = Metrics(thread_manager, {bitfinex})
@@ -35,12 +34,13 @@ def main():
 
 
 def dummy_main():
-    beat = Beat(10000)
+    beat = Beat(1000)
     while beat.loop():
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
         cointegration_fairs = cointegrator_strategy.step(dummy_data)
         executor.tick_fairs(cointegration_fairs)
+        executor.window_count += 1
 
 
 # thread_manager.attach("main", main)
