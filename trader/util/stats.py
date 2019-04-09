@@ -735,11 +735,8 @@ class Gaussian:
         1    0.02658
         dtype: float64
         """
-        if isinstance(self.__mean, pd.Series) and (
-            isinstance(x, pd.Series) or isinstance(x, pd.DataFrame)
-        ):
-            x = x[self.__mean.index]
         # TODO: vectorize
+        # TODO: if x has some funky ordering, preserve it
         cov_inv = np.linalg.pinv(self.__covariance)
         if isinstance(self.__covariance, pd.DataFrame):
             cov_inv = pd.DataFrame(
