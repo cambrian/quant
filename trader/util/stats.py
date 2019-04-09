@@ -575,6 +575,12 @@ class Gaussian:
         0.15915494309189535
 
         """
+
+        if isinstance(self.__mean, pd.Series) and (
+            isinstance(x, pd.Series) or isinstance(x, pd.DataFrame)
+        ):
+            x = x[self.__mean.index]
+
         # Consider pre-computing and storing this distribution on the Gaussian.
         distribution = multivariate_normal(self.mean, self.covariance, allow_singular=True)
         result = distribution.pdf(x)
@@ -625,6 +631,7 @@ class Gaussian:
         array([0.017, 0.644])
 
         """
+        # TODO: reorder a and b to match self
         # Consider pre-computing and storing this distribution on the Gaussian.
         distribution = multivariate_normal(self.mean, self.covariance, allow_singular=True)
 
@@ -696,6 +703,10 @@ class Gaussian:
         array([1.73205081, 1.        ])
 
         """
+        if isinstance(self.__mean, pd.Series) and (
+            isinstance(x, pd.Series) or isinstance(x, pd.DataFrame)
+        ):
+            x = x[self.__mean.index]
         if self.__should_vectorize(x):
             cov_inv = np.linalg.pinv(self.__covariance)
             result = np.array([mahalanobis(self.__mean, x_i, cov_inv) for x_i in x])
@@ -703,8 +714,6 @@ class Gaussian:
                 result = _reindex(result, x.index, pd.Series)
             return result
         else:
-            if isinstance(self.__mean, pd.Series):
-                x = x[self.__mean.index]
             return mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
 
     def __should_vectorize(self, points):
@@ -726,6 +735,11 @@ class Gaussian:
         1    0.02658
         dtype: float64
         """
+        if isinstance(self.__mean, pd.Series) and (
+            isinstance(x, pd.Series) or isinstance(x, pd.DataFrame)
+        ):
+            x = x[self.__mean.index]
+        # TODO: vectorize
         cov_inv = np.linalg.pinv(self.__covariance)
         if isinstance(self.__covariance, pd.DataFrame):
             cov_inv = pd.DataFrame(
