@@ -496,18 +496,14 @@ class Gaussian:
         dtype: int64
         covariance:
            a  b
-        a  1  4
-        b  1  4
+        a  1  2
+        b  2  4
 
         """
         if type(s) == list:
             s = np.array(s)
         if len(np.shape(s)) == 1:
-            s2_diag = np.diag(s * s)
-            if isinstance(self.__mean, pd.Series):
-                s2_diag = _reindex(s2_diag, self.__mean.index, pd.DataFrame)
-            cov = self.__covariance @ s2_diag
-            return Gaussian(self.__mean * s, cov)
+            return Gaussian(self.__mean * s, self.__covariance * s[:, None] * s[None, :])
         return Gaussian(self.__mean * s, self.__covariance * s * s)
 
     def __truediv__(self, s):
