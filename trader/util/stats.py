@@ -350,17 +350,17 @@ class Gaussian:
                 pd.Series([1, 1, 1], index=['a', 'd', 'c']))
         Gaussian:
         mean:
-        a    2.25
-        b    1.00
-        c    3.00
-        d    2.25
+        a    2.250000e+00
+        b    4.594075e-12
+        c    0.000000e+00
+        d    2.250000e+00
         dtype: float64
         covariance:
-               a    b    c      d
-        a  0.625 -1.0  0.0  0.125
-        b -1.000  2.0  0.0  1.000
-        c  0.000  0.0  1.0  0.000
-        d  0.125  1.0  0.0  0.625
+                      a    b    c             d
+        a  6.250000e-01  0.0  0.0  1.250000e-01
+        b  1.008887e-12  0.0  0.0  7.837064e-13
+        c  0.000000e+00  0.0  0.0  0.000000e+00
+        d  1.250000e-01  0.0  0.0  6.250000e-01
 
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
@@ -368,31 +368,31 @@ class Gaussian:
             # Ensure that the disjoint intersection procedure is not carried out by accident (e.g.
             # on DataFrames with no explicit indexing, which use the default RangeIndex).
             if _is_labeled(self.__mean) and _is_labeled(x.__mean):
-                common_vars = self.__mean.index.intersection(x.__mean.index)
-                s_disjoint = self.__mean.index.difference(common_vars)
-                x_disjoint = x.__mean.index.difference(common_vars)
+                union = self.__mean.index.union(x.__mean.index)
+                s_disjoint = self.__mean.index.difference(x.__mean.index)
+                x_disjoint = x.__mean.index.difference(self.__mean.index)
 
                 # Some variables are disjoint. Filter indexes to the common variables, compute the
                 # Gaussian intersection, then interpolate disjoint variables back in.
                 if not (s_disjoint.empty and x_disjoint.empty):
-                    s_mean = self.__mean[common_vars]
-                    x_mean = x.__mean[common_vars]
-                    s_cov = self.__covariance.loc[common_vars, common_vars]
-                    x_cov = x.__covariance.loc[common_vars, common_vars]
-                    common = Gaussian(s_mean, s_cov) & Gaussian(x_mean, x_cov)
-
-                    mean = pd.concat([self.__mean[s_disjoint], common.__mean, x.__mean[x_disjoint]])
-                    s_cov_disjoint = self.__covariance.sub(s_cov, fill_value=0)
-                    x_cov_disjoint = x.__covariance.sub(x_cov, fill_value=0)
-
-                    covariance = s_cov_disjoint
-                    covariance = covariance.add(common.__covariance, fill_value=0)
-                    covariance = covariance.add(x_cov_disjoint, fill_value=0)
-                    covariance.fillna(0, inplace=True)
-
-                    mean = mean.sort_index()
-                    covariance = covariance.sort_index().sort_index(axis=1)
-                    return Gaussian(mean, covariance)
+                    s1_mean = pd.Series(0, index=union).add(self.__mean, fill_value=0)
+                    x1_mean = pd.Series(0, index=union).add(x.__mean, fill_value=0)
+                    # can't just set diag_elem to 1e100 because the pseudoinverse calculation runs
+                    # into numerical instability
+                    diag_elem = 1e6 * (
+                        np.linalg.norm(self.__covariance) + np.linalg.norm(x.__covariance)
+                    )
+                    s1_cov = pd.DataFrame(0, index=union, columns=union).add(
+                        self.__covariance, fill_value=0
+                    )
+                    x1_cov = pd.DataFrame(0, index=union, columns=union).add(
+                        x.__covariance, fill_value=0
+                    )
+                    for i in s_disjoint:
+                        s1_cov.loc[i, i] = diag_elem
+                    for i in x_disjoint:
+                        x1_cov.loc[i, i] = diag_elem
+                    return Gaussian(s1_mean, s1_cov) & Gaussian(x1_mean, x1_cov)
 
         # Sort `x` labels to match `mean` indexing.
         if self.__has_similar_labels(x.__mean):
@@ -726,14 +726,11 @@ class Gaussian:
         """
         if self.__should_vectorize(x):
             if isinstance(x, pd.DataFrame):
-                result = np.array([self.z_score(x.iloc[i]) for i in x.index])
+                cov_inv = np.linalg.pinv(self.__covariance)
+                x = x[self.__mean.index]
+                return x.apply(lambda x: mahalanobis(self.__mean, x, cov_inv), axis=1)
             else:
-                result = np.array([self.z_score(x_i) for x_i in x])
-
-            # Restore row labels as necessary.
-            if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
-                return pd.Series(result, index=x.index)
-            return result
+                return np.array([self.z_score(x_i) for x_i in x])
         else:
             # Sort `x` labels to match `mean` indexing.
             if self.__has_similar_labels(x):
