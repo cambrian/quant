@@ -6,11 +6,12 @@ def orthogonal_projection(a, b):
     """
     Project `a` onto the vector `b`.
 
-    >>> orthogonal_projection(np.array([1,0]), np.array([1,1]))
+    >>> orthogonal_projection(np.array([1, 0]), np.array([1, 1]))
     array([0.5, 0.5])
 
-    >>> orthogonal_projection(np.array([1,1]), np.array([1,0]))
+    >>> orthogonal_projection(np.array([1, 1]), np.array([1, 0]))
     array([1., 0.])
+
     """
     b = np.array(b)
     dims = len(np.shape(a))
