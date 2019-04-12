@@ -107,18 +107,18 @@ class Executor:
         )
         print(orders)
 
-        for (
-            order_exchange_pair,
-            order_size,
-        ) in orders.items():  # double check pandas iteration syntax
-            print(order_exchange_pair, order_size)
-            # exchange_name, pair = order_exchange_pair.split("_", 1)
-            # if order_size < 0:
-            #     fill = exchanges[exchange_name].order(pair=pair, direction=SELL, price=bid, size=sell_size, order_type=IMMEDIATE_OR_CANCEL)
-            #     update_balances(balances, fill)
-            # else if order_size > 0:
-            #     fill = exchanges[exchange_name].order(pair=pair, direction=BUY, price=ask, size=buy_size, order_type=IMMEDIATE_OR_CANCEL)
-            #     update_balances(balances, fill)
+        # for (
+        #     order_exchange_pair,
+        #     order_size,
+        # ) in orders.items():  # double check pandas iteration syntax
+        #     print(order_exchange_pair, order_size)
+        # exchange_name, pair = order_exchange_pair.split("_", 1)
+        # if order_size < 0:
+        #     fill = exchanges[exchange_name].order(pair=pair, direction=SELL, price=bid, size=sell_size, order_type=IMMEDIATE_OR_CANCEL)
+        #     update_balances(balances, fill)
+        # else if order_size > 0:
+        #     fill = exchanges[exchange_name].order(pair=pair, direction=BUY, price=ask, size=buy_size, order_type=IMMEDIATE_OR_CANCEL)
+        #     update_balances(balances, fill)
         trade_lock.release()
 
     def tick_fairs(self, fairs):
@@ -158,23 +158,14 @@ class Executor:
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
-        bal_no_quote = pd.DataFrame.from_dict(balances, orient="index")
+        bal_no_quote = pd.Series(balances)
         bal_no_quote = (
-            bal_no_quote.drop([quote_currency])
-            if quote_currency in bal_no_quote.index
-            else bal_no_quote
+            bal_no_quote.drop([quote_currency]) if quote_currency in bal_no_quote else bal_no_quote
         )
         pair_balances = bal_no_quote.rename(lambda c: TradingPair(c, quote_currency))
-        proposed_orders = pd.DataFrame(target_balance_values / fairs.mean) - pair_balances
-        prices = (proposed_orders >= 0) * pd.DataFrame(asks) + (proposed_orders < 0) * pd.DataFrame(
-            bids
-        )
-        mean = pd.DataFrame(fairs.mean)
-        mean.columns = [0]
-        # print(mean)
-        profitable = (
-            pd.DataFrame(np.sign(proposed_orders) * (mean / prices - 1))
-            > pd.DataFrame(fees) + min_edge
-        )
+        proposed_orders = (target_balance_values / fairs.mean) - pair_balances
+        prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
+
+        profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge
         profitable_orders = proposed_orders * profitable
         return profitable_orders
