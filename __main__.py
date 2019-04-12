@@ -4,7 +4,8 @@ import trader.strategy as strategy
 from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
 from trader.metrics import Metrics
-from trader.util.constants import BITFINEX, BTC_USD, BTC_USDT, ETH_USD, ETH_USDT
+from trader.util.constants import (BITFINEX, BTC_USD, BTC_USDT, ETH_USD,
+                                   ETH_USDT)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
@@ -19,8 +20,9 @@ dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
 cointegrator_strategy = strategy.Cointegrator(6000)
+kalman_strategy = strategy.Kalman(100, 10)
 # executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
-executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT]})
+executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]})
 # metrics = Metrics(thread_manager, {bitfinex})
 
 
@@ -38,9 +40,10 @@ def dummy_main():
     while beat.loop():
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
-        cointegration_fairs = cointegrator_strategy.step(dummy_data)
-        executor.tick_fairs(cointegration_fairs)
-        executor.window_count += 1
+        # cointegration_fairs = cointegrator_strategy.step(dummy_data)
+        kalman_fairs = kalman_strategy.tick(dummy_data)
+        # executor.tick_fairs(cointegration_fairs)
+        executor.tick_fairs(kalman_fairs)
 
 
 # thread_manager.attach("main", main)

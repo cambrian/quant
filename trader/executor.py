@@ -3,8 +3,10 @@ from queue import Queue
 from threading import Lock
 
 import numpy as np
+import pandas as pd
 
 from trader.util import Feed
+from trader.util.constants import TradingPair
 from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, Order
@@ -33,7 +35,6 @@ class Executor:
         self.__latest_books = {}
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
-        self.window_count = 0
 
         # Set up book feeds for every pair.
         for exchange, pairs in exchange_pairs.items():
@@ -68,8 +69,6 @@ class Executor:
         this same exchange pair. If true, it will wait for the other thread to finish trading this
         pair and try immediately after.
         """
-        if self.window_count < 6000:
-            return
         trade_lock = self.__trade_locks[exchange, pair]
         if wait_for_other_trade:
             trade_lock.acquire()
@@ -78,68 +77,52 @@ class Executor:
 
         self.__books_lock.acquire()
         book = self.__latest_books[exchange, pair]
+        bids = {}
+        asks = {}
+        fees = {}
+        for (exchange, pair) in self.__latest_books:
+            book = self.__latest_books[exchange, pair]
+            bids[pair] = book.bid
+            asks[pair] = book.ask
+            fees[pair] = exchange.fees["taker"]
+            if pair.base not in exchange.balances:
+                exchange.balances[pair.base] = 0.0
         self.__books_lock.release()
+        bids = pd.Series(bids)
+        asks = pd.Series(asks)
+        fees = pd.Series(fees)
 
-        # TODO Maybe change Gaussian type to handle singular vs multiple tracked pairs the same
-        # Multiple pairs' fairs, strategy tracks multiple pairs
-        if (
-            isinstance(self.__latest_fairs, dict)
-            and self.__latest_fairs is not None
-            and pair in self.__latest_fairs
-        ):
-            fairs = self.__latest_fairs[pair]
-        elif self.__latest_fairs is not None:
-            fairs = self.__latest_fairs
-        else:
-            fairs = None
-
-        if fairs is None:
+        if self.__latest_fairs is None:
             trade_lock.release()
             return
 
         ask = book.ask
         bid = book.bid
         balance = exchange.balances[pair.base]
-        fees = exchange.fees
-        buy_size = (
-            self.order_size(Direction.BUY, fees["taker"], balance, fairs, ask) if ask != None else 0
+        min_edge = 1
+        # fees = exchange.fees
+
+        orders = self.get_orders(
+            exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge
         )
-        sell_size = (
-            self.order_size(Direction.SELL, fees["taker"], balance, fairs, bid)
-            if bid != None
-            else 0
-        )
-        Log.data(
-            "executor-trade",
-            {
-                "pair": pair.json_value(),
-                "balance": balance,
-                "buy_size": buy_size,
-                "sell_size": sell_size,
-                "bid": bid,
-                "ask": ask,
-            },
-        )
-        if buy_size > 0:
-            Log.data("executor-buy", {"pair": pair.json_value(), "size": buy_size})
-            order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, ask, buy_size)
-            Log.info("dummy-executor Order: {}".format(order))
-        if sell_size > 0:
-            Log.data("executor-sell", {"pair": pair.json_value(), "size": sell_size})
-            # TODO: Remove. In place now until strategy is implemented so we don't sell all BTC.
-            # sell_size = max(0.004, sell_size / 1000)
-            order = exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, sell_size)
-            Log.info("dummy-executor Order: {}".format(order))
+        print(orders)
+
+        for (
+            order_exchange_pair,
+            order_size,
+        ) in orders.items():  # double check pandas iteration syntax
+            print(order_exchange_pair, order_size)
+            # exchange_name, pair = order_exchange_pair.split("_", 1)
+            # if order_size < 0:
+            #     fill = exchanges[exchange_name].order(pair=pair, direction=SELL, price=bid, size=sell_size, order_type=IMMEDIATE_OR_CANCEL)
+            #     update_balances(balances, fill)
+            # else if order_size > 0:
+            #     fill = exchanges[exchange_name].order(pair=pair, direction=BUY, price=ask, size=buy_size, order_type=IMMEDIATE_OR_CANCEL)
+            #     update_balances(balances, fill)
         trade_lock.release()
 
     def tick_fairs(self, fairs):
-        if isinstance(fairs.mean, float):
-            self.__latest_fairs = fairs
-        else:
-            if self.__latest_fairs is None:
-                self.__latest_fairs = {}
-            for i, pair in enumerate(fairs.mean.index):
-                self.__latest_fairs[pair] = Gaussian([fairs.mean[i]], [fairs.stddev[i]])
+        self.__latest_fairs = fairs
 
         self.__books_lock.acquire()
         for exchange, pair in self.__latest_books:
@@ -159,3 +142,39 @@ class Executor:
         desired_balance_value = edge * SIZE_PARAMETER * dir_
         proposed_order_size = (desired_balance_value / price - balance) * dir_
         return max(0, proposed_order_size)
+
+    def get_orders(self, balances, bids, asks, fairs, size, fees, min_edge):
+        """Takes fair as Gaussian, balances in base currency.
+        Returns orders in base currency (negative size indicates sell).
+
+        Since our fair estimate may have skewed uncertainty, it may be the case that
+        a price change for one trading pair causes us to desire positions in other
+        pairs. Therefore get_orders needs to consider the entire set of fairs and
+        bid/asks at once.
+        """
+        mids = (bids + asks) / 2  # use mid price for target balance value calculations
+        quote_currency = mids.index[0].quote
+
+        gradient = fairs.gradient(mids) * fairs.mean
+        balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
+        target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
+        bal_no_quote = pd.DataFrame.from_dict(balances, orient="index")
+        bal_no_quote = (
+            bal_no_quote.drop([quote_currency])
+            if quote_currency in bal_no_quote.index
+            else bal_no_quote
+        )
+        pair_balances = bal_no_quote.rename(lambda c: TradingPair(c, quote_currency))
+        proposed_orders = pd.DataFrame(target_balance_values / fairs.mean) - pair_balances
+        prices = (proposed_orders >= 0) * pd.DataFrame(asks) + (proposed_orders < 0) * pd.DataFrame(
+            bids
+        )
+        mean = pd.DataFrame(fairs.mean)
+        mean.columns = [0]
+        # print(mean)
+        profitable = (
+            pd.DataFrame(np.sign(proposed_orders) * (mean / prices - 1))
+            > pd.DataFrame(fees) + min_edge
+        )
+        profitable_orders = proposed_orders * profitable
+        return profitable_orders

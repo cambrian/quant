@@ -68,6 +68,12 @@ class TradingPair:
             return True
         return False
 
+    def __eq__(self, other):
+        return self.base == other.base and self.quote == other.quote
+
+    def __hash__(self):
+        return id(self)
+
 
 # USD quotes.
 BTC_USD = TradingPair(BTC, USD)
