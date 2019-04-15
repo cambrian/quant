@@ -104,20 +104,17 @@ class Executor:
         orders = self.get_orders(
             exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge
         )
-        print(orders)
 
-        # for (
-        #     order_exchange_pair,
-        #     order_size,
-        # ) in orders.items():  # double check pandas iteration syntax
-        #     print(order_exchange_pair, order_size)
-        # exchange_name, pair = order_exchange_pair.split("_", 1)
-        # if order_size < 0:
-        #     fill = exchanges[exchange_name].order(pair=pair, direction=SELL, price=bid, size=sell_size, order_type=IMMEDIATE_OR_CANCEL)
-        #     update_balances(balances, fill)
-        # else if order_size > 0:
-        #     fill = exchanges[exchange_name].order(pair=pair, direction=BUY, price=ask, size=buy_size, order_type=IMMEDIATE_OR_CANCEL)
-        #     update_balances(balances, fill)
+        for (
+            order_exchange_pair,
+            order_size,
+        ) in orders.items():  # double check pandas iteration syntax
+            if order_size < 0:
+                Log.data("executor-sell", {"pair": pair.json_value(), "size": order_size})
+                exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, order_size)
+            elif order_size > 0:
+                Log.data("executor-buy", {"pair": pair.json_value(), "size": order_size})
+                exchange.add_order(pair, Direction.BUY, Order.Type.IOC, ask, order_size)
         trade_lock.release()
 
     def tick_fairs(self, fairs):
