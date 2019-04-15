@@ -88,9 +88,9 @@ class Executor:
             if pair.base not in exchange.balances:
                 exchange.balances[pair.base] = 0.0
         self.__books_lock.release()
-        bids = pd.Series(bids)
-        asks = pd.Series(asks)
-        fees = pd.Series(fees)
+        bids = pd.Series(bids).sort_index()
+        asks = pd.Series(asks).sort_index()
+        fees = pd.Series(fees).sort_index()
 
         if self.__latest_fairs is None:
             trade_lock.release()
@@ -100,7 +100,6 @@ class Executor:
         bid = book.bid
         balance = exchange.balances[pair.base]
         min_edge = 1
-        # fees = exchange.fees
 
         orders = self.get_orders(
             exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge
@@ -158,14 +157,13 @@ class Executor:
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
-        bal_no_quote = pd.Series(balances)
+        bal_no_quote = pd.Series(balances).sort_index()
         bal_no_quote = (
             bal_no_quote.drop([quote_currency]) if quote_currency in bal_no_quote else bal_no_quote
         )
         pair_balances = bal_no_quote.rename(lambda c: TradingPair(c, quote_currency))
-        proposed_orders = (target_balance_values / fairs.mean) - pair_balances
+        proposed_orders = target_balance_values / fairs.mean - pair_balances
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
-
         profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge
         profitable_orders = proposed_orders * profitable
         return profitable_orders
