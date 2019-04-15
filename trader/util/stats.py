@@ -383,13 +383,14 @@ class Gaussian:
                 s_disjoint = self.__mean.index.difference(x.__mean.index)
                 x_disjoint = x.__mean.index.difference(self.__mean.index)
 
-                # Some variables are disjoint. Filter indexes to the common variables, compute the
-                # Gaussian intersection, then interpolate disjoint variables back in.
+                # Some variables are disjoint. Fill in zero-means and large variances for the
+                # variables not present in each Gaussian, then compute the intersection as normal.
                 if not (s_disjoint.empty and x_disjoint.empty):
                     s1_mean = pd.Series(0, index=union).add(self.__mean, fill_value=0)
                     x1_mean = pd.Series(0, index=union).add(x.__mean, fill_value=0)
-                    # can't just set diag_elem to 1e100 because the pseudoinverse calculation runs
-                    # into numerical instability
+                    # Can't just set `diag_elem` to 1e100 because the pseudoinverse calculation runs
+                    # into numerical instability. Instead, we ensure that the fill element scales
+                    # with the (summed) matrix norms of each covariance.
                     diag_elem = 1e10 * (
                         np.linalg.norm(self.__covariance) + np.linalg.norm(x.__covariance)
                     )
