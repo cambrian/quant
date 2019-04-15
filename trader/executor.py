@@ -104,6 +104,7 @@ class Executor:
         orders = self.get_orders(
             exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge
         )
+        Log.info("executor_orders {}".format(orders))
 
         for (
             order_exchange_pair,
