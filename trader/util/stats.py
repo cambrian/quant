@@ -341,6 +341,17 @@ class Gaussian:
         a  0.625 -0.125
         b -0.125  0.625
 
+        >>> Gaussian(pd.Series([1], index=['a']), 1) & Gaussian(pd.Series([2], index=['b']), 2)
+        Gaussian:
+        mean:
+        a    1.0
+        b    2.0
+        dtype: float64
+        covariance:
+             a    b
+        a  1.0  0.0
+        b  0.0  2.0
+
         >>> Gaussian(pd.Series([1, 2, 1], index=['a', 'd', 'b']), pd.DataFrame([ \
                 [2, 1, -1], \
                 [1, 2, 1], \
@@ -351,16 +362,16 @@ class Gaussian:
         Gaussian:
         mean:
         a    2.250000e+00
-        b    4.594075e-12
-        c    0.000000e+00
+        b    1.054712e-15
+        c    3.000000e+00
         d    2.250000e+00
         dtype: float64
         covariance:
-                      a    b    c             d
-        a  6.250000e-01  0.0  0.0  1.250000e-01
-        b  1.008887e-12  0.0  0.0  7.837064e-13
-        c  0.000000e+00  0.0  0.0  0.000000e+00
-        d  1.250000e-01  0.0  0.0  6.250000e-01
+               a         b    c      d
+        a  0.625 -0.500002  0.0  0.125
+        b -0.500  1.000000  0.0  0.500
+        c  0.000  0.000000  1.0  0.000
+        d  0.125  0.499998  0.0  0.625
 
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
@@ -379,7 +390,7 @@ class Gaussian:
                     x1_mean = pd.Series(0, index=union).add(x.__mean, fill_value=0)
                     # can't just set diag_elem to 1e100 because the pseudoinverse calculation runs
                     # into numerical instability
-                    diag_elem = 1e6 * (
+                    diag_elem = 1e10 * (
                         np.linalg.norm(self.__covariance) + np.linalg.norm(x.__covariance)
                     )
                     s1_cov = pd.DataFrame(0, index=union, columns=union).add(
@@ -388,9 +399,9 @@ class Gaussian:
                     x1_cov = pd.DataFrame(0, index=union, columns=union).add(
                         x.__covariance, fill_value=0
                     )
-                    for i in s_disjoint:
-                        s1_cov.loc[i, i] = diag_elem
                     for i in x_disjoint:
+                        s1_cov.loc[i, i] = diag_elem
+                    for i in s_disjoint:
                         x1_cov.loc[i, i] = diag_elem
                     return Gaussian(s1_mean, s1_cov) & Gaussian(x1_mean, x1_cov)
 
