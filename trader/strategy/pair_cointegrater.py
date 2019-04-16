@@ -14,6 +14,7 @@ class PairCointegrator(Strategy):
         self.cointegration_period = window_size // cointegration_frequency
         self.sample_counter = 0
         self.price_history = None
+        self.covs = {}
 
     def tick(self, frame):
         prices = frame["price"]
@@ -33,15 +34,11 @@ class PairCointegrator(Strategy):
             stddev = deltas.std() + 1e-10
             self.regression_slope = deltas.corr().mul(stddev, axis=1).div(stddev, axis=0)
 
-            coint_p = pd.DataFrame(0, index=prices.index, columns=prices.index)
-            prediction_covs = {}
             for pair_i in prices.index:
                 for pair_j in prices.index:
                     if pair_i >= pair_j:
                         continue
                     p = coint(df[pair_i], df[pair_j], maxlag=0, autolag=None)[1]
-                    coint_p.loc[pair_i, pair_j] = p
-                    coint_p.loc[pair_j, pair_i] = p
                     deltas_ij = deltas[[pair_i, pair_j]]
                     regression_vector = [self.regression_slope.loc[pair_i][pair_j], -1]
                     cov_pred = orthogonal_projection(deltas_ij, regression_vector).cov()
@@ -53,20 +50,16 @@ class PairCointegrator(Strategy):
                     eigenvalue_ratio_sam = w_sam[1] / w_sam[0]
                     w_reg = w_pred[1] * np.array([eigenvalue_ratio_sam, 1])
                     cov_reg = v_pred @ np.diag(w_reg) @ v_pred.T
+                    # discount predictions for p values > .03
+                    cov_reg *= max(1, p * p * 900)
                     cov_reg = pd.DataFrame(
                         cov_reg, index=deltas_ij.columns, columns=deltas_ij.columns
                     )
-                    prediction_covs[pair_i, pair_j] = cov_reg
-                    prediction_covs[pair_j, pair_i] = cov_reg[::-1].T[::-1]
-            # discount predictions for p values > .03
-            self.coint_f = (coint_p * coint_p * 900).clip(1)
-            self.prediction_covs = prediction_covs
+                    self.covs[pair_i, pair_j] = cov_reg
+                    self.covs[pair_j, pair_i] = cov_reg[::-1].T[::-1]
 
         self.sample_counter -= 1
         self.sample_counter %= self.cointegration_period
-
-        if self.coint_f is None:
-            return self.null_estimate(prices)
 
         fairs = []
         delta = prices / self.mean - 1
@@ -76,7 +69,7 @@ class PairCointegrator(Strategy):
                     continue
                 regression_vector = [self.regression_slope.loc[pair_i][pair_j], -1]
                 fair_delta_mean = hyperplane_projection(delta[[pair_i, pair_j]], regression_vector)
-                fair_cov = self.prediction_covs[pair_i, pair_j] * self.coint_f.loc[pair_i, pair_j]
+                fair_cov = self.covs[pair_i, pair_j]
                 fair = Gaussian(fair_delta_mean, fair_cov)
                 fairs.append(fair)
         fair = (Gaussian.intersect(fairs) + 1) * self.mean
