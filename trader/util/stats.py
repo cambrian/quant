@@ -380,12 +380,12 @@ class Gaussian:
             # on DataFrames with no explicit indexing, which use the default RangeIndex).
             if _is_labeled(self.__mean) and _is_labeled(x.__mean):
                 union = self.__mean.index.union(x.__mean.index)
-                s_disjoint = self.__mean.index.difference(x.__mean.index)
-                x_disjoint = x.__mean.index.difference(self.__mean.index)
+                not_in_s = x.__mean.index.difference(self.__mean.index)
+                not_in_x = self.__mean.index.difference(x.__mean.index)
 
                 # Some variables are disjoint. Fill in zero-means and large variances for the
                 # variables not present in each Gaussian, then compute the intersection as normal.
-                if not (s_disjoint.empty and x_disjoint.empty):
+                if not (not_in_s.empty and not_in_x.empty):
                     s1_mean = pd.Series(0, index=union).add(self.__mean, fill_value=0)
                     x1_mean = pd.Series(0, index=union).add(x.__mean, fill_value=0)
                     # Can't just set `diag_elem` to 1e100 because the pseudoinverse calculation runs
@@ -400,9 +400,9 @@ class Gaussian:
                     x1_cov = pd.DataFrame(0, index=union, columns=union).add(
                         x.__covariance, fill_value=0
                     )
-                    for i in x_disjoint:
+                    for i in not_in_s:
                         s1_cov.loc[i, i] = diag_elem
-                    for i in s_disjoint:
+                    for i in not_in_x:
                         x1_cov.loc[i, i] = diag_elem
                     return Gaussian(s1_mean, s1_cov) & Gaussian(x1_mean, x1_cov)
 
