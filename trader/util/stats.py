@@ -491,8 +491,8 @@ class Gaussian:
         [[1 0]
          [0 4]]
 
-        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), [[1, 1], [1, 1]]) * pd.Series([1, 2], \
-            index=['a', 'b'])
+        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), [[1, 1], [1, 1]]) * pd.Series([2, 1], \
+            index=['b', 'a'])
         Gaussian:
         mean:
         a    1
@@ -507,6 +507,8 @@ class Gaussian:
         if type(s) == list:
             s = np.array(s)
         if len(np.shape(s)) == 1:
+            if self.__has_similar_labels(s):
+                s = s[self.__mean.index]
             return Gaussian(self.__mean * s, self.__covariance * s[:, None] * s[None, :])
         return Gaussian(self.__mean * s, self.__covariance * s * s)
 

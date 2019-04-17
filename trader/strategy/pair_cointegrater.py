@@ -31,7 +31,7 @@ class PairCointegrator(Strategy):
             df = pd.DataFrame(self.price_history, columns=prices.index)
             self.mean = df.mean()
             deltas = df / self.mean - 1
-            stddev = deltas.std() + 1e-10
+            stddev = deltas.std() + 1e-100
             self.regression_slope = deltas.corr().mul(stddev, axis=1).div(stddev, axis=0)
 
             for pair_i in prices.index:
