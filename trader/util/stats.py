@@ -362,16 +362,16 @@ class Gaussian:
         Gaussian:
         mean:
         a    2.250000e+00
-        b    1.054712e-15
+        b   -2.997602e-15
         c    3.000000e+00
         d    2.250000e+00
         dtype: float64
         covariance:
-               a         b    c      d
-        a  0.625 -0.500002  0.0  0.125
-        b -0.500  1.000000  0.0  0.500
-        c  0.000  0.000000  1.0  0.000
-        d  0.125  0.499998  0.0  0.625
+               a    b    c      d
+        a  0.625 -0.5  0.0  0.125
+        b -0.500  1.0  0.0  0.500
+        c  0.000  0.0  1.0  0.000
+        d  0.125  0.5  0.0  0.625
 
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
@@ -389,7 +389,7 @@ class Gaussian:
                 # into numerical instability. Instead, we ensure that the fill element scales
                 # with the (summed) matrix norms of each covariance.
                 diag_elem = 1e10 * (
-                    np.linalg.norm(self.__covariance) + np.linalg.norm(x.__covariance)
+                    np.linalg.norm(self.__covariance, 1) + np.linalg.norm(x.__covariance, 1)
                 )
                 s1_cov = pd.DataFrame(0, index=union, columns=union).add(
                     self.__covariance, fill_value=0
