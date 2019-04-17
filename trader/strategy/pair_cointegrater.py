@@ -38,7 +38,7 @@ class PairCointegrator(Strategy):
                 for pair_j in prices.index:
                     if pair_i >= pair_j:
                         continue
-                    p = coint(df[pair_i], df[pair_j], maxlag=0, autolag=None)[1]
+                    p = coint(deltas[pair_i], deltas[pair_j], trend="nc", maxlag=0, autolag=None)[1]
                     deltas_ij = deltas[[pair_i, pair_j]]
                     regression_vector = [self.regression_slope.loc[pair_i][pair_j], -1]
                     cov_pred = orthogonal_projection(deltas_ij, regression_vector).cov()
@@ -46,7 +46,7 @@ class PairCointegrator(Strategy):
                     # prediction covariance slope
                     cov_sam = deltas_ij.cov()
                     w_pred, v_pred = np.linalg.eigh(cov_pred)
-                    w_sam, v_sam = np.linalg.eigh(cov_sam)
+                    w_sam, _v_sam = np.linalg.eigh(cov_sam)
                     eigenvalue_ratio_sam = w_sam[1] / w_sam[0]
                     w_reg = w_pred[1] * np.array([eigenvalue_ratio_sam, 1])
                     cov_reg = v_pred @ np.diag(w_reg) @ v_pred.T
@@ -56,7 +56,7 @@ class PairCointegrator(Strategy):
                         cov_reg, index=deltas_ij.columns, columns=deltas_ij.columns
                     )
                     self.covs[pair_i, pair_j] = cov_reg
-                    self.covs[pair_j, pair_i] = cov_reg[::-1].T[::-1]
+                    self.covs[pair_j, pair_i] = cov_reg.loc[::-1, ::-1]
 
         self.sample_counter -= 1
         self.sample_counter %= self.cointegration_period
