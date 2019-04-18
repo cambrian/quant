@@ -13,23 +13,21 @@ class Kalman(Strategy):
     likelihood of cointegration.
     """
 
-    def __init__(self, correlation_window_size, movement_half_life, cointegration_freq=4):
-        self.moving_prices_history = None
-        self.correlation_window_size = correlation_window_size
+    def __init__(self, window_size, movement_half_life, cointegration_freq=4):
+        self.price_history = None
+        self.window_size = window_size
         self.moving_prices = Ema(movement_half_life)
-        self.moving_volumes = Ema(correlation_window_size / 2)
+        self.moving_volumes = Ema(window_size / 2)
         self.prev_fair = None
-        self.cointegration_period = correlation_window_size // cointegration_freq
+        self.cointegration_period = window_size // cointegration_freq
         self.sample_counter = 0
         self.coint_f = None
 
     def tick(self, frame):
         prices = frame["price"]
         volumes = frame["volume"]
-        if self.moving_prices_history is None:
-            self.moving_prices_history = RingBuffer(
-                self.correlation_window_size, dtype=(np.float, len(prices.index))
-            )
+        if self.price_history is None:
+            self.price_history = RingBuffer(self.window_size, dtype=(np.float, len(prices.index)))
 
         if self.prev_fair is None:
             self.prev_fair = self.null_estimate(frame)
@@ -40,15 +38,12 @@ class Kalman(Strategy):
         self.moving_prices.step(prices)
         self.moving_volumes.step(volumes)
 
-        if not self.moving_prices.ready:
+        self.price_history.append(prices)
+
+        if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return self.null_estimate(frame)
 
-        self.moving_prices_history.append(self.moving_prices.value)
-
-        if len(self.moving_prices_history) < self.correlation_window_size:
-            return self.null_estimate(frame)
-
-        df = pd.DataFrame(self.moving_prices_history, columns=prices.index)
+        df = pd.DataFrame(self.price_history, columns=prices.index)
 
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
