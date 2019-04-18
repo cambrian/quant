@@ -13,13 +13,13 @@ class Kalman(Strategy):
     likelihood of cointegration.
     """
 
-    def __init__(self, window_size, movement_half_life, cointegration_freq=4):
+    def __init__(self, window_size, cointegration_period, movement_half_life):
         self.price_history = None
         self.window_size = window_size
         self.moving_prices = Ema(movement_half_life)
         self.moving_volumes = Ema(window_size / 2)
         self.prev_fair = None
-        self.cointegration_period = window_size // cointegration_freq
+        self.cointegration_period = cointegration_period
         self.sample_counter = 0
         self.coint_f = None
 
