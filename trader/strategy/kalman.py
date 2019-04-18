@@ -8,8 +8,10 @@ from trader.util.stats import Ema, Gaussian
 
 
 class Kalman(Strategy):
-    """Predicts fairs based on correlated movements between pairs.
-    All inputs should be cointegrated."""
+    """
+    Models fairs based on correlated movements between pairs. Weights predictions by volume and
+    likelihood of cointegration.
+    """
 
     def __init__(self, correlation_window_size, movement_half_life, cointegration_freq=4):
         self.moving_prices_history = None
@@ -47,11 +49,6 @@ class Kalman(Strategy):
             return self.null_estimate(frame)
 
         df = pd.DataFrame(self.moving_prices_history, columns=prices.index)
-        mean = df.mean()
-        diffs = df.diff().iloc[1:]
-        diff = Gaussian(diffs.iloc[-1], diffs.cov())
-        # Could also calculate diff from the raw price movements but using smoothed movements
-        # for diff seems to improve RoR
 
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
