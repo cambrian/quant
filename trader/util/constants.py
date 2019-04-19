@@ -60,7 +60,7 @@ class TradingPair:
     def json_value(self):
         return (self.__base.json_value(), self.__quote.json_value())
 
-    # Make TradingPair instances sortable
+    # Make TradingPair instances sortable.
     def __lt__(self, other):
         if self.__base < other.__base:
             return True

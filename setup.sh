@@ -12,3 +12,7 @@ git config filter.nbstripout.clean 'nbstripout'
 git config filter.nbstripout.smudge cat
 git config filter.nbstripout.required true
 git config diff.ipynb.textconv 'nbstripout -t'
+
+# Spark Java requirements.
+brew tap AdoptOpenJDK/openjdk
+brew cask install adoptopenjdk/openjdk/adoptopenjdk8
