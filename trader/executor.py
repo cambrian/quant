@@ -11,8 +11,6 @@ from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, Order
 
-SIZE_PARAMETER = 100
-
 
 class Executor:
     """Given fair updates, listens to book updates and places orders to optimize our portfolio.
@@ -29,12 +27,14 @@ class Executor:
 
     """
 
-    def __init__(self, thread_manager, exchange_pairs):
+    def __init__(self, thread_manager, exchange_pairs, size, min_edge):
         self.__books_lock = Lock()
         self.__trade_locks = defaultdict(Lock)
         self.__latest_books = {}
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
+        self.__size = size
+        self.__min_edge = min_edge
 
         # Set up book feeds for every pair.
         for exchange, pairs in exchange_pairs.items():
@@ -99,10 +99,9 @@ class Executor:
         ask = book.ask
         bid = book.bid
         _balance = exchange.balances[pair.base]
-        min_edge = 0
 
         orders = self.get_orders(
-            exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge
+            exchange.balances, bids, asks, self.__latest_fairs, self.__size, fees, self.__min_edge
         )
         Log.info("executor_orders {}".format(orders))
 
@@ -136,7 +135,7 @@ class Executor:
         dir_ = 1 if direction == Direction.BUY else -1
         edge = ((fair.mean / price - 1) * dir_ - fees) / fair.stddev
         # Positive edge --> profitable order.
-        desired_balance_value = edge * SIZE_PARAMETER * dir_
+        desired_balance_value = edge * self.__size * dir_
         proposed_order_size = (desired_balance_value / price - balance) * dir_
         return max(0, proposed_order_size)
 
