@@ -68,6 +68,9 @@ class TradingPair:
             return True
         return False
 
+    def __ge__(self, other):
+        return not self < other
+
     def __eq__(self, other):
         return self.base == other.base and self.quote == other.quote
 

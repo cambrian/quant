@@ -99,7 +99,7 @@ class Executor:
         ask = book.ask
         bid = book.bid
         _balance = exchange.balances[pair.base]
-        min_edge = 1
+        min_edge = 0
 
         orders = self.get_orders(
             exchange.balances, bids, asks, self.__latest_fairs, SIZE_PARAMETER, fees, min_edge

@@ -20,7 +20,7 @@ dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
 cointegrator_strategy = strategy.Cointegrator(6000)
-kalman_strategy = strategy.Kalman(100, 10)
+kalman_strategy = strategy.Kalman(512, 32, 100)
 # executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
 executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]})
 # metrics = Metrics(thread_manager, {bitfinex})
@@ -36,8 +36,7 @@ def main():
 
 
 def dummy_main():
-    beat = Beat(1000)
-    while beat.loop():
+    while True:
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
         # cointegration_fairs = cointegrator_strategy.step(dummy_data)
