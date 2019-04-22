@@ -95,11 +95,11 @@ class BasicGridSearch(Optimizer):
         return (self.__best_params, self.__best_result)
 
 
-def optimize(sc, runner, param_spaces, parallelism=2):
+def optimize(sc, strategy, runner, param_spaces, parallelism=2):
     def sim(kwargs):
         return runner(**kwargs)
 
-    optimizer = BasicGridSearch(param_spaces)
+    optimizer = strategy(param_spaces)
     last_results = None
     while True:
         trials = optimizer.next_trials(last_results)
@@ -125,4 +125,4 @@ if __name__ == "__main__":
         return -1 * ((a - 3) ** 2 + (b + 2) ** 2) + 3
 
     param_spaces = {"a": range(-10, 10, 1), "b": range(-5, 5, 1)}
-    print(optimize(sc, paraboloid, param_spaces))
+    print(optimize(sc, BasicGridSearch, paraboloid, param_spaces))
