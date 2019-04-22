@@ -98,7 +98,7 @@ class Executor:
 
         ask = book.ask
         bid = book.bid
-        balance = exchange.balances[pair.base]
+        _balance = exchange.balances[pair.base]
         min_edge = 1
 
         orders = self.get_orders(
@@ -107,9 +107,9 @@ class Executor:
         Log.info("executor_orders {}".format(orders))
 
         for (
-            order_exchange_pair,
+            _order_exchange_pair,
             order_size,
-        ) in orders.items():  # double check pandas iteration syntax
+        ) in orders.items():  # TODO: Double check Pandas iteration syntax.
             if order_size < 0:
                 Log.data("executor-sell", {"pair": pair.json_value(), "size": order_size})
                 exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, order_size)
@@ -149,7 +149,7 @@ class Executor:
         pairs. Therefore get_orders needs to consider the entire set of fairs and
         bid/asks at once.
         """
-        mids = (bids + asks) / 2  # use mid price for target balance value calculations
+        mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
         quote_currency = mids.index[0].quote
 
         gradient = fairs.gradient(mids) * fairs.mean

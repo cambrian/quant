@@ -10,6 +10,7 @@ nbstripout>=0.3.4
 numpy>=1.16.2
 numpy-ringbuffer>=0.2.1
 pandas>=0.24.1
+pyspark>=2.4.1
 pytest>=4.3.1
 pytest-testmon>=0.9.16
 pytest-watch>=4.2.0
