@@ -155,11 +155,9 @@ class Executor:
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
-        bal_no_quote = pd.Series(balances).sort_index()
-        bal_no_quote = (
-            bal_no_quote.drop([quote_currency]) if quote_currency in bal_no_quote else bal_no_quote
-        )
-        pair_balances = bal_no_quote.rename(lambda c: TradingPair(c, quote_currency))
+        pair_balances = pd.Series(balances).rename(lambda c: TradingPair(c, quote_currency))[
+            mids.index
+        ]
         proposed_orders = target_balance_values / fairs.mean - pair_balances
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
         profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge
