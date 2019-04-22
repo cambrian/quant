@@ -54,7 +54,7 @@ class Kalman(Strategy):
                     if i >= j:
                         continue
                     p = coint(deltas[i], deltas[j], trend="nc", maxlag=0, autolag=None)[1]
-                    f = max(1, p * 40)
+                    f = max(1, p * 100)
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
