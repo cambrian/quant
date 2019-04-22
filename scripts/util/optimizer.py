@@ -1,10 +1,11 @@
-"""Should be run using the Spark CLI executor."""
+"""Spark/EMR optimizer tools."""
+
 import os
 from abc import ABC, abstractmethod
 from itertools import islice, product
 
 
-def dict_product(d):
+def _dict_product(d):
     """Maps `{a: [x, y], b: [z, w]}`
          to `[{a: x, b: z}, {a: x, b: w}, {a: y, b: z}, {a: y, b: w}]`.
 
@@ -12,7 +13,7 @@ def dict_product(d):
     return (dict(zip(d.keys(), vs)) for vs in product(*d.values()))
 
 
-def take(n, iterable):
+def _take(n, iterable):
     """Takes the first `n` items of the given iterable."""
     return list(islice(iterable, n))
 
@@ -54,7 +55,7 @@ class Optimizer(ABC):
 class BasicGridSearch(Optimizer):
     def __init__(self, param_spaces, chunk_size=None):
         """Expects `param_spaces` to contain generator expressions for grid values."""
-        self.__trials = dict_product(param_spaces)
+        self.__trials = _dict_product(param_spaces)
         self.__chunk_size = chunk_size
         self.__last_trials = None
         self.__best_params = None
@@ -84,7 +85,7 @@ class BasicGridSearch(Optimizer):
             self.__done = True
         # Or chunk?
         else:
-            trials = take(self.__chunk_size, self.__trials)
+            trials = _take(self.__chunk_size, self.__trials)
             if len(trials) < self.__chunk_size:
                 self.__done = True
 
@@ -95,7 +96,7 @@ class BasicGridSearch(Optimizer):
         return (self.__best_params, self.__best_result)
 
 
-def optimize(sc, strategy, runner, param_spaces, parallelism=2):
+def _optimize(sc, strategy, runner, param_spaces, parallelism):
     def sim(kwargs):
         return runner(**kwargs)
 
@@ -110,7 +111,7 @@ def optimize(sc, strategy, runner, param_spaces, parallelism=2):
     return optimizer.best_params()
 
 
-if __name__ == "__main__":
+def optimize_local(name, strategy, runner, param_spaces):
     # Assumes you have JDK 1.8 as installed in the setup script.
     os.environ["PYSPARK_PYTHON"] = "python3"
     os.environ["JAVA_HOME"] = "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home"
@@ -118,11 +119,26 @@ if __name__ == "__main__":
     # This import is often stateful.
     from pyspark import SparkContext
 
-    sc = SparkContext("local", "test")
+    sc = SparkContext("local", name)
+    return _optimize(sc, strategy, runner, param_spaces, 1)
 
+
+def optimize_emr(name, strategy, runner, param_spaces, parallelism):
+    # This import is often stateful.
+    from pyspark import SparkContext
+
+    sc = SparkContext.getOrCreate()
+    # TODO: Write result out to S3 and print it to console in shell script.
+    return _optimize(sc, strategy, runner, param_spaces, parallelism)
+
+
+def test_optimize_local():
     # Vertex at (3, -2, 3).
     def paraboloid(a, b):
         return -1 * ((a - 3) ** 2 + (b + 2) ** 2) + 3
 
     param_spaces = {"a": range(-10, 10, 1), "b": range(-5, 5, 1)}
-    print(optimize(sc, BasicGridSearch, paraboloid, param_spaces))
+    assert optimize_local("paraboloid", BasicGridSearch, paraboloid, param_spaces) == (
+        {"a": 3, "b": -2},
+        3,
+    )
