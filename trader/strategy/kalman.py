@@ -16,6 +16,7 @@ class Kalman(Strategy):
     def __init__(self, window_size, cointegration_period, movement_half_life):
         self.price_history = None
         self.window_size = window_size
+        self.movement_half_life = movement_half_life
         self.moving_prices = Ema(movement_half_life)
         self.moving_volumes = Ema(window_size / 2)
         self.prev_fair = None
@@ -53,35 +54,47 @@ class Kalman(Strategy):
                     if i >= j:
                         continue
                     p = coint(deltas[i], deltas[j], trend="nc", maxlag=0, autolag=None)[1]
-                    f = max(1, p * 40)
+                    f = max(1, p * 100)
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
-
-        diffs = df.diff()
-        step = Gaussian(diffs.iloc[-1], diffs.cov())
-        relative_fair = self.prev_fair + step
 
         var = df.var()
         stddev = np.sqrt(var) + 1e-100
         r = df.corr()
         r2 = r * r
-        delta = prices - self.moving_prices.value
+        diffs = df.diff()
+        movement_diffs = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
+        correlated_slopes = r.mul(stddev, axis=1).div(stddev, axis=0)
+        price_ratios = prices[np.newaxis, :] / prices[:, np.newaxis]
         # In theory it's better to substitute self.prev_fair.mean for prices
         # in these calculations, but the difference is marginal and prices is more concise
         volume_signals = np.sqrt(self.moving_volumes.value * prices)
         volume_f = np.max(volume_signals) / volume_signals
-        fair_delta_means = r.mul(delta, axis=0).mul(stddev, axis=1).div(stddev, axis=0)
-        correlated_vars = (diffs.var() / prices.pow(2))[:, np.newaxis] * prices.pow(2)[
-            np.newaxis, :
-        ]
+
+        # Calculate fair based on deltas since moving avg
+        delta = prices - self.moving_prices.value
+        fair_delta_means = correlated_slopes.mul(delta, axis=0)
+        correlated_delta_vars = movement_diffs.var()[:, np.newaxis] * np.square(price_ratios)
         fair_delta_vars = (
-            volume_f * self.coint_f * ((1 - r2) * var[np.newaxis, :] + r2 * correlated_vars)
+            volume_f * self.coint_f * ((1 - r2) * var[np.newaxis, :] + r2 * correlated_delta_vars)
         )
-        fair_deltas = Gaussian.intersect(
+        fair_delta = Gaussian.intersect(
             [Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in prices.index]
         )
-        absolute_fair = fair_deltas + self.moving_prices.value
+        absolute_fair = fair_delta + self.moving_prices.value
+
+        # Calculate fair based on deltas since the last fair estimate
+        step = prices - self.prev_fair.mean
+        fair_step_means = correlated_slopes.mul(step, axis=0)
+        correlated_step_vars = diffs.var()[:, np.newaxis] * np.square(price_ratios)
+        fair_step_vars = (
+            volume_f * self.coint_f * ((1 - r2) * var[np.newaxis, :] + r2 * correlated_step_vars)
+        )
+        fair_step = Gaussian.intersect(
+            [Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in prices.index]
+        )
+        relative_fair = fair_step + self.prev_fair
 
         new_fair = absolute_fair & relative_fair
         self.prev_fair = new_fair
