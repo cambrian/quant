@@ -127,4 +127,4 @@ dmypy.json
 *.log
 
 # Allow 1min.h5 in research
-!ressearch/data/1min.h5
+!research/data/1min.h5
