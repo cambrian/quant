@@ -15,8 +15,9 @@ For compute-intensive tasks (like hyperparameter searches), you might prefer to 
 the cloud. To write your job, follow the pattern in `scripts/remote/paraboloid.py` (exporting a
 single function `job` that encapsulates your task).
 
-Sanity check your job by running `./local.sh scripts/remote/paraboloid.py` from the repo root. When
-you are convinced that your job can run to completion, replace `./local.sh` with `./spark.sh`.
+Sanity check your job by running `./deploy-local.sh scripts/remote/paraboloid.py` from the repo
+root. When you are convinced that your job can run to completion, replace `./deploy-local.sh` with
+`./deploy-spark.sh`.
 
 ### Hints
 - You may also provide a second parameter, which is the local file path to read input from. The
@@ -29,4 +30,4 @@ you are convinced that your job can run to completion, replace `./local.sh` with
 - By default (i.e. assuming no changes to `mrjob.conf`), the job library will attempt, for each new
   job, to re-use an AWS cluster with the same configuration. If a cluster is idle for 20 minutes, it
   will time out, and the next job to be created will spawn a new cluster.
-- Default AWS credentials are provided in `./spark.sh`, so no CLI config should be necessary.
+- Default AWS credentials are provided in `./deploy-spark.sh`, so no CLI config should be necessary.
