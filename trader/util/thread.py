@@ -135,8 +135,13 @@ class ThreadManager:
     def __init__(self):
         self.__termination_queue = Queue()
         self.__finite_thread_count = 0
+        self.__completed_threads = 0
         self.__thread_runners = []
         self.__state = ThreadManager.State.INITIALIZED
+
+    @property
+    def num_completed_threads(self):
+        return self.__completed_threads
 
     def __propagate_error(self, name, fn, should_terminate):
         # Used to propagate unhandled errors to the main thread.
@@ -188,13 +193,12 @@ class ThreadManager:
         self.__state = ThreadManager.State.RUNNING
         for runner in self.__thread_runners:
             self.__run_daemon(runner)
-        completed_threads = 0
         while True:
             (name, exc) = self.__termination_queue.get()
-            completed_threads += 1
+            self.__completed_threads += 1
             if exc is None:
                 Log.info("thread <{}> terminated".format(name))
-                if completed_threads == self.__finite_thread_count:
+                if self.__completed_threads == self.__finite_thread_count:
                     self.__state == ThreadManager.State.FINISHED
                     break
             else:

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed
-from trader.util.constants import Pairs
+from trader.util.constants import DUMMY, Pairs
 from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, Order
@@ -60,7 +60,8 @@ class Executor:
                 return
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
-        self.__trade(exchange, pair)
+        if exchange.id != DUMMY:
+            self.__trade(exchange, pair)
         Log.data("executor-book", book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):

@@ -35,6 +35,7 @@ def main():
 
 
 def dummy_main():
+    threads = 0
     while True:
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
@@ -42,6 +43,9 @@ def dummy_main():
         kalman_fairs = kalman_strategy.tick(dummy_data)
         # executor.tick_fairs(cointegration_fairs)
         executor.tick_fairs(kalman_fairs)
+        threads += 2
+        while thread_manager.num_completed_threads < threads:
+            pass
 
 
 # thread_manager.attach("main", main)
