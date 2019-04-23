@@ -1,4 +1,4 @@
-# Setup the module environment to run this script.
+# NOTE: Keep me at the top. (Sets up the module environment to run this script.)1
 from setup import ROOT_DIRECTORY  # isort:skip, pylint: disable=import-error
 
 import os

@@ -96,7 +96,7 @@ class BasicGridSearch(Optimizer):
         return (self.__best_params, self.__best_result)
 
 
-def _optimize(sc, strategy, runner, param_spaces, parallelism):
+def optimize(sc, strategy, runner, param_spaces, parallelism):
     def sim(kwargs):
         return runner(**kwargs)
 
@@ -120,16 +120,7 @@ def optimize_local(name, strategy, runner, param_spaces):
     from pyspark import SparkContext
 
     sc = SparkContext("local", name)
-    return _optimize(sc, strategy, runner, param_spaces, 1)
-
-
-def optimize_emr(name, strategy, runner, param_spaces, parallelism):
-    # This import is often stateful.
-    from pyspark import SparkContext
-
-    sc = SparkContext.getOrCreate()
-    # TODO: Write result out to S3 and print it to console in shell script.
-    return _optimize(sc, strategy, runner, param_spaces, parallelism)
+    return optimize(sc, strategy, runner, param_spaces, 1)
 
 
 def test_optimize_local():
