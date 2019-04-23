@@ -88,6 +88,17 @@ BTC_USDT = TradingPair(BTC, USDT)
 ETH_USDT = TradingPair(ETH, USDT)
 XRP_USDT = TradingPair(XRP, USDT)
 
+# Use instead of recreating a TradingPair from base currencies
+Pairs = {
+    (BTC, USDT): BTC_USDT,
+    (ETH, USDT): ETH_USDT,
+    (XRP, USDT): XRP_USDT,
+    (BTC, USD): BTC_USD,
+    (ETH, USD): ETH_USD,
+    (XRP, USD): XRP_USD,
+    (USDT, USDT): USDT,
+}
+
 
 def not_implemented():
     raise NotImplementedError("not implemented")
