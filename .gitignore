@@ -122,8 +122,8 @@ dmypy.json
 *.pkl
 *.h5
 *.testmon*
-input
-output
+quant.zip
+generated.py
 
 # Logs
 *.log
