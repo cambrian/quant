@@ -20,4 +20,4 @@ python3 job.py $1
 INPUT_FILE=${2:-/dev/null}
 export PYTHONPATH=$PYTHONPATH:.
 python3 generated.py --conf-path mrjob.conf -r emr $INPUT_FILE
-rm -f quant.zip
+rm -f quant.zip generated.py
