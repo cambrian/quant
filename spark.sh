@@ -1,17 +1,17 @@
 #!/bin/bash
 set -e
 
-# Usage:
-# 1. Set up your AWS CLI credentials.
-# 2. Run `./spark.sh SCRIPT [INPUT_FILE]`.
-
 if [ -z "$1" ]
   then
     echo "Script argument expected."
     exit 1
 fi
 
-# Archive current master of `quant`.
+# Security YOLO...
+export AWS_ACCESS_KEY_ID=AKIA3CMPUXHLHXWY23PM
+export AWS_SECRET_ACCESS_KEY=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
+
+# Archive current master of `quant` as a dependency.
 git archive --output quant.zip master
 
 # Generate complete job runner.

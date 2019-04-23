@@ -28,12 +28,12 @@ class Optimizer(ABC):
     """
 
     @abstractmethod
-    def __init__(self, param_spaces):
+    def __init__(self, param_spaces, **kwargs):
         pass
 
     @abstractmethod
     def next_trials(self, last_results=None):
-        """Given some feedback `last_results` from the last set of trials, output the next set of
+        """Given some feedback `last_results` from the last set of trials, outputs the next set of
         parameter trials.
 
         Args:
@@ -48,7 +48,7 @@ class Optimizer(ABC):
 
     @abstractmethod
     def best_params(self):
-        """Return a tuple of (best params, best result) so far (`None` if no trials have run)."""
+        """Returns a tuple of (best params, best result) so far (`None` if no trials have run)."""
         pass
 
 
@@ -96,11 +96,11 @@ class BasicGridSearch(Optimizer):
         return (self.__best_params, self.__best_result)
 
 
-def optimize(sc, strategy, runner, param_spaces, parallelism):
+def optimize(sc, strategy, runner, param_spaces, parallelism, **kwargs):
     def sim(kwargs):
         return runner(**kwargs)
 
-    optimizer = strategy(param_spaces)
+    optimizer = strategy(param_spaces, **kwargs)
     last_results = None
     while True:
         trials = optimizer.next_trials(last_results)
@@ -109,27 +109,3 @@ def optimize(sc, strategy, runner, param_spaces, parallelism):
         rdd = sc.parallelize(trials, parallelism)
         last_results = rdd.map(sim).collect()
     return optimizer.best_params()
-
-
-def optimize_local(name, strategy, runner, param_spaces):
-    # Assumes you have JDK 1.8 as installed in the setup script.
-    os.environ["PYSPARK_PYTHON"] = "python3"
-    os.environ["JAVA_HOME"] = "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home"
-
-    # This import is often stateful.
-    from pyspark import SparkContext
-
-    sc = SparkContext("local", name)
-    return optimize(sc, strategy, runner, param_spaces, 1)
-
-
-def test_optimize_local():
-    # Vertex at (3, -2, 3).
-    def paraboloid(a, b):
-        return -1 * ((a - 3) ** 2 + (b + 2) ** 2) + 3
-
-    param_spaces = {"a": range(-10, 10, 1), "b": range(-5, 5, 1)}
-    assert optimize_local("paraboloid", BasicGridSearch, paraboloid, param_spaces) == (
-        {"a": 3, "b": -2},
-        3,
-    )

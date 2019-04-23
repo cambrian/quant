@@ -1,4 +1,5 @@
-def job(sc, input_path):
+def job(sc, input_path, working_dir):
+    """Your entire job must go within the function definition (including imports)."""
     from research.util.optimizer import BasicGridSearch, optimize
 
     # Vertex at (3, -2, 3).
