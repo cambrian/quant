@@ -122,9 +122,11 @@ dmypy.json
 *.pkl
 *.h5
 *.testmon*
+quant.zip
+generated.py
 
 # Logs
 *.log
 
-# Allow 1min.h5 in research
+# Allow 1min.h5 in research.
 !research/data/1min.h5

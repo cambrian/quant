@@ -4,7 +4,7 @@ Usage (from root): python3 . 2>&1 | python3 scripts/log_btc_usd.py
 
 """
 
-# Setup the module environment to run this script.
+# NOTE: Keep me at the top. (Sets up the module environment to run this script.)
 import setup  # isort:skip, pylint: disable=import-error
 
 import sys

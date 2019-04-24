@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed
-from trader.util.constants import TradingPair
+from trader.util.constants import DUMMY, Pairs
 from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, Order
@@ -60,7 +60,8 @@ class Executor:
                 return
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
-        self.__trade(exchange, pair)
+        if exchange.id != DUMMY:
+            self.__trade(exchange, pair)
         Log.data("executor-book", book)
 
     def __trade(self, exchange, pair, wait_for_other_trade=False):
@@ -105,16 +106,22 @@ class Executor:
         )
         Log.info("executor_orders {}".format(orders))
 
-        for (
-            _order_exchange_pair,
-            order_size,
-        ) in orders.items():  # TODO: Double check Pandas iteration syntax.
+        for (order_exchange_pair, order_size) in orders.items():
             if order_size < 0:
-                Log.data("executor-sell", {"pair": pair.json_value(), "size": order_size})
-                exchange.add_order(pair, Direction.SELL, Order.Type.IOC, bid, order_size)
+                order_size = abs(order_size)
+                Log.data(
+                    "executor-sell", {"pair": order_exchange_pair.json_value(), "size": order_size}
+                )
+                exchange.add_order(
+                    order_exchange_pair, Direction.SELL, Order.Type.IOC, bid, order_size
+                )
             elif order_size > 0:
-                Log.data("executor-buy", {"pair": pair.json_value(), "size": order_size})
-                exchange.add_order(pair, Direction.BUY, Order.Type.IOC, ask, order_size)
+                Log.data(
+                    "executor-buy", {"pair": order_exchange_pair.json_value(), "size": order_size}
+                )
+                exchange.add_order(
+                    order_exchange_pair, Direction.BUY, Order.Type.IOC, ask, order_size
+                )
         trade_lock.release()
 
     def tick_fairs(self, fairs):
@@ -154,9 +161,7 @@ class Executor:
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
-        pair_balances = pd.Series(balances).rename(lambda c: TradingPair(c, quote_currency))[
-            mids.index
-        ]
+        pair_balances = pd.Series(balances).rename(lambda c: Pairs[c, quote_currency])[mids.index]
         proposed_orders = target_balance_values / fairs.mean - pair_balances
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
         profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge

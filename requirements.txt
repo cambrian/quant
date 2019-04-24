@@ -1,3 +1,4 @@
+# TODO: Create a stripped version of this for EMR.
 awscli>=1.16.134
 bitfinex-v2>=1.1.5
 black>=19.3b0
@@ -6,6 +7,7 @@ colorful>=0.5.0
 hyperopt>=0.1.2
 krakenex>=2.1.0
 matplotlib>=3.0.3
+mrjob>=0.6.7
 nbstripout>=0.3.4
 numpy>=1.16.2
 numpy-ringbuffer>=0.2.1
@@ -14,6 +16,7 @@ pyspark>=2.4.1
 pytest>=4.3.1
 pytest-testmon>=0.9.16
 pytest-watch>=4.2.0
+s3fs>=0.2.1
 sklearn>=0.0
 sortedcontainers>=2.1.0
 statsmodels>=0.9.0
