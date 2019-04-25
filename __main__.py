@@ -4,7 +4,8 @@ import trader.strategy as strategy
 from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
 from trader.metrics import Metrics
-from trader.util.constants import BITFINEX, BTC_USD, BTC_USDT, ETH_USD, ETH_USDT
+from trader.util.constants import (BITFINEX, BTC_USD, BTC_USDT, ETH_USD,
+                                   ETH_USDT)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
@@ -19,7 +20,7 @@ dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
 cointegrator_strategy = strategy.Cointegrator(6000)
-kalman_strategy = strategy.Kalman(512, 32, 100)
+kalman_strategy = strategy.Kalman(512, 100, 32, 8)
 # executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
 executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})

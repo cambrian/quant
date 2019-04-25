@@ -13,7 +13,7 @@ MARKET_CAPS = pd.Series(
 )
 
 # TODO: how would this work across multiple quote currencies?
-def add_cap_weighted_fund(P, volumes, name, pairs):
+def add_cap_weighted_basket(P, volumes, name, pairs):
     P_components = P[pairs]
     base_prices = P_components.mean()
     currencies = [pair[:3] for pair in pairs]
@@ -49,9 +49,8 @@ class KalmanFilter(Strategy):
 
         df = pd.DataFrame(self.price_history, columns=frame.index)
         volumes = frame["volume"].copy()
-        # Add "funds" (cap-weighted baskets) to the dataset, which should enable better pairwise
-        # analysis
-        add_cap_weighted_fund(df, volumes, "total_market", frame.index)
+        # Add cap-weighted baskets to the dataset, which should enable better pairwise analysis
+        add_cap_weighted_basket(df, volumes, "total_market", frame.index)
         prices = df.iloc[-1]
         # the fair combination step assumes that all estimates are i.i.d. They are not - especially
         # in the case of funds. Is this a problem?
