@@ -10,22 +10,22 @@ from trader.util.linalg import hyperplane_projection, orthogonal_projection
 from trader.util.stats import Gaussian
 
 
-def johansen(P, lags=1):
+def johansen(P, maxlag):
     """
-    Returns the statistically-significant cointegrating vectors in P, as well as the mean
-    values of P.
+    Returns the statistically-significant cointegrating vectors in P (normalized to unit vectors),
+    as well as the mean values of P.
     """
     mean = P.mean()
-    c = coint_johansen(P / mean - 1, det_order=-1, k_ar_diff=lags)
+    c = coint_johansen(P / mean - 1, det_order=-1, k_ar_diff=maxlag)
     significant_results = (c.lr1 > c.cvt[:, 1]) * (c.lr2 < c.cvm[:, 2])
     Q = pd.DataFrame(c.evec[:, significant_results].T, columns=P.columns)
     return mean, Q.div(Q.apply(np.linalg.norm, axis=1), axis=0)
 
 
 # TODO: reimplement with vector autoregression test, similar to johansen internals.
-def test_coint(P, mean_train, q):
+def test_coint(P, mean_train, q, maxlag):
     x = (P / mean_train - 1) @ q
-    return adfuller(x, regression="nc")[1]
+    return adfuller(x, regression="nc", maxlag=maxlag, autolag=None)[1]
 
 
 def cosine_similar_to_any(Q, x):
@@ -36,11 +36,12 @@ def cosine_similar_to_any(Q, x):
 
 
 class Cointegrator(Strategy):
-    def __init__(self, train_size, validation_size, cointegration_period):
+    def __init__(self, train_size, validation_size, cointegration_period, maxlag):
         self.window_size = train_size + validation_size
         self.train_size = train_size
         self.validation_size = validation_size
         self.cointegration_period = cointegration_period
+        self.maxlag = maxlag
         self.sample_counter = 0
         self.price_history = None
         self.base_prices = None
@@ -66,13 +67,16 @@ class Cointegrator(Strategy):
             P = pd.DataFrame(self.price_history, columns=prices.index)
             P_train = P.iloc[: self.train_size]
             P_val = P.iloc[self.train_size :]
-            mean, candidates = johansen(P_train)
+            mean, candidates = johansen(P_train, self.maxlag)
             self.base_prices = mean
-            new_coints = [q for q in candidates.values if test_coint(P_val, mean, q) < 0.05]
+            new_coints = [
+                q for q in candidates.values if test_coint(P_val, mean, q, self.maxlag) < 0.05
+            ]
             old_coints = [
                 q
                 for q in self.coints
-                if test_coint(P_val, mean, q) < 0.05 and not cosine_similar_to_any(new_coints, q)
+                if test_coint(P_val, mean, q, self.maxlag) < 0.05
+                and not cosine_similar_to_any(new_coints, q)
             ]
             self.coints = new_coints + old_coints
             self.base_cov = P.cov()
