@@ -18,7 +18,7 @@ data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
-cointegrator_strategy = strategy.Cointegrator(4000, 2000, 100, 30)
+# cointegrator_strategy = strategy.Cointegrator(4000, 2000, 100, 30)
 kalman_strategy = strategy.Kalman(512, 100, 32, 8)
 # executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]})
 executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)

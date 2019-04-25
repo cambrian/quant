@@ -32,6 +32,9 @@ USDT = Currency("USDT")
 BTC = Currency("BTC")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
+LTC = Currency("LTC")
+EOS = Currency("EOS")
+NEO = Currency("NEO")
 STABLECOINS = {USD, USDT}
 
 
@@ -82,20 +85,32 @@ class TradingPair:
 BTC_USD = TradingPair(BTC, USD)
 ETH_USD = TradingPair(ETH, USD)
 XRP_USD = TradingPair(XRP, USD)
+LTC_USD = TradingPair(LTC, USD)
+EOS_USD = TradingPair(EOS, USD)
+NEO_USD = TradingPair(NEO, USD)
 
 # USDT quotes.
 BTC_USDT = TradingPair(BTC, USDT)
 ETH_USDT = TradingPair(ETH, USDT)
 XRP_USDT = TradingPair(XRP, USDT)
+LTC_USDT = TradingPair(LTC, USDT)
+EOS_USDT = TradingPair(EOS, USDT)
+NEO_USDT = TradingPair(NEO, USDT)
 
 # Use instead of recreating a TradingPair from base currencies
 Pairs = {
     (BTC, USDT): BTC_USDT,
     (ETH, USDT): ETH_USDT,
     (XRP, USDT): XRP_USDT,
+    (LTC, USDT): LTC_USDT,
+    (EOS, USDT): EOS_USDT,
+    (NEO, USDT): NEO_USDT,
     (BTC, USD): BTC_USD,
     (ETH, USD): ETH_USD,
     (XRP, USD): XRP_USD,
+    (LTC, USD): LTC_USD,
+    (EOS, USD): EOS_USD,
+    (NEO, USD): NEO_USD,
     (USDT, USDT): USDT,
 }
 

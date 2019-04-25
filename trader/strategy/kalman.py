@@ -4,26 +4,26 @@ from numpy_ringbuffer import RingBuffer
 from statsmodels.tsa.stattools import coint
 
 from trader.strategy.base import Strategy
+from trader.util.constants import BTC, EOS, ETH, LTC, NEO, XRP
+from trader.util.log import Log
 from trader.util.stats import Ema, Gaussian
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
-MARKET_CAPS = pd.Series(
-    {"BTC": 99e9, "ETH": 18e9, "XRP": 14e9, "BCH": 5e9, "EOS": 5e9, "LTC": 5e9, "NEO": 7e8}
-)
+MARKET_CAPS = pd.Series({BTC: 99e9, ETH: 18e9, XRP: 14e9, EOS: 5e9, LTC: 5e9, NEO: 7e8})
 
-# TODO: how would this work across multiple quote currencies?
+
 def add_cap_weighted_basket(P, volumes, name, pairs):
     P_components = P[pairs]
     base_prices = P_components.mean()
-    currencies = [pair[:3] for pair in pairs]
+    currencies = [pair.base for pair in pairs]
     caps = MARKET_CAPS[currencies]
     ratios = 1 / base_prices * caps.values
     P[name] = P_components @ ratios / ratios.sum()
     volumes[name] = volumes[pairs] @ base_prices / P[name].iloc[-1]
 
 
-class KalmanFilter(Strategy):
+class Kalman(Strategy):
     """
     Models fairs based on correlated movements between pairs. Weights predictions by volume and
     likelihood of cointegration.
@@ -41,7 +41,7 @@ class KalmanFilter(Strategy):
         self.sample_counter = 0
         self.coint_f = None
 
-    def step(self, frame):
+    def tick(self, frame):
         if self.price_history is None:
             self.price_history = RingBuffer(self.window_size, dtype=(np.float64, len(frame.index)))
 
@@ -59,10 +59,10 @@ class KalmanFilter(Strategy):
         self.moving_volumes.step(volumes)
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
-            return self.null_estimate(frame["price"])
+            return self.null_estimate(frame)
 
         if self.prev_fair is None:
-            self.prev_fair = self.null_estimate(df.iloc[-1])
+            self.prev_fair = self.null_estimate(frame)
 
         if self.coint_f is None:
             self.coint_f = pd.DataFrame(1, index=df.columns, columns=df.columns)
