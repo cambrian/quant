@@ -13,8 +13,19 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT, USD,
-                                   XRP, XRP_USDT, not_implemented)
+from trader.util.constants import (
+    BTC,
+    BTC_USDT,
+    DUMMY,
+    ETH,
+    ETH_USDT,
+    LTC_USDT,
+    USD,
+    USDT,
+    XRP,
+    XRP_USDT,
+    not_implemented,
+)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.types import Direction, Order, OrderBook
@@ -43,7 +54,14 @@ class DummyExchange(Exchange):
         self.__latest_books = {}
         self.__prices = {pair: (0, 0) for pair in self.__supported_pairs}
         self.__balances = defaultdict(float)
-        self.translate = {BTC_USDT: "BTC_USDT", ETH_USDT: "ETH_USDT", XRP_USDT: "XRP_USDT"}
+        self.__balances[BTC] = 2.43478623
+        self.__balances[USDT] = 245.17003318
+        self.translate = {
+            BTC_USDT: "BTC_USDT",
+            ETH_USDT: "ETH_USDT",
+            XRP_USDT: "XRP_USDT",
+            LTC_USDT: "LTC_USDT",
+        }
         self.__order_id = 0
 
     @property
@@ -119,16 +137,16 @@ class DummyExchange(Exchange):
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         if side == Direction.BUY:
-            if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
-                Log.info("dummy-buy - order not filled because price is not most recent.")
-                return None
+            # if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
+            #     Log.info("dummy-buy - order not filled because price is not most recent.")
+            #     return None
             Log.data("dummy-buy", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] += volume
             self.__balances[pair.quote] -= volume * price
         else:
-            if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
-                Log.info("dummy-sell - order not filled because price is not most recent.")
-                return None
+            # if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
+            #     Log.info("dummy-sell - order not filled because price is not most recent.")
+            #     return None
             Log.data("dummy-sell", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] -= volume
             self.__balances[pair.quote] += volume * price

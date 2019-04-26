@@ -13,7 +13,8 @@ from sortedcontainers import SortedList
 from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.thread import MVar
@@ -39,7 +40,7 @@ class Bitfinex(Exchange):
         super().__init__(thread_manager)
         self.__api_key = os.getenv("BITFINEX_API_KEY", "")
         self.__api_secret = os.getenv("BITFINEX_SECRET", "")
-        self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret)
+        self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret, 2.0)
         self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
@@ -141,28 +142,24 @@ class Bitfinex(Exchange):
                         if not delete:
                             order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
 
-    def prices(self, pairs, volume_time_frame=None):
+    def prices(self, pairs, volume_time_frame):
         """
 
         NOTE: `volume_time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
-        data = {"close": [], "volume": []}
+        data = {}
         for pair in pairs:
             if pair not in self.__supported_pairs:
                 raise ExchangeError("pair not supported by Bitfinex")
             book = self.book_feed(pair).latest
-            pair = self.__translate_to[pair]
-            data["close"].append(book.last_price)
-            if volume_time_frame is not None:
-                # Ignore index [0] timestamp.
-                # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
-                ochlv = self.__bfxv2.candles(volume_time_frame, pair, "last")[1:]
-                # TODO: Is this volume lagged?
-                data["volume"].append(ochlv[4])
-        if volume_time_frame is None:
-            del data["volume"]
-        return pd.DataFrame.from_dict(data, orient="index", columns=pairs)
+            trans_pair = self.__translate_to[pair]
+            # Ignore index [0] timestamp.
+            # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
+            ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
+            # TODO: Is this volume lagged?
+            data[pair] = (book.last_price, ochlv[4])
+        return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):
         if self.__balances_feed is None:
@@ -255,12 +252,15 @@ class Bitfinex(Exchange):
             "is_postonly": maker,
         }
         new_order = self.__bfxv1._post("/order/new", payload=payload, verify=True)
-        order = Order(new_order["id"], self.id, pair, side, order_type, price, volume)
-        if new_order["is_live"] == False:
-            order.update_status(Order.Status.REJECTED)
-        elif new_order["is_cancelled"] == False:
-            order.update_status(Order.Status.CANCELLED)
-        return order
+        Log.info("Bitfinex-order {}".format(new_order))
+        if "id" in new_order:
+            order = Order(new_order["id"], self.id, pair, side, order_type, price, volume)
+            if new_order["is_live"] == False:
+                order.update_status(Order.Status.REJECTED)
+            elif new_order["is_cancelled"] == False:
+                order.update_status(Order.Status.CANCELLED)
+            return order
+        return None
 
     def cancel_order(self, order_id):
         return self.__bfxv1.delete_order(order_id)

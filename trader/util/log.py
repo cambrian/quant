@@ -26,10 +26,13 @@ def _no_color(x):
 
 
 def _get_caller_context():
-    frame = inspect.stack()[2]
-    filename = frame[0].f_code.co_filename
-    # TODO: Maybe use the full filename if it is generally useful.
-    return "{}:{}".format(filename.split("/")[-1], frame[0].f_lineno)
+    try:
+        frame = inspect.stack()[2]
+        filename = frame[0].f_code.co_filename
+        # TODO: Maybe use the full filename if it is generally useful.
+        return "{}:{}".format(filename.split("/")[-1], frame[0].f_lineno)
+    except KeyError:
+        return "unknown"
 
 
 class Log:
