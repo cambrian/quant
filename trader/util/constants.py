@@ -35,15 +35,9 @@ USDT = Currency("USDT")
 BTC = Currency("BTC")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
-<<<<<<< HEAD
 LTC = Currency("LTC")
 EOS = Currency("EOS")
 NEO = Currency("NEO")
-=======
-NEO = Currency("NEO")
-LTC = Currency("LTC")
-EOS = Currency("EOS")
->>>>>>> Fixing log bug, adding live bitfinex trading
 STABLECOINS = {USD, USDT}
 
 
