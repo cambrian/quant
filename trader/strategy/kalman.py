@@ -75,13 +75,12 @@ class Kalman(Strategy):
                     if i >= j:
                         continue
                     p = coint(deltas[i], deltas[j], trend="nc", maxlag=self.maxlag, autolag=None)[1]
-                    f = max(1, p * 100)
+                    f = max(1, p * p * 2500)
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
         diffs = df.diff()
-        movement_diffs = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
         var = df.var()
         stddev = np.sqrt(var) + 1e-100
         r = df.corr()
@@ -94,9 +93,12 @@ class Kalman(Strategy):
         volume_signals = np.sqrt(self.moving_volumes.value * prices)
         volume_f = np.max(volume_signals) / volume_signals
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
-        correlated_delta_vars = movement_diffs.var()[:, np.newaxis] * np.square(price_ratios)
+        movement_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
+        correlated_delta_vars = movement_vars[:, np.newaxis] * np.square(price_ratios)
         fair_delta_vars = (
-            volume_f * self.coint_f * ((1 - r2) * var[np.newaxis, :] + r2 * correlated_delta_vars)
+            volume_f
+            * self.coint_f
+            * ((1 - r2) * movement_vars[np.newaxis, :] + r2 * correlated_delta_vars)
         )
         fair_delta = Gaussian.intersect(
             [Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in df.columns]
@@ -105,9 +107,12 @@ class Kalman(Strategy):
 
         step = prices - self.prev_fair.mean
         fair_step_means = correlated_slopes.mul(step, axis=0)
-        correlated_step_vars = diffs.var()[:, np.newaxis] * np.square(price_ratios)
+        step_vars = diffs.var()
+        correlated_step_vars = step_vars[:, np.newaxis] * np.square(price_ratios)
         fair_step_vars = (
-            volume_f * self.coint_f * ((1 - r2) * var[np.newaxis, :] + r2 * correlated_step_vars)
+            volume_f
+            * self.coint_f
+            * ((1 - r2) * step_vars[np.newaxis, :] + r2 * correlated_step_vars)
         )
         fair_step = Gaussian.intersect(
             [Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in df.columns]
