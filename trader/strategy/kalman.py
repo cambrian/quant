@@ -93,12 +93,12 @@ class Kalman(Strategy):
         volume_signals = np.sqrt(self.moving_volumes.value * prices)
         volume_f = np.max(volume_signals) / volume_signals
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
-        movement_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
-        correlated_delta_vars = movement_vars[:, np.newaxis] * np.square(price_ratios)
+        delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
+        correlated_delta_vars = delta_vars[:, np.newaxis] * np.square(price_ratios)
         fair_delta_vars = (
             volume_f
             * self.coint_f
-            * ((1 - r2) * movement_vars[np.newaxis, :] + r2 * correlated_delta_vars)
+            * ((1 - r2) * delta_vars[np.newaxis, :] + r2 * correlated_delta_vars)
         )
         fair_delta = Gaussian.intersect(
             [Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in df.columns]
