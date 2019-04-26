@@ -25,13 +25,13 @@ executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size
 # metrics = Metrics(thread_manager, {bitfinex})
 
 
-def main():
-    beat = Beat(60000)
-    while beat.loop():
-        bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
-        dummy_fairs = dummy_strategy.tick(bitfinex_data)
-        fairs = Gaussian.intersect([dummy_fairs])
-        executor.tick_fairs(fairs)
+# def main():
+#     beat = Beat(60000)
+#     while beat.loop():
+#         bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
+#         dummy_fairs = dummy_strategy.tick(bitfinex_data)
+#         fairs = Gaussian.intersect([dummy_fairs])
+#         executor.tick_fairs(fairs)
 
 
 def dummy_main():

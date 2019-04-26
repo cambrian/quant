@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from numpy_ringbuffer import RingBuffer
 from scipy.spatial import distance
 from statsmodels.tsa.stattools import adfuller
@@ -23,6 +24,7 @@ def johansen(P, maxlag):
 
 
 # TODO: reimplement with vector autoregression test, similar to johansen internals.
+@pytest.mark.skip(reason="not a test of functionality")
 def test_coint(P, mean_train, q, maxlag):
     x = (P / mean_train - 1) @ q
     return adfuller(x, regression="nc", maxlag=maxlag, autolag=None)[1]

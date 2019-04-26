@@ -97,7 +97,8 @@ LTC_USDT = TradingPair(LTC, USDT)
 EOS_USDT = TradingPair(EOS, USDT)
 NEO_USDT = TradingPair(NEO, USDT)
 
-# Use instead of recreating a TradingPair from base currencies
+# TODO: Maybe make this a static function `TradingPair.of`.
+# Use instead of recreating a TradingPair from base currencies.
 Pairs = {
     (BTC, USDT): BTC_USDT,
     (ETH, USDT): ETH_USDT,
