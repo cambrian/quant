@@ -25,6 +25,9 @@ class Currency:
     def __lt__(self, other):
         return self.__id < other.__id
 
+    def __deepcopy__(self, memo):
+        return self
+
 
 # Currencies.
 USD = Currency("USD")
@@ -32,9 +35,15 @@ USDT = Currency("USDT")
 BTC = Currency("BTC")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
+<<<<<<< HEAD
 LTC = Currency("LTC")
 EOS = Currency("EOS")
 NEO = Currency("NEO")
+=======
+NEO = Currency("NEO")
+LTC = Currency("LTC")
+EOS = Currency("EOS")
+>>>>>>> Fixing log bug, adding live bitfinex trading
 STABLECOINS = {USD, USDT}
 
 
@@ -80,6 +89,9 @@ class TradingPair:
     def __hash__(self):
         return id(self)
 
+    def __deepcopy__(self, memo):
+        return self
+
 
 # USD quotes.
 BTC_USD = TradingPair(BTC, USD)
@@ -93,9 +105,9 @@ NEO_USD = TradingPair(NEO, USD)
 BTC_USDT = TradingPair(BTC, USDT)
 ETH_USDT = TradingPair(ETH, USDT)
 XRP_USDT = TradingPair(XRP, USDT)
+NEO_USDT = TradingPair(NEO, USDT)
 LTC_USDT = TradingPair(LTC, USDT)
 EOS_USDT = TradingPair(EOS, USDT)
-NEO_USDT = TradingPair(NEO, USDT)
 
 # TODO: Maybe make this a static function `TradingPair.of`.
 # Use instead of recreating a TradingPair from base currencies.
@@ -112,7 +124,8 @@ Pairs = {
     (LTC, USD): LTC_USD,
     (EOS, USD): EOS_USD,
     (NEO, USD): NEO_USD,
-    (USDT, USDT): USDT,
+    (USDT, USDT): None,
+    (USD, USD): None,
 }
 
 

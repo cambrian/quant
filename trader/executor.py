@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed
-from trader.util.constants import DUMMY, Pairs
+from trader.util.constants import BITFINEX, BTC, DUMMY, USD, Pairs
 from trader.util.log import Log
 from trader.util.stats import Gaussian
 from trader.util.types import Direction, Order
@@ -60,7 +60,7 @@ class Executor:
                 return
         self.__latest_books[exchange, pair] = book
         self.__books_lock.release()
-        if exchange.id != DUMMY:
+        if exchange.id != DUMMY and exchange.id != BITFINEX:
             self.__trade(exchange, pair)
         Log.data("executor-book", book)
 
@@ -109,31 +109,53 @@ class Executor:
         for (order_exchange_pair, order_size) in orders.items():
             if order_size < 0:
                 order_size = abs(order_size)
-                Log.data(
-                    "executor-sell", {"pair": order_exchange_pair.json_value(), "size": order_size}
-                )
-                exchange.add_order(
-                    order_exchange_pair, Direction.SELL, Order.Type.IOC, bid, order_size
-                )
+                if order_size > exchange.balances[order_exchange_pair.base]:
+                    order_size = exchange.balances[order_exchange_pair.base]
+                if order_size > 0:
+                    Log.data(
+                        "executor-sell", {"pair": order_exchange_pair.json_value(), "size": order_size}
+                    )
+                    exchange.add_order(
+                        order_exchange_pair,
+                        Direction.SELL,
+                        Order.Type.IOC,
+                        bids[order_exchange_pair],
+                        order_size,
+                    )
             elif order_size > 0:
-                Log.data(
-                    "executor-buy", {"pair": order_exchange_pair.json_value(), "size": order_size}
-                )
-                exchange.add_order(
-                    order_exchange_pair, Direction.BUY, Order.Type.IOC, ask, order_size
-                )
+                if (
+                    order_size * asks[order_exchange_pair]
+                    > exchange.balances[order_exchange_pair.quote]
+                ):
+                    order_size = (
+                        exchange.balances[order_exchange_pair.quote] / asks[order_exchange_pair]
+                    )
+                if order_size > 0:
+                    Log.data(
+                        "executor-buy", {"pair": order_exchange_pair.json_value(), "size": order_size}
+                    )
+                    exchange.add_order(
+                        order_exchange_pair,
+                        Direction.BUY,
+                        Order.Type.IOC,
+                        asks[order_exchange_pair],
+                        order_size,
+                    )
         trade_lock.release()
 
     def tick_fairs(self, fairs):
         self.__latest_fairs = fairs
 
         self.__books_lock.acquire()
+        trading_exchanges = []
         for exchange, pair in self.__latest_books:
-            self.__thread_manager.attach(
-                "executor-fairs-trade-{}-{}".format(exchange.id, pair),
-                lambda: self.__trade(exchange, pair, wait_for_other_trade=True),
-                should_terminate=True,
-            )
+            if exchange not in trading_exchanges:
+                self.__thread_manager.attach(
+                    "executor-fairs-trade-{}-{}".format(exchange.id, pair),
+                    lambda: self.__trade(exchange, pair, wait_for_other_trade=True),
+                    should_terminate=True,
+                )
+                trading_exchanges.append(exchange)
         self.__books_lock.release()
         # TODO: Make this a call to `Log.data`.
         Log.info(fairs)
@@ -159,6 +181,7 @@ class Executor:
         quote_currency = mids.index[0].quote
 
         gradient = fairs.gradient(mids) * fairs.mean
+        Log.info("Gradient {}".format(gradient))
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
         pair_balances = pd.Series(balances).rename(lambda c: Pairs[c, quote_currency])[mids.index]
