@@ -86,6 +86,33 @@ class TradingPair:
     def __deepcopy__(self, memo):
         return self
 
+class ExchangePair:
+    """A tuple of Exchange and TradingPair"""
+    def __init__(self, exchange, pair):
+        from trader.exchange.base import Exchange
+        if not isinstance(exchange, Exchange):
+            raise TypeError("exchange is not a valid exchange object")
+        if not isinstance(pair, TradingPair):
+            raise TypeError("pair is not a TradingPair")
+        self.__exchange = exchange
+        self.__pair = pair
+
+    @property
+    def exchange_id(self):
+        return self.__exchange.id
+
+    @property
+    def quote(self):
+        return self.__pair.quote
+
+    @property
+    def base(self):
+        return self.__pair.base
+
+    @property
+    def pair(self):
+        return self.__pair
+
 
 # USD quotes.
 BTC_USD = TradingPair(BTC, USD)

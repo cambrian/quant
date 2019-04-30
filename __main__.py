@@ -4,8 +4,8 @@ import trader.strategy as strategy
 from trader.exchange import Bitfinex, DummyExchange
 from trader.executor import Executor
 from trader.metrics import Metrics
-from trader.util.constants import (BITFINEX, BTC_USD, BTC_USDT, ETH_USD,
-                                   ETH_USDT, LTC_USDT, XRP_USDT)
+from trader.util.constants import (BTC_USD, BTC_USDT, ETH_USD, ETH_USDT,
+                                   LTC_USDT, XRP_USDT, ExchangePair)
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.stats import Gaussian
