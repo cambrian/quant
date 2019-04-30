@@ -34,7 +34,9 @@ def main():
         bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
         kalman_fairs = kalman_strategy.tick(bitfinex_data)
         fairs = Gaussian.intersect([kalman_fairs])
-        executor.tick_fairs(fairs)
+        Log.info(fairs)
+        if kalman_strategy.warmed_up:
+            executor.tick_fairs(fairs)
 
 # def dummy_main():
 #     threads = 0

@@ -40,6 +40,11 @@ class Kalman(Strategy):
         self.prev_fair = None
         self.sample_counter = 0
         self.coint_f = None
+        self.__warmed_up = False
+
+    @property
+    def warmed_up(self):
+        return self.__warmed_up
 
     def tick(self, frame):
         if self.price_history is None:
@@ -60,6 +65,8 @@ class Kalman(Strategy):
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return self.null_estimate(frame)
+
+        self.__warmed_up = True
 
         if self.prev_fair is None:
             self.prev_fair = self.null_estimate(frame)

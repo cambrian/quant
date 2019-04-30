@@ -157,8 +157,6 @@ class Executor:
                 )
                 trading_exchanges.append(exchange)
         self.__books_lock.release()
-        # TODO: Make this a call to `Log.data`.
-        Log.info(fairs)
 
     def order_size(self, direction, fees, balance, fair, price):
         dir_ = 1 if direction == Direction.BUY else -1
@@ -181,7 +179,6 @@ class Executor:
         quote_currency = mids.index[0].quote
 
         gradient = fairs.gradient(mids) * fairs.mean
-        Log.info("Gradient {}".format(gradient))
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
         pair_balances = pd.Series(balances).rename(lambda c: Pairs[c, quote_currency])[mids.index]
