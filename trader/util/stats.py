@@ -437,9 +437,56 @@ class Gaussian:
         [[2 4]
          [6 8]]
 
+        >>> Gaussian(pd.Series([0, 0, 0]), pd.DataFrame([ \
+                [ 2, -1,  0], \
+                [-1,  2, -1], \
+                [ 0, -1,  2] \
+            ])) + Gaussian(pd.Series([1, 2, 1]), pd.DataFrame([ \
+                [ 1, -1, 0], \
+                [ 0, -1, 2], \
+                [-1,  2, -1] \
+            ]))
+        Gaussian:
+        mean:
+        0    1
+        1    2
+        2    1
+        dtype: int64
+        covariance:
+           0  1  2
+        0  3 -2  0
+        1 -1  1  1
+        2 -1  1  1
+
+        >>> Gaussian(pd.Series([1, 2], index=["a", "b"]), pd.DataFrame([ \
+                [1,2], \
+                [3,4] \
+            ], index=['a', 'b'], columns=['a', 'b'])) + \
+            Gaussian(pd.Series([3, 4], index=['c', 'd']), pd.DataFrame([ \
+                [5, 6], \
+                [7,8] \
+            ], index=['c', 'd'], columns=['c', 'd']))
+        Gaussian:
+        mean:
+        a    1.0
+        b    2.0
+        c    3.0
+        d    4.0
+        dtype: float64
+        covariance:
+             a    b    c    d
+        a  1.0  2.0  0.0  0.0
+        b  3.0  4.0  0.0  0.0
+        c  0.0  0.0  5.0  6.0
+        d  0.0  0.0  7.0  8.0
+
+
         """
         if isinstance(x, Gaussian):
-            return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
+            if isinstance(self.__mean, pd.Series):
+                return Gaussian(self.__mean.add(x.__mean, fill_value=0.0), self.__covariance.add(x.__covariance, fill_value=0.0).fillna(0.0))
+            else:
+                return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
         return Gaussian(self.__mean + x, self.__covariance)
 
     def __sub__(self, x):
