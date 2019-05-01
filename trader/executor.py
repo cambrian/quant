@@ -173,8 +173,4 @@ class Executor:
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
         profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge
         profitable_orders = proposed_orders * profitable
-        Log.data("balances", str(pair_balances))
-        Log.data("fairs", str(fairs.mean))
-        Log.data("mids", str(mids))
-        Log.data("proposed_orders", str(proposed_orders))
         return profitable_orders
