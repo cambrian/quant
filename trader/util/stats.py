@@ -374,7 +374,11 @@ class Gaussian:
         c  0.000  0.0  1.0  0.000
         d  0.125  0.5  0.0  0.625
 
-        >>> Gaussian(pd.Series([1], index=['a']), [1]) & Gaussian(pd.Series([]),[])
+        >>> Gaussian(pd.Series([1], index=['a']), [1]) & Gaussian(pd.Series([]),[])Gaussian:
+        mean:
+        0.9999999999
+        covariance:
+        0.9999999999
 
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
@@ -487,20 +491,8 @@ class Gaussian:
                 [1,2], \
                 [3,4] \
             ], index=['a', 'b'], columns=['a', 'b'])) + \
-            pd.Series([3, 4])
-        Gaussian:
-        mean:
-        a    1.0
-        b    2.0
-        c    3.0
-        d    4.0
-        dtype: float64
-        covariance:
-             a    b    c    d
-        a  1.0  2.0  0.0  0.0
-        b  3.0  4.0  0.0  0.0
-        c  0.0  0.0  5.0  6.0
-        d  0.0  0.0  7.0  8.0
+            pd.Series([3, 4], index=['c','d'])
+        TODO
 
 
         """
