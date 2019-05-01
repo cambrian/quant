@@ -27,7 +27,7 @@
     "python.linting.pep8Args": [
         "--max-line-length=100"
     ],
-    "python.pythonPath": "/usr/local/bin/python3",
+    "python.pythonPath": "python3",
     "python.sortImports.args": [
         "-ns",
         "__init__.py"

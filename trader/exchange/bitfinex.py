@@ -13,12 +13,11 @@ from sortedcontainers import SortedList
 from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.thread import MVar
-from trader.util.types import Direction, Order, OrderBook
+from trader.util.types import Direction, Order, OrderBook, ExchangePair
 
 
 class Bitfinex(Exchange):
@@ -115,8 +114,7 @@ class Bitfinex(Exchange):
         while True:
             if last_trade_price is not None:
                 yield OrderBook(
-                    self,
-                    pair,
+                    ExchangePair(self.id, pair),
                     last_trade_price,
                     order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
                     order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
@@ -158,7 +156,7 @@ class Bitfinex(Exchange):
             # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
             ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
             # TODO: Is this volume lagged?
-            data[pair] = (book.last_price, ochlv[4])
+            data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
         return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):

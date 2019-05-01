@@ -6,4 +6,4 @@ class Dummy(Strategy):
     """A strategy that always returns a null prediction."""
 
     def tick(self, frame):
-        return self.null_estimate(frame)
+        return Gaussian(pd.Series([]), [])

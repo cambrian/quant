@@ -7,13 +7,130 @@ Miscellaneous wrapper types.
 from enum import Enum
 
 
+class Currency:
+    """A currency."""
+
+    def __init__(self, id):
+        self.__id = id
+
+    def __repr__(self):
+        return self.__id
+
+    def json_value(self):
+        return repr(self)
+
+    def __lt__(self, other):
+        return self.__id < other.__id
+
+    def __ge__(self, other):
+        return not self < other
+
+    def __hash__(self):
+        return hash(self.__id)
+
+
+class TradingPair:
+    """A trading pair."""
+
+    def __init__(self, base, quote):
+        if not isinstance(base, Currency):
+            raise TypeError("base is not a Currency")
+        if not isinstance(quote, Currency):
+            raise TypeError("quote is not a Currency")
+        self.__base = base
+        self.__quote = quote
+
+    @property
+    def base(self):
+        return self.__base
+
+    @property
+    def quote(self):
+        return self.__quote
+
+    def __repr__(self):
+        return f"{self.base}-{self.quote}"
+
+    def json_value(self):
+        return (self.base.json_value(), self.quote.json_value())
+
+    def __lt__(self, other):
+        if self.base < other.base:
+            return True
+        if self.base > other.base:
+            return False
+        if self.quote < other.quote:
+            return True
+        return False
+
+    def __ge__(self, other):
+        return not self < other
+
+    def __eq__(self, other):
+        return self.base == other.base and self.quote == other.quote
+
+    def __hash__(self):
+        return hash((self.base, self.quote))
+
+
+class ExchangePair:
+    """A tuple of Exchange and TradingPair"""
+
+    def __init__(self, exchange_id, pair):
+        # TODO: check exchange_id for validity?
+        if not isinstance(pair, TradingPair):
+            raise TypeError("pair is not a TradingPair")
+        self.__exchange_id = exchange_id
+        self.__pair = pair
+
+    @property
+    def exchange_id(self):
+        return self.__exchange_id
+
+    @property
+    def pair(self):
+        return self.__pair
+
+    @property
+    def quote(self):
+        return self.pair.quote
+
+    @property
+    def base(self):
+        return self.pair.base
+
+    def __repr__(self):
+        return f"{self.exchange_id}-{self.base}-{self.quote}"
+
+    def __lt__(self, other):
+        if self.exchange_id < other.exchange_id:
+            return True
+        if self.exchange_id > other.exchange_id:
+            return False
+        if self.pair < other.pair:
+            return True
+        return False
+
+    def __ge__(self, other):
+        return not self < other
+
+    def __eq__(self, other):
+        return self.exchange_id == other.exchange_id and self.pair == other.pair
+
+    def __hash__(self):
+        return hash((self.exchange_id, self.pair))
+
+    def json_value(self):
+        return (self.exchange_id, self.pair.json_value())
+
+
 class OrderBook:
     """An immutable order book.
 
     TODO: Add actual levels to this book.
 
     Attributes:
-        exchange (Exchange): The book's exchange.
+        exchange_id (str): The id for this book's exchange.
         pair (Constant): The pair being traded.
         last_price (float): The last trade price.
         bid (float): Best bid price.
@@ -21,9 +138,8 @@ class OrderBook:
 
     """
 
-    def __init__(self, exchange, pair, last_price, bid, ask):
-        self.__exchange = exchange
-        self.__pair = pair
+    def __init__(self, exchange_pair, last_price, bid, ask):
+        self.__exchange_pair = exchange_pair
         self.__last_price = last_price
         self.__bid = bid
         self.__ask = ask
@@ -31,20 +147,31 @@ class OrderBook:
     def __eq__(self, other):
         return (
             type(self) == type(other)
-            and self.__exchange == other.__exchange
-            and self.__pair == other.__pair
+            and self.__exchange_pair == other.__exchange_pair
             and self.__last_price == other.__last_price
             and self.__bid == other.__bid
             and self.__ask == other.__ask
         )
 
     @property
-    def exchange(self):
-        return self.__exchange.id
+    def exchange_pair(self):
+        return self.__exchange_pair
+
+    @property
+    def exchange_id(self):
+        return self.exchange_pair.exchange_id
 
     @property
     def pair(self):
-        return self.__pair
+        return self.exchange_pair.pair
+
+    @property
+    def base(self):
+        return self.exchange_pair.base
+
+    @property
+    def quote(self):
+        return self.exchange_pair.quote
 
     @property
     def last_price(self):
@@ -63,8 +190,7 @@ class OrderBook:
 
     def json_value(self):
         return {
-            "exchange": self.exchange,
-            "pair": self.pair.json_value(),
+            "exchange_pair": self.exchange_pair.json_value(),
             "last_price": self.last_price,
             "bid": self.bid,
             "ask": self.ask,
@@ -79,11 +205,11 @@ class Direction(Enum):
 
 
 class Order:
-    """An exchange agnostic representation of an order.
+    """An exchange_id agnostic representation of an order.
 
     Attributes:
-        id (int): The order's exchange ID
-        exchange (Exchange): The order's exchange.
+        id (int): The order's exchange_id ID
+        exchange_id (Exchange): The order's exchange_id.
         pair (Constant): The order's traded pair.
         side (Direction): Side of the order book.
         order_type (Order.Type): Order fill type.
@@ -99,16 +225,16 @@ class Order:
         FILLED = 4
 
     class Type(Enum):
-        """An enum to be translated by each exchange."""
+        """An enum to be translated by each exchange_id."""
 
         MARKET = 1
         LIMIT = 2
         IOC = 3
         FOK = 4
 
-    def __init__(self, id, exchange, pair, side, order_type, price, volume):
+    def __init__(self, id, exchange_id, pair, side, order_type, price, volume):
         self.__id = id
-        self.__exchange = exchange
+        self.__exchange_id = exchange_id
         self.__pair = pair
         self.__side = side
         self.__order_type = order_type
@@ -121,8 +247,8 @@ class Order:
         return self.__id
 
     @property
-    def exchange(self):
-        return self.__exchange
+    def exchange_id(self):
+        return self.__exchange_id
 
     @property
     def pair(self):
@@ -149,13 +275,13 @@ class Order:
         return self.__status
 
     # TODO: Maybe remove so users cannot change status arbitrarily, instead just calling an
-    # `update` fn that queries the exchange and updates accordingly. More complexity/time, though.
+    # `update` fn that queries the exchange_id and updates accordingly. More complexity/time, though.
     def update_status(self, status):
         self.__status = status
 
     def __repr__(self):
         return "({}, {}, Order: #{}, Side: {}, Order Type: {}, Price: {}, Volume: {}, Status: {})".format(
-            self.__exchange,
+            self.__exchange_id,
             self.__pair,
             self.__id,
             self.__side,

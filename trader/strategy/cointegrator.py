@@ -58,12 +58,12 @@ class Cointegrator(Strategy):
             self.price_history = RingBuffer(self.window_size, dtype=(np.float64, len(prices.index)))
 
         if self.prev_prediction is None:
-            self.prev_prediction = self.null_estimate(frame)
+            self.prev_prediction = Gaussian(prices, [1e100 for _ in prices])
 
         self.price_history.append(prices)
 
         if len(self.price_history) < self.window_size:
-            return self.null_estimate(frame)
+            return Gaussian(pd.Series([]), [])
 
         if self.sample_counter == 0:
             P = pd.DataFrame(self.price_history, columns=prices.index)
@@ -87,7 +87,7 @@ class Cointegrator(Strategy):
         self.sample_counter %= self.cointegration_period
 
         if not self.coints:
-            return self.null_estimate(frame)
+            return Gaussian([], [])
 
         fair_means = [
             (hyperplane_projection(prices / self.base_prices - 1, q) + 1) * self.base_prices

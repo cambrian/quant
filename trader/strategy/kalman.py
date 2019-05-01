@@ -40,11 +40,6 @@ class Kalman(Strategy):
         self.prev_fair = None
         self.sample_counter = 0
         self.coint_f = None
-        self.__warmed_up = False
-
-    @property
-    def warmed_up(self):
-        return self.__warmed_up
 
     def tick(self, frame):
         if self.price_history is None:
@@ -59,17 +54,17 @@ class Kalman(Strategy):
         prices = df.iloc[-1]
         # the fair combination step assumes that all estimates are i.i.d. They are not - especially
         # in the case of funds. Is this a problem?
+        # Also something to think about - this adds non-exchange-pair columns to df, which may
+        # cause type errors if we try to do any manipulation of columns
 
         self.moving_prices.step(prices)
         self.moving_volumes.step(volumes)
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
-            return self.null_estimate(frame)
-
-        self.__warmed_up = True
+            return Gaussian(pd.Series([]), [])
 
         if self.prev_fair is None:
-            self.prev_fair = self.null_estimate(frame)
+            self.prev_fair = Gaussian(prices, [1e100 for _ in prices])
 
         if self.coint_f is None:
             self.coint_f = pd.DataFrame(1, index=df.columns, columns=df.columns)
@@ -79,7 +74,7 @@ class Kalman(Strategy):
             deltas = df - df.mean()
             for i in df.columns:
                 for j in df.columns:
-                    if i >= j:
+                    if str(i) >= str(j):
                         continue
                     p = coint(deltas[i], deltas[j], trend="nc", maxlag=self.maxlag, autolag=None)[1]
                     f = max(1, p * p * 2500)
@@ -87,7 +82,7 @@ class Kalman(Strategy):
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
-        diffs = df.diff()
+        diffs = df.diff()[1:]
         var = df.var()
         stddev = np.sqrt(var) + 1e-100
         r = df.corr()
@@ -100,7 +95,7 @@ class Kalman(Strategy):
         volume_signals = np.sqrt(self.moving_volumes.value * prices)
         volume_f = np.max(volume_signals) / volume_signals
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
-        delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :]
+        delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :].var()
         correlated_delta_vars = delta_vars[:, np.newaxis] * np.square(price_ratios)
         fair_delta_vars = (
             volume_f

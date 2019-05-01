@@ -46,11 +46,12 @@ class Ema:
         return self.__samples_needed == 0
 
 
+# TODO: we should probably accept range indexes as proper lables
 def _is_labeled(x):
     if isinstance(x, pd.Series):
-        return not isinstance(x.index, RangeIndex)
+        return x.empty or not isinstance(x.index, RangeIndex)
     elif isinstance(x, pd.DataFrame):
-        return not isinstance(x.columns, RangeIndex)
+        return x.empty or not isinstance(x.columns, RangeIndex)
     return False
 
 
@@ -373,6 +374,8 @@ class Gaussian:
         c  0.000  0.0  1.0  0.000
         d  0.125  0.5  0.0  0.625
 
+        >>> Gaussian(pd.Series([1], index=['a']), [1]) & Gaussian(pd.Series([]),[])
+
         """
         # Check if Pandas-based Gaussians have variables not in common, complicating intersection.
         if _is_labeled(self.__mean) and _is_labeled(x.__mean):
@@ -388,9 +391,9 @@ class Gaussian:
                 # Can't just set `diag_elem` to 1e100 because the pseudoinverse calculation runs
                 # into numerical instability. Instead, we ensure that the fill element scales
                 # with the (summed) matrix norms of each covariance.
-                diag_elem = 1e10 * (
-                    np.linalg.norm(self.__covariance, 1) + np.linalg.norm(x.__covariance, 1)
-                )
+                n1 = 0 if self.__covariance.empty else np.linalg.norm(self.__covariance, 1)
+                n2 = 0 if x.__covariance.empty else np.linalg.norm(x.__covariance, 1)
+                diag_elem = 1e10 * (n1 + n2)
                 s1_cov = pd.DataFrame(0, index=union, columns=union).add(
                     self.__covariance, fill_value=0
                 )
@@ -437,9 +440,78 @@ class Gaussian:
         [[2 4]
          [6 8]]
 
+        >>> Gaussian(pd.Series([0, 0, 0]), pd.DataFrame([ \
+                [ 2, -1,  0], \
+                [-1,  2, -1], \
+                [ 0, -1,  2] \
+            ])) + Gaussian(pd.Series([1, 2, 1]), pd.DataFrame([ \
+                [ 1, -1, 0], \
+                [ 0, -1, 2], \
+                [-1,  2, -1] \
+            ]))
+        Gaussian:
+        mean:
+        0    1
+        1    2
+        2    1
+        dtype: int64
+        covariance:
+           0  1  2
+        0  3 -2  0
+        1 -1  1  1
+        2 -1  1  1
+
+        >>> Gaussian(pd.Series([1, 2], index=["a", "b"]), pd.DataFrame([ \
+                [1,2], \
+                [3,4] \
+            ], index=['a', 'b'], columns=['a', 'b'])) + \
+            Gaussian(pd.Series([3, 4], index=['c', 'd']), pd.DataFrame([ \
+                [5, 6], \
+                [7,8] \
+            ], index=['c', 'd'], columns=['c', 'd']))
+        Gaussian:
+        mean:
+        a    1.0
+        b    2.0
+        c    3.0
+        d    4.0
+        dtype: float64
+        covariance:
+             a    b    c    d
+        a  1.0  2.0  0.0  0.0
+        b  3.0  4.0  0.0  0.0
+        c  0.0  0.0  5.0  6.0
+        d  0.0  0.0  7.0  8.0
+
+        >>> Gaussian(pd.Series([1, 2], index=["a", "b"]), pd.DataFrame([ \
+                [1,2], \
+                [3,4] \
+            ], index=['a', 'b'], columns=['a', 'b'])) + \
+            pd.Series([3, 4])
+        Gaussian:
+        mean:
+        a    1.0
+        b    2.0
+        c    3.0
+        d    4.0
+        dtype: float64
+        covariance:
+             a    b    c    d
+        a  1.0  2.0  0.0  0.0
+        b  3.0  4.0  0.0  0.0
+        c  0.0  0.0  5.0  6.0
+        d  0.0  0.0  7.0  8.0
+
+
         """
         if isinstance(x, Gaussian):
-            return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
+            if isinstance(self.__mean, pd.Series):
+                return Gaussian(
+                    self.__mean.add(x.__mean, fill_value=0.0),
+                    self.__covariance.add(x.__covariance, fill_value=0.0).fillna(0.0),
+                )
+            else:
+                return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
         return Gaussian(self.__mean + x, self.__covariance)
 
     def __sub__(self, x):

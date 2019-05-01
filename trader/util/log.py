@@ -9,7 +9,7 @@ import colorful
 _colorize = colorful.Colorful()
 _colorize.use_style("solarized")
 
-_serializable_types = (dict, list, tuple, int, float, bool, type(None))
+_serializable_types = (dict, list, tuple, int, float, bool, type(None), str)
 
 
 def _time():
@@ -95,25 +95,25 @@ class Log:
     def data(key, value):
         """Logs values that comprise a data stream."""
         warning = None
+        json_value = None
         if isinstance(value, _serializable_types):
             json_value = value
-        else:
+        elif callable(getattr(value, "json_value", None)):
             try:
                 json_value = value.json_value()
                 if not isinstance(json_value, _serializable_types):
                     warning = "json_value for type {} returned a JSON-incompatible object"
-            except (AttributeError, TypeError) as e:
-                if isinstance(e, TypeError):
-                    warning = "json_value for type {} has a bad signature"
-                else:
-                    warning = "object of type {} has no json_value method"
+            except TypeError as e:
+                warning = "json_value for type {} has a bad signature"
+        else:
+            warning = "could not figure out how to serialize value"
         try:
             json_message = json.dumps({"key": key, "value": json_value})
         except TypeError:
             # Unfortunately the `json_value` hack is not recursive by default.
             warning = "inner fields of this object are JSON-incompatible"
-        if warning is not None:
-            json_value = repr(value)
+        if warning:
+            json_message = repr(value)
             Log.warn(warning.format(type(value).__name__) + " (falling back to repr)")
         Log._log(
             Log.Level.DATA,

@@ -28,7 +28,7 @@ from trader.util.constants import (
 )
 from trader.util.feed import Feed
 from trader.util.log import Log
-from trader.util.types import Direction, Order, OrderBook
+from trader.util.types import Direction, Order, OrderBook, ExchangePair
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)
@@ -98,7 +98,7 @@ class DummyExchange(Exchange):
             (price, _) = self.__book_queues[trans_pair].get()
             # Spread is hard to manage generally across currencies
             spread = 0  # random.random()
-            book = OrderBook(self, pair, price, price - spread, price + spread)
+            book = OrderBook(ExchangePair(self.id, pair), price, price - spread, price + spread)
             self.__latest_books[pair] = book
             yield book
 
@@ -118,7 +118,7 @@ class DummyExchange(Exchange):
             else:
                 # Prices should be tracked in `step_time`.
                 val = (0, 0)
-            data[pair] = val
+            data[ExchangePair(self.id, pair)] = val
         Log.info("Dummy-prices {}".format(data))
         # Log.data("Dummy-prices", {"data": data})
         return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])

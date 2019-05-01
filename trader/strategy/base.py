@@ -28,9 +28,3 @@ class Strategy(ABC):
 
         """
         pass
-
-    def null_estimate(self, frame):
-        """Return fair estimates centered at the current prices with very low confidence."""
-        mean = frame["price"]
-        variance = frame["price"].replace(frame["price"], 1e100)
-        return Gaussian(mean, variance)
