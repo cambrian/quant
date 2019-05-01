@@ -483,6 +483,7 @@ class Gaussian:
         c  0.0  0.0  5.0  6.0
         d  0.0  0.0  7.0  8.0
 
+<<<<<<< HEAD
         >>> Gaussian(pd.Series([1, 2], index=["a", "b"]), pd.DataFrame([ \
                 [1,2], \
                 [3,4] \
@@ -502,14 +503,20 @@ class Gaussian:
         c  0.0  0.0  5.0  6.0
         d  0.0  0.0  7.0  8.0
 
+=======
+>>>>>>> d298aa3db5fc61df5bf575592cab9c1063636fec
 
         """
         if isinstance(x, Gaussian):
             if isinstance(self.__mean, pd.Series):
+<<<<<<< HEAD
                 return Gaussian(
                     self.__mean.add(x.__mean, fill_value=0.0),
                     self.__covariance.add(x.__covariance, fill_value=0.0).fillna(0.0),
                 )
+=======
+                return Gaussian(self.__mean.add(x.__mean, fill_value=0.0), self.__covariance.add(x.__covariance, fill_value=0.0).fillna(0.0))
+>>>>>>> d298aa3db5fc61df5bf575592cab9c1063636fec
             else:
                 return Gaussian(self.__mean + x.__mean, self.__covariance + x.__covariance)
         return Gaussian(self.__mean + x, self.__covariance)
