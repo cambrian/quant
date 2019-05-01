@@ -17,7 +17,7 @@ from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP
 from trader.util.feed import Feed
 from trader.util.log import Log
 from trader.util.thread import MVar
-from trader.util.types import Direction, Order, OrderBook, ExchangePair
+from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
 
 class Bitfinex(Exchange):

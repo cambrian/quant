@@ -28,7 +28,7 @@ from trader.util.constants import (
 )
 from trader.util.feed import Feed
 from trader.util.log import Log
-from trader.util.types import Direction, Order, OrderBook, ExchangePair
+from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)

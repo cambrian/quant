@@ -9,7 +9,7 @@ from trader.util import Feed
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
 from trader.util.log import Log
 from trader.util.stats import Gaussian
-from trader.util.types import Direction, Order, ExchangePair, TradingPair
+from trader.util.types import Direction, ExchangePair, Order, TradingPair
 
 
 class Executor:
