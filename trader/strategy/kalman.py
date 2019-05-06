@@ -71,12 +71,11 @@ class Kalman(Strategy):
 
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
-            deltas = df - df.mean()
             for i in df.columns:
                 for j in df.columns:
                     if str(i) >= str(j):
                         continue
-                    p = coint(deltas[i], deltas[j], trend="nc", maxlag=self.maxlag, autolag=None)[1]
+                    p = coint(prices[i], prices[j], trend="ct", maxlag=self.maxlag, autolag=None)[1]
                     f = max(1, p * p * 2500)
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
