@@ -1,7 +1,7 @@
 import pandas as pd
 
 from trader.strategy.base import Strategy
-from trader.util.stats import Gaussian
+from trader.util import Gaussian
 
 
 class Dummy(Strategy):

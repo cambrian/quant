@@ -13,21 +13,10 @@ from sortedcontainers import SortedList
 from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
-from trader.util.constants import (
-    BTC,
-    BTC_USDT,
-    DUMMY,
-    ETH,
-    ETH_USDT,
-    LTC_USDT,
-    USD,
-    USDT,
-    XRP,
-    XRP_USDT,
-    not_implemented,
-)
-from trader.util.feed import Feed
-from trader.util.log import Log
+from trader.util import Feed, Log
+from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
+                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
+                                   not_implemented)
 from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
 

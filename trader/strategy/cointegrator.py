@@ -6,9 +6,9 @@ from scipy.spatial import distance
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
-from research.strategy.base import Strategy
+from trader.strategy.base import Strategy
+from trader.util import Gaussian
 from trader.util.linalg import hyperplane_projection, orthogonal_projection
-from trader.util.stats import Gaussian
 
 
 def johansen(P, maxlag):

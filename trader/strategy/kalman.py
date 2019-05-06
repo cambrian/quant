@@ -4,9 +4,9 @@ from numpy_ringbuffer import RingBuffer
 from statsmodels.tsa.stattools import coint
 
 from trader.strategy.base import Strategy
+from trader.util import Gaussian, Log
 from trader.util.constants import BTC, EOS, ETH, LTC, NEO, XRP
-from trader.util.log import Log
-from trader.util.stats import Ema, Gaussian
+from trader.util.stats import DoubleEma, Ema
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
@@ -75,7 +75,7 @@ class Kalman(Strategy):
                 for j in df.columns:
                     if str(i) >= str(j):
                         continue
-                    p = coint(prices[i], prices[j], trend="ct", maxlag=self.maxlag, autolag=None)[1]
+                    p = coint(df[i], df[j], trend="ct", maxlag=self.maxlag, autolag=None)[1]
                     f = max(1, p * p * 2500)
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f

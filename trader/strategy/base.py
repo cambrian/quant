@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 
-from trader.util.stats import Gaussian
-
 
 class Strategy(ABC):
     """An abstract class for writing strategies."""
