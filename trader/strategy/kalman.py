@@ -76,7 +76,7 @@ class Kalman(Strategy):
                     if str(i) >= str(j):
                         continue
                     p = coint(df[i], df[j], trend="ct", maxlag=self.maxlag, autolag=None)[1]
-                    f = max(1, p * p * 2500)
+                    f = 1 + p * p * p * 15625
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period

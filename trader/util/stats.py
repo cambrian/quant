@@ -49,6 +49,9 @@ class DoubleEma:
     Double ema. Like the simple ema, but also extrapolates based on trend to compensate for lag.
     Equivalent to 2 * Ema(x) - Ema(Ema(x)).
 
+    See https://people.duke.edu/~rnau/411avg.htm for a good discussion of the theory behind double
+    and triple Emas.
+
     Args:
         half_life (float): The half life (in steps) for the weights of new samples.
     """

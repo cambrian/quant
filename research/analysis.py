@@ -28,8 +28,6 @@ def max_abs_drawdown(pnls):
     for pnl in pnls:
         if pnl > peak:
             peak = pnl
-        if peak == 0:
-            continue
         dd = peak - pnl
         if dd > mdd:
             mdd = dd
