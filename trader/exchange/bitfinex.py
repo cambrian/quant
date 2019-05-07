@@ -235,6 +235,27 @@ class Bitfinex(Exchange):
     def fees(self):
         return self.__fees
 
+    def warm_up(self, pairs, window_size, strategy):
+        rows = 0
+        while rows < window_size:
+            data = {}
+            for pair in pairs:
+                trans_pair = self.__translate_to[pair]
+                if rows == 0:
+                    data[pair] = self.__bfxv2.candles('1m', trans_pair, "hist", limit='5000')
+                else:
+                    data[pair] = self.__bfxv2.candles('1m', trans_pair, "hist", limit='5000', end=last_time)[1:]
+
+            tick_data = {}
+            for i, elem in enumerate(data[pairs[0]]):
+                for j in range(0, len(pairs)):
+                    if j != 0:
+                        elem = data[pairs[j]][i]
+                    tick_data[ExchangePair(self.id, pairs[j])] = (elem[1], elem[4])
+                strategy.tick(pd.DataFrame.from_dict(tick_data, orient='index', columns=['price', 'volume']))
+            last_time = data[pairs[0]][-1][0]
+            rows += len(data[pairs[0]])
+
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
         pair = self.__translate_to[pair][1:]
