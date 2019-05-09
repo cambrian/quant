@@ -44,32 +44,6 @@ class Ema:
         return self.__samples_needed == 0
 
 
-class DoubleEma:
-    """
-    Note: In general, prefer HoltEma.
-
-    Double ema. Like the simple ema, but also extrapolates based on trend to compensate for lag.
-    Equivalent to 2 * Ema(x) - Ema(Ema(x)).
-    """
-
-    def __init__(self, half_life):
-        self.__e = Ema(half_life)
-        self.__ee = Ema(half_life)
-
-    @property
-    def value(self):
-        return 2 * self.__e.value - self.__ee.value
-
-    def step(self, x):
-        self.__e.step(x)
-        self.__ee.step(self.__e.value)
-        return self.value
-
-    @property
-    def ready(self):
-        return self.__e.ready
-
-
 class HoltEma:
     """
     Holt's linear exponential smoothing. In addition to estimating a moving value, also estimates

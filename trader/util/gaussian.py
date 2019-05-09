@@ -8,7 +8,7 @@ from scipy.special import binom as choose
 from scipy.stats import multivariate_normal
 
 
-# TODO: we should probably accept range indexes as proper lables
+# TODO: we should probably accept range indexes as proper labels
 def _is_labeled(x):
     if isinstance(x, pd.Series):
         return x.empty or not isinstance(x.index, RangeIndex)
@@ -80,11 +80,11 @@ class Gaussian:
 
         >>> Gaussian([1, 1], pd.DataFrame([[1, 1]], index=['a', 'b']))
         Traceback (most recent call last):
-        stats.GaussianError: covariance column labels and index labels do not match
+        gaussian.GaussianError: covariance column labels and index labels do not match
 
         >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1]))
         Traceback (most recent call last):
-        stats.GaussianError: mean labels and covariance labels do not match
+        gaussian.GaussianError: mean labels and covariance labels do not match
 
         >>> Gaussian(pd.Series([1, 1], index=['b', 'a']), [1, 1])
         Gaussian:
@@ -336,7 +336,8 @@ class Gaussian:
         c  0.000  0.0  1.0  0.000
         d  0.125  0.5  0.0  0.625
 
-        >>> Gaussian(pd.Series([1], index=['a']), [1]) & Gaussian(pd.Series([]),[])Gaussian:
+        >>> Gaussian(pd.Series([1], index=['a']), [1]) & Gaussian(pd.Series([]),[])
+        Gaussian:
         mean:
         0.9999999999
         covariance:
@@ -761,18 +762,18 @@ class Gaussian:
         dtype: float64
 
         """
+        cov_inv = np.linalg.pinv(self.__covariance)
         if self.__should_vectorize(x):
             if isinstance(x, pd.DataFrame):
-                cov_inv = np.linalg.pinv(self.__covariance)
                 x = x[self.__mean.index]
                 return x.apply(lambda x: mahalanobis(self.__mean, x, cov_inv), axis=1)
             else:
-                return np.array([self.z_score(x_i) for x_i in x])
+                return np.array([mahalanobis(self.__mean, x_i, cov_inv) for x_i in x])
         else:
             # Sort `x` labels to match `mean` indexing.
             if self.__has_similar_labels(x):
                 x = x[self.__mean.index]
-            return mahalanobis(self.__mean, x, np.linalg.pinv(self.__covariance))
+            return mahalanobis(self.__mean, x, cov_inv)
 
     def gradient(self, x):
         """
@@ -824,6 +825,29 @@ class Gaussian:
             if self.__has_similar_labels(x):
                 return result[x_index_saved]
             return result
+
+    @staticmethod
+    def distance_bhattacharyya(a, b):
+        """
+        A distance measure for differently-shaped distributions. Reduces to Mahanalobis distance
+        when the input distributions have identical covariance. Outputs are in the range [0, inf).
+
+        Formula from https://en.wikipedia.org/wiki/Bhattacharyya_distance
+
+        TODO: currently crashes when both covariances are 0
+        >>> Gaussian.distance_bhattacharyya(Gaussian(1,1), Gaussian(1,1))
+        0.0
+        >>> Gaussian.distance_bhattacharyya(Gaussian(1,1), Gaussian(0,1))
+        0.125
+        """
+        if a.__has_similar_labels(b):
+            b = b[a.__mean.index]
+        cov_joint = (a.__covariance + b.__covariance) / 2
+        diff = a.__mean - b.__mean
+        return (1 / 8) * diff.T @ np.linalg.pinv(cov_joint) @ diff + (1 / 2) * np.log(
+            np.linalg.det(cov_joint)
+            / np.sqrt(np.linalg.det(a.__covariance) * np.linalg.det(b.__covariance))
+        )
 
     def __has_similar_labels(self, x):
         if _is_labeled(self.__mean) and _is_labeled(x):
