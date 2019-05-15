@@ -6,7 +6,7 @@ from statsmodels.tsa.stattools import coint
 from trader.strategy.base import Strategy
 from trader.util import Gaussian, Log
 from trader.util.constants import BTC, EOS, ETH, LTC, NEO, XRP
-from trader.util.stats import DoubleEma, Ema
+from trader.util.stats import Ema, HoltEma
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
@@ -23,17 +23,30 @@ def add_cap_weighted_basket(P, volumes, name, pairs):
     volumes[name] = volumes[pairs] @ base_prices / P[name].iloc[-1]
 
 
+def bhattacharyya_multi(a, b):
+    """
+    Vectorized calculation of Bhattacharyya distance for 1-d Gaussians.
+    Formula from https://en.wikipedia.org/wiki/Bhattacharyya_distance
+    """
+    return (1 / 4) * (
+        np.log((1 / 4) * (a.variance / b.variance + b.variance / a.variance + 2))
+        + (a.mean - b.mean) ** 2 / (a.variance + b.variance)
+    )
+
+
 class Kalman(Strategy):
     """
     Models fairs based on correlated movements between pairs. Weights predictions by volume and
     likelihood of cointegration.
     """
 
-    def __init__(self, window_size, movement_half_life, cointegration_period, maxlag):
+    def __init__(
+        self, window_size, movement_half_life, trend_half_life, cointegration_period, maxlag
+    ):
         self.price_history = None
         self.window_size = window_size
         self.movement_half_life = movement_half_life
-        self.moving_prices = Ema(movement_half_life)
+        self.moving_prices = HoltEma(movement_half_life, trend_half_life)
         self.moving_volumes = Ema(window_size / 2)
         self.cointegration_period = cointegration_period
         self.maxlag = maxlag
@@ -57,8 +70,8 @@ class Kalman(Strategy):
         # Also something to think about - this adds non-exchange-pair columns to df, which may
         # cause type errors if we try to do any manipulation of columns
 
-        self.moving_prices.step(prices)
-        self.moving_volumes.step(volumes)
+        moving_prices = self.moving_prices.step(prices)
+        moving_volumes = self.moving_volumes.step(volumes)
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return Gaussian(pd.Series([]), [])
@@ -69,6 +82,12 @@ class Kalman(Strategy):
         if self.coint_f is None:
             self.coint_f = pd.DataFrame(1, index=df.columns, columns=df.columns)
 
+        # The moving average is already trend-compenstated, so we remove trend from the data.
+        A = np.vstack([df.index.values, np.ones(len(df.index))]).T
+        Q = np.linalg.lstsq(A, df, rcond=None)[0]
+        trend = A @ Q
+        df -= trend
+
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
             for i in df.columns:
@@ -76,7 +95,7 @@ class Kalman(Strategy):
                     if str(i) >= str(j):
                         continue
                     p = coint(df[i], df[j], trend="ct", maxlag=self.maxlag, autolag=None)[1]
-                    f = 1 + p * p * p * 15625
+                    f = 1 + p * p * p * 15625  # .04 -> 2, .05 -> ~3, .1 -> ~16
                     self.coint_f.loc[i, j] = f
                     self.coint_f.loc[j, i] = f
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
@@ -87,11 +106,9 @@ class Kalman(Strategy):
         r = df.corr()
         r2 = r * r
         correlated_slopes = r.mul(stddev, axis=1).div(stddev, axis=0)
-        price_ratios = prices[np.newaxis, :] / prices[:, np.newaxis]
-        delta = prices - self.moving_prices.value
-        # In theory it's better to substitute self.prev_fair.mean for prices
-        # in these calculations, but the difference is marginal and prices is more concise
-        volume_signals = np.sqrt(self.moving_volumes.value * prices)
+        price_ratios = moving_prices[np.newaxis, :] / moving_prices[:, np.newaxis]
+        delta = prices - moving_prices
+        volume_signals = np.sqrt(moving_volumes * moving_prices)
         volume_f = np.max(volume_signals) / volume_signals
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
         delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :].var()
@@ -101,12 +118,17 @@ class Kalman(Strategy):
             * self.coint_f
             * ((1 - r2) * delta_vars[np.newaxis, :] + r2 * correlated_delta_vars)
         )
-        fair_delta = Gaussian.intersect(
-            [Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in df.columns]
+        fair_deltas = [
+            Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in df.columns
+        ]
+        fair_delta = Gaussian.intersect(fair_deltas)
+        disagreement = pd.DataFrame([bhattacharyya_multi(fair_delta, f) for f in fair_deltas])
+        fair_delta = Gaussian(
+            fair_delta.mean, fair_delta.variance * (1 + disagreement.pow(2).sum())
         )
-        absolute_fair = fair_delta + self.moving_prices.value
+        absolute_fair = fair_delta + moving_prices
 
-        step = prices - self.prev_fair.mean
+        step = prices - (self.prev_fair.mean + self.moving_prices.trend)
         fair_step_means = correlated_slopes.mul(step, axis=0)
         step_vars = diffs.var()
         correlated_step_vars = step_vars[:, np.newaxis] * np.square(price_ratios)
@@ -115,10 +137,13 @@ class Kalman(Strategy):
             * self.coint_f
             * ((1 - r2) * step_vars[np.newaxis, :] + r2 * correlated_step_vars)
         )
-        fair_step = Gaussian.intersect(
-            [Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in df.columns]
+        fair_steps = [Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in df.columns]
+        fair_step = Gaussian.intersect(fair_steps)
+        disagreement_step = pd.DataFrame([bhattacharyya_multi(fair_step, f) for f in fair_steps])
+        fair_step = Gaussian(
+            fair_step.mean, fair_step.variance * (1 + disagreement_step.pow(2).sum())
         )
-        relative_fair = fair_step + self.prev_fair
+        relative_fair = fair_step + self.prev_fair + self.moving_prices.trend
 
         fair = absolute_fair & relative_fair
         self.prev_fair = fair

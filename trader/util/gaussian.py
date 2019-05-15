@@ -834,11 +834,13 @@ class Gaussian:
 
         Formula from https://en.wikipedia.org/wiki/Bhattacharyya_distance
 
-        TODO: currently crashes when both covariances are 0
+        TODO: return inf instead of nan when both covariances are 0
         >>> Gaussian.distance_bhattacharyya(Gaussian(1,1), Gaussian(1,1))
         0.0
         >>> Gaussian.distance_bhattacharyya(Gaussian(1,1), Gaussian(0,1))
         0.125
+        >>> Gaussian.distance_bhattacharyya(Gaussian(1,0), Gaussian(0,0))
+        inf
         """
         if a.__has_similar_labels(b):
             b = b[a.__mean.index]

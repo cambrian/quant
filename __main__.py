@@ -12,15 +12,21 @@ from trader.util.types import Direction, Order
 
 thread_manager = ThreadManager()
 bitfinex = Bitfinex(thread_manager)
-# data_min = pd.read_hdf("research/data/1min.h5")
-# dummy_exchange = DummyExchange(thread_manager, data_min, {})
+data_min = pd.read_hdf("research/data/1min.h5")
+dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
 # cointegrator_strategy = strategy.Cointegrator(
 #     train_size=1200, validation_size=600, cointegration_period=64
 # )
 window_size = 7500
-kalman_strategy = strategy.Kalman(window_size=window_size, movement_half_life=60, cointegration_period=60, maxlag=120)
+kalman_strategy = strategy.Kalman(
+    window_size=window_size,
+    movement_half_life=60,
+    trend_half_life=3000,
+    cointegration_period=60,
+    maxlag=120,
+)
 executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]}, size=10, min_edge=0.0005)
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})
