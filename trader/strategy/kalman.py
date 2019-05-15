@@ -26,12 +26,22 @@ def add_cap_weighted_basket(P, volumes, name, pairs):
 def bhattacharyya_multi(a, b):
     """
     Vectorized calculation of Bhattacharyya distance for 1-d Gaussians.
-    Formula from https://en.wikipedia.org/wiki/Bhattacharyya_distance
+    Formula from https://en.wikipedia.org/wiki/Bhattacharyya_distance.
     """
     return (1 / 4) * (
         np.log((1 / 4) * (a.variance / b.variance + b.variance / a.variance + 2))
         + (a.mean - b.mean) ** 2 / (a.variance + b.variance)
     )
+
+
+def intersect_with_disagreement(gaussians):
+    """
+    Intersects 1-d gaussians and scales the intersection variance by a function of disagreement
+    betweem the result and the inputs.
+    """
+    intersection = Gaussian.intersect(gaussians)
+    disagreement = pd.DataFrame([bhattacharyya_multi(intersection, g) for g in gaussians])
+    return Gaussian(intersection.mean, intersection.variance * (1 + disagreement.pow(2).sum()))
 
 
 class Kalman(Strategy):
@@ -121,11 +131,7 @@ class Kalman(Strategy):
         fair_deltas = [
             Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in df.columns
         ]
-        fair_delta = Gaussian.intersect(fair_deltas)
-        disagreement = pd.DataFrame([bhattacharyya_multi(fair_delta, f) for f in fair_deltas])
-        fair_delta = Gaussian(
-            fair_delta.mean, fair_delta.variance * (1 + disagreement.pow(2).sum())
-        )
+        fair_delta = intersect_with_disagreement(fair_deltas)
         absolute_fair = fair_delta + moving_prices
 
         step = prices - (self.prev_fair.mean + self.moving_prices.trend)
@@ -138,11 +144,7 @@ class Kalman(Strategy):
             * ((1 - r2) * step_vars[np.newaxis, :] + r2 * correlated_step_vars)
         )
         fair_steps = [Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in df.columns]
-        fair_step = Gaussian.intersect(fair_steps)
-        disagreement_step = pd.DataFrame([bhattacharyya_multi(fair_step, f) for f in fair_steps])
-        fair_step = Gaussian(
-            fair_step.mean, fair_step.variance * (1 + disagreement_step.pow(2).sum())
-        )
+        fair_step = intersect_with_disagreement(fair_steps)
         relative_fair = fair_step + self.prev_fair + self.moving_prices.trend
 
         fair = absolute_fair & relative_fair
