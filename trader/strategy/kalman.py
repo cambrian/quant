@@ -6,7 +6,7 @@ from statsmodels.tsa.stattools import coint
 from trader.strategy.base import Strategy
 from trader.util import Gaussian, Log
 from trader.util.constants import BTC, EOS, ETH, LTC, NEO, XRP
-from trader.util.stats import DoubleEma, Ema
+from trader.util.stats import Ema
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
