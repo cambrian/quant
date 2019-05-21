@@ -10,13 +10,13 @@ from trader.util.stats import Ema, HoltEma
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
-MARKET_CAPS = pd.Series({BTC: 99e9, ETH: 18e9, XRP: 14e9, EOS: 5e9, LTC: 5e9, NEO: 7e8})
+MARKET_CAPS = pd.Series({"BTC": 99e9, "ETH": 18e9, XRP: 14e9, EOS: 5e9, LTC: 5e9, NEO: 7e8})
 
 
 def add_cap_weighted_basket(P, volumes, name, pairs):
     P_components = P[pairs]
     base_prices = P_components.mean()
-    currencies = [pair.base for pair in pairs]
+    currencies = [repr(pair.base) for pair in pairs]
     caps = MARKET_CAPS[currencies]
     ratios = 1 / base_prices * caps.values
     P[name] = P_components @ ratios / ratios.sum()

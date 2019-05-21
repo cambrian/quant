@@ -55,10 +55,10 @@ class Bitfinex(Exchange):
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
         self.__order_types = {
-            Order.Type.MARKET: "exchange market",
-            Order.Type.LIMIT: "exchange limit",
-            Order.Type.IOC: "exchange immediate-or-cancel",
-            Order.Type.FOK: "exchange fill-or-kill",
+            Order.Type.MARKET: "market",
+            Order.Type.LIMIT: "limit",
+            Order.Type.IOC: "immediate-or-cancel",
+            Order.Type.FOK: "fill-or-kill",
         }
         self.__book_feeds = {}
         self.__balances_queue = Queue()

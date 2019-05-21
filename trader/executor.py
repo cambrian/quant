@@ -114,7 +114,7 @@ class Executor:
                     exchange.add_order(
                         exchange_pair.pair,
                         Direction.SELL,
-                        Order.Type.IOC,
+                        Order.Type.FOK,
                         bids[exchange_pair],
                         order_size,
                     )
