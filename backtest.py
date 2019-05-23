@@ -8,7 +8,7 @@ import research.util.credentials as creds
 
 def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
     """
-    prepare_test_data(['BTC-USDT', 'ETH-USDT'], '2017-08-18 08:00:00, '2017-08-20 09:00:00', 5)
+    prepare_test_data('binance', ['BTC-USDT', 'ETH-USDT'], '2017-08-18 08:00:00, '2017-08-20 09:00:00', 5)
     returns a `DataFrame` of the form
 
     timestamp                                    pv
@@ -22,6 +22,8 @@ def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
       timestamp                  pair      price     volume
     0 2017-08-18 08:00:00+00:00  BTC-USDT  4291.100  2.605985
     1 2017-08-18 08:00:00+00:00  ETH-USDT   307.494  8.248910
+
+    with pricing data fetched from the `binance` table in Postgres.
 
     TODO: Extend to multiple exchanges.
     """
