@@ -7,16 +7,17 @@ from trader.strategy.base import Strategy
 from trader.util import Gaussian, Log
 from trader.util.constants import BTC, EOS, ETH, LTC, NEO, XRP
 from trader.util.stats import Ema, HoltEma
+from trader.util.types import ex_pair_from_str
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
-MARKET_CAPS = pd.Series({BTC: 99e9, ETH: 18e9, XRP: 14e9, EOS: 5e9, LTC: 5e9, NEO: 7e8})
+MARKET_CAPS = pd.Series({'BTC': 99e9, 'ETH': 18e9, 'XRP': 14e9, 'EOS': 5e9, 'LTC': 5e9, 'NEO': 7e8})
 
 
 def add_cap_weighted_basket(P, volumes, name, pairs):
     P_components = P[pairs]
     base_prices = P_components.mean()
-    currencies = [pair.base for pair in pairs]
+    currencies = [repr(ex_pair_from_str(pair).base) for pair in pairs]
     caps = MARKET_CAPS[currencies]
     ratios = 1 / base_prices * caps.values
     P[name] = P_components @ ratios / ratios.sum()
