@@ -7,12 +7,8 @@ import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
-<<<<<<< HEAD
 from trader.util.types import (Direction, ExchangePair, Order, TradingPair,
                                ex_pair_from_str)
-=======
-from trader.util.types import Direction, ExchangePair, Order, TradingPair, ex_pair_from_str
->>>>>>> 1defc88d1c4f58cf2460b47873f5880679a66373
 
 
 class Executor:
