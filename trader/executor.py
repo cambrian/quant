@@ -7,8 +7,12 @@ import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
+<<<<<<< HEAD
 from trader.util.types import (Direction, ExchangePair, Order, TradingPair,
                                ex_pair_from_str)
+=======
+from trader.util.types import Direction, ExchangePair, Order, TradingPair, ex_pair_from_str
+>>>>>>> 1defc88d1c4f58cf2460b47873f5880679a66373
 
 
 class Executor:
@@ -87,14 +91,14 @@ class Executor:
         asks = pd.Series(index=self.__latest_fairs.mean.index)
         fees = pd.Series(index=self.__latest_fairs.mean.index)
         balances = {}
-        for exchange_pair in self.__latest_fairs.mean.index:
-            from_string = ex_pair_from_str(exchange_pair)
-            exchange = self.__exchanges[from_string.exchange_id]
-            book = self.__latest_books[from_string]
-            bids[exchange_pair] = book.bid
-            asks[exchange_pair] = book.ask
-            fees[exchange_pair] = exchange.fees["taker"]
-            balances[exchange.id, from_string.base] = exchange.balances[from_string.base] or 0
+        for exchange_pair_string in self.__latest_fairs.mean.index:
+            exchange_pair = ex_pair_from_str(exchange_pair_string)
+            exchange = self.__exchanges[exchange_pair.exchange_id]
+            book = self.__latest_books[exchange_pair]
+            bids[exchange_pair_string] = book.bid
+            asks[exchange_pair_string] = book.ask
+            fees[exchange_pair_string] = exchange.fees["taker"]
+            balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
         self.__books_lock.release()
         balances = pd.Series(balances)
 
@@ -114,7 +118,7 @@ class Executor:
                         "executor-sell", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
-                        exchange_pair.pair,
+                        ex_pair_from_str(exchange_pair).pair,
                         Direction.SELL,
                         Order.Type.FOK,
                         bids[exchange_pair],
@@ -128,7 +132,7 @@ class Executor:
                         "executor-buy", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
-                        exchange_pair.pair,
+                        ex_pair_from_str(exchange_pair).pair,
                         Direction.BUY,
                         Order.Type.IOC,
                         asks[exchange_pair],

@@ -17,7 +17,7 @@ from trader.util import Feed, Log
 from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
                                    LTC_USDT, USD, USDT, XRP, XRP_USDT,
                                    not_implemented)
-from trader.util.types import Direction, ExchangePair, Order, OrderBook
+from trader.util.types import (Direction, ExchangePair, Order, OrderBook)
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)
