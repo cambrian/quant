@@ -138,6 +138,8 @@ class ExchangePair:
         return (self.exchange_id, self.pair.json_value())
 
 def ex_pair_from_str(string):
+    if isinstance(string, ExchangePair):
+        return string
     if not isinstance(string, str):
         return None
     triple = string.split('-')

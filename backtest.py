@@ -94,7 +94,7 @@ def job(sc, input_path, working_dir):
     from trader.exchange import DummyExchange
     from trader.util.constants import BTC_USDT, ETH_USDT
     from trader.util.thread import ThreadManager
-    from research.util.optimizer import BasicGridSearch, optimize, aggregator
+    from research.util.optimizer import BasicGridSearch, optimize, aggregate
     from trader.util.gaussian import Gaussian
     from trader.strategy import Kalman
     from trader.executor import Executor
@@ -125,10 +125,10 @@ def job(sc, input_path, working_dir):
         return return_value
 
 
-    param_spaces = {"strategy": [Kalman], "executor": [Executor], "window_size": range(90, 91, 1), "movement_half_life": range(90, 91, 1), "trend_half_life": range(3000, 3001, 1),
+    param_spaces = {"strategy": [Kalman], "executor": [Executor], "window_size": range(90, 91, 1), "movement_half_life": range(90, 92, 1), "trend_half_life": range(3000, 3001, 1),
     "cointegration_period": range(60, 61, 1), "maxlag": range(120, 121, 1)}
     # param_spaces = {"a": range(-100, 100, 1), "b": range(-50, 50, 1)}
-    aggregator(sc, inside_job, param_spaces, parallelism=2)
+    aggregate(sc, inside_job, param_spaces, parallelism=2)
     # return optimize(sc, BasicGridSearch, inside_job, param_spaces, parallelism=2)
 
 

@@ -7,7 +7,8 @@ import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
-from trader.util.types import Direction, ExchangePair, Order, TradingPair
+from trader.util.types import (Direction, ExchangePair, Order, TradingPair,
+                               ex_pair_from_str)
 
 
 class Executor:
@@ -87,12 +88,13 @@ class Executor:
         fees = pd.Series(index=self.__latest_fairs.mean.index)
         balances = {}
         for exchange_pair in self.__latest_fairs.mean.index:
-            exchange = self.__exchanges[exchange_pair.exchange_id]
-            book = self.__latest_books[exchange_pair]
+            from_string = ex_pair_from_str(exchange_pair)
+            exchange = self.__exchanges[from_string.exchange_id]
+            book = self.__latest_books[from_string]
             bids[exchange_pair] = book.bid
             asks[exchange_pair] = book.ask
             fees[exchange_pair] = exchange.fees["taker"]
-            balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
+            balances[exchange.id, from_string.base] = exchange.balances[from_string.base] or 0
         self.__books_lock.release()
         balances = pd.Series(balances)
 
@@ -102,14 +104,14 @@ class Executor:
         Log.info("executor_orders {}".format(orders))
 
         for exchange_pair, order_size in orders.items():
-            exchange = self.__exchanges[exchange_pair.exchange_id]
+            exchange = self.__exchanges[ex_pair_from_str(exchange_pair).exchange_id]
             if order_size < 0:
                 order_size = abs(order_size)
                 # if order_size > exchange.balances[exchange_pair.base]:
                 #     order_size = exchange.balances[exchange_pair.base]
                 if order_size > 0:
                     Log.data(
-                        "executor-sell", {"pair": exchange_pair.json_value(), "size": order_size}
+                        "executor-sell", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
                         exchange_pair.pair,
@@ -123,7 +125,7 @@ class Executor:
                 #     order_size = exchange.balances[exchange_pair.quote] / asks[exchange_pair]
                 if order_size > 0:
                     Log.data(
-                        "executor-buy", {"pair": exchange_pair.json_value(), "size": order_size}
+                        "executor-buy", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
                         exchange_pair.pair,
@@ -158,7 +160,7 @@ class Executor:
         bid/asks at once.
         """
         mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
-        quote_currency = mids.index[0].quote
+        quote_currency = ex_pair_from_str(mids.index[0]).quote
 
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)

@@ -98,7 +98,7 @@ class DummyExchange(Exchange):
             else:
                 # Prices should be tracked in `step_time`.
                 val = (0, 0)
-            data[ExchangePair(self.id, pair)] = val
+            data[repr(ExchangePair(self.id, pair))] = val
         Log.info("Dummy-prices {}".format(data))
         # Log.data("Dummy-prices", {"data": data})
         return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
