@@ -11,7 +11,7 @@ from trader.util.types import ex_pair_from_str
 
 # taken from coinmarketcap
 # TODO: soon we'll want to be fetching this dynamically
-MARKET_CAPS = pd.Series({'BTC': 99e9, 'ETH': 18e9, 'XRP': 14e9, 'EOS': 5e9, 'LTC': 5e9, 'NEO': 7e8})
+MARKET_CAPS = pd.Series({"BTC": 99e9, "ETH": 18e9, "XRP": 14e9, "EOS": 5e9, "LTC": 5e9, "NEO": 7e8})
 
 
 def add_cap_weighted_basket(P, volumes, name, pairs):

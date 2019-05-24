@@ -24,14 +24,7 @@ from trader.util.types import Direction, ExchangePair, Order, OrderBook
 class DummyExchange(Exchange):
     """Dummy exchange. Uses historical data and executes orders at last trade price."""
 
-    # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the `Exchange` base class before
-    # making that change.
-    __instance_exists = False
-
     def __init__(self, thread_manager, data, fees):
-        assert not DummyExchange.__instance_exists
-        DummyExchange.__instance_exists = True
         super().__init__(thread_manager)
         self.__data = data
         self.__supported_pairs = data.iloc[0].index
@@ -70,7 +63,7 @@ class DummyExchange(Exchange):
         self.time += 1
 
     def book_feed(self, pair):
-        trans_pair = self.translate[pair]
+        trans_pair = self.translate[repr(pair)]
         if trans_pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
         if trans_pair in self.__books:
@@ -83,7 +76,7 @@ class DummyExchange(Exchange):
 
     def __book(self, pair):
         while True:
-            trans_pair = self.translate[pair]
+            trans_pair = self.translate[repr(pair)]
             (price, _) = self.__book_queues[trans_pair].get()
             # Spread is hard to manage generally across currencies
             spread = 0  # random.random()
@@ -93,9 +86,7 @@ class DummyExchange(Exchange):
 
     def prices(self, pairs, time_frame=None):
         """
-
         NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
-
         """
         data = {}
         for pair in pairs:
