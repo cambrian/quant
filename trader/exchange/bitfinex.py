@@ -14,8 +14,7 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
 from trader.util.thread import MVar
 from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
@@ -235,6 +234,9 @@ class Bitfinex(Exchange):
     def fees(self):
         return self.__fees
 
+    # TODO: refactor in the following way:
+    # * change this fn to get_warmup_data(self, pairs, duration, resolution)
+    # * add code in __main__.py to process signals from aggregated data and tick the strategies.
     def warm_up(self, pairs, window_size, strategy):
         rows = 0
         while rows < window_size:
