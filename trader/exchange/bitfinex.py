@@ -14,7 +14,8 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 from trader.util.thread import MVar
 from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
@@ -155,7 +156,7 @@ class Bitfinex(Exchange):
             # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
             ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
             # TODO: Is this volume lagged?
-            data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
+            data[repr(ExchangePair(self.id, pair))] = (book.last_price, ochlv[4])
         return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):
@@ -252,7 +253,7 @@ class Bitfinex(Exchange):
                 for j in range(0, len(pairs)):
                     if j != 0:
                         elem = data[pairs[j]][i]
-                    tick_data[ExchangePair(self.id, pairs[j])] = (elem[1], elem[4])
+                    tick_data[repr(ExchangePair(self.id, pairs[j]))] = (elem[1], elem[4])
                 strategy.tick(
                     pd.DataFrame.from_dict(tick_data, orient="index", columns=["price", "volume"])
                 )

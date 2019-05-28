@@ -17,7 +17,7 @@ from trader.util import Feed, Log
 from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
                                    LTC_USDT, USD, USDT, XRP, XRP_USDT,
                                    not_implemented)
-from trader.util.types import Direction, ExchangePair, Order, OrderBook
+from trader.util.types import (Direction, ExchangePair, Order, OrderBook)
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)
@@ -46,10 +46,10 @@ class DummyExchange(Exchange):
         self.__balances[BTC] = 2.43478623
         self.__balances[USDT] = 245.17003318
         self.translate = {
-            BTC_USDT: "BTC_USDT",
-            ETH_USDT: "ETH_USDT",
-            XRP_USDT: "XRP_USDT",
-            LTC_USDT: "LTC_USDT",
+            'BTC-USDT': "BTC_USDT",
+            'ETH-USDT': "ETH_USDT",
+            'XRP-USDT': "XRP_USDT",
+            'LTC-USDT': "LTC_USDT",
         }
         self.__order_id = 0
 
@@ -99,7 +99,7 @@ class DummyExchange(Exchange):
         """
         data = {}
         for pair in pairs:
-            trans_pair = self.translate[pair]
+            trans_pair = self.translate[repr(pair)]
             if trans_pair not in self.__supported_pairs:
                 raise ExchangeError("pair not supported by Dummy")
             if trans_pair in self.__prices:
