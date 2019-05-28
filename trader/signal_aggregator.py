@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from trader.util.constants import BCH, BTC, EOS, ETH, LTC, NEO, XRP
@@ -8,10 +9,12 @@ CIRCULATING_SUPPLY = pd.Series(
     {BTC: 18e6, ETH: 106e6, XRP: 42e9, BCH: 18e6, EOS: 913e6, LTC: 62e6, NEO: 65e6}
 )
 
-# TODO
+# TODO:
 # think about how to do this. what if a quote_usd pair does not exist on a particular exchange?
 def convert_quotes_to_usd(frame):
-    pass
+    frame = frame.copy()
+    frame["volume"] *= frame["price"]
+    return frame
 
 
 def aggregate_currency_quotes(moving_volumes, frame):
@@ -28,8 +31,8 @@ def aggregate_currency_quotes(moving_volumes, frame):
     currencies = {pair.base for pair in frame.index}
     aggregates = pd.DataFrame(index=currencies, columns=frame.columns)
     for c in currencies:
-        components = frame.filter(regex=c + "-.*", axis=0)
-        moving_volumes_c = moving_volumes.filter(regex=c + "-.*") + 1e-10
+        components = frame.filter(regex="-" + c + "-.*", axis=0)
+        moving_volumes_c = moving_volumes.filter(regex="-" + c + "-.*") + 1e-10
         volume = components["volume"].sum()
         price = components["price"] @ moving_volumes_c / moving_volumes_c.sum()
         aggregates.loc[c] = (price, volume)
@@ -44,7 +47,7 @@ def add_baskets_mut(baskets, aggregates):
         components = aggregates.loc[currencies]
         # scale down to avoid numerical instability
         price = components["price"] @ CIRCULATING_SUPPLY[currencies] / 1e9
-        volume = components["volume"] @ components["price"] / price
+        volume = components["volume"].sum()
         aggregates.loc[name] = (price, volume)
 
 
@@ -59,7 +62,8 @@ class SignalAggregator:
         self.__baskets = baskets
 
     def step(self, frame):
+        frame = convert_quotes_to_usd(frame)
         moving_volumes = self.__moving_volumes.step(frame["volume"])
         aggregates = aggregate_currency_quotes(moving_volumes, frame)
         add_baskets_mut(self.__baskets, aggregates)
-        return aggregates
+        return aggregates.astype(np.float64)
