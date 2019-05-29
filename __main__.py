@@ -8,7 +8,7 @@ from trader.util import Feed, Gaussian, Log
 from trader.util.constants import (BTC, BTC_USD, BTC_USDT, ETH, ETH_USD,
                                    ETH_USDT, LTC_USDT, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
-from trader.util.types import Direction, Order
+from trader.util.types import Direction, ExchangePair, Order
 
 thread_manager = ThreadManager()
 bitfinex = Bitfinex(thread_manager)
@@ -27,16 +27,30 @@ kalman_strategy = strategy.Kalman(
     cointegration_period=60,
     maxlag=120,
 )
-executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]}, size=10, min_edge=0.0005)
+pairs = [BTC_USD, ETH_USD]
+executor = Executor(thread_manager, {bitfinex: pairs}, size=10, min_edge=0.0005)
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})
 
-aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH]})
+aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
+
+def warmup():
+    warmup_data = bitfinex.get_warmup_data(pairs, window_size, '1m')
+    for i in range(0, len(warmup_data[pairs[0]])):
+        tick_data = {}
+        for pair in pairs:
+            elem = warmup_data[pair][i]
+            tick_data[ExchangePair(bitfinex.id, pair)] = (elem[1], elem[4])
+        tick_data = pd.DataFrame.from_dict(tick_data, orient='index', columns=['price', 'volume'])
+        signals = aggregator.step(tick_data)
+        kalman_strategy.tick(tick_data, signals)
 
 
 def main():
     beat = Beat(60000)
-    bitfinex.warm_up([BTC_USD, ETH_USD], window_size, kalman_strategy)
+    warmup()
+    Log.info("Warmup Complete")
+
     while beat.loop():
         bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
         signals = aggregator.step(bitfinex_data)
