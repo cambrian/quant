@@ -1,12 +1,12 @@
 import pandas as pd
 
 import trader.strategy as strategy
+from trader import Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
-from trader.executor import Executor
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (BTC_USD, BTC_USDT, ETH_USD, ETH_USDT,
-                                   LTC_USDT, XRP_USDT)
+from trader.util.constants import (BTC, BTC_USD, BTC_USDT, ETH, ETH_USD,
+                                   ETH_USDT, LTC_USDT, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 from trader.util.types import Direction, Order
 
@@ -31,13 +31,16 @@ executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]}, size=10, min
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})
 
+aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH]})
+
 
 def main():
     beat = Beat(60000)
     bitfinex.warm_up([BTC_USD, ETH_USD], window_size, kalman_strategy)
     while beat.loop():
         bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
-        kalman_fairs = kalman_strategy.tick(bitfinex_data)
+        signals = aggregator.step(bitfinex_data)
+        kalman_fairs = kalman_strategy.tick(bitfinex_data, signals)
         fairs = Gaussian.intersect([kalman_fairs])
         Log.info(fairs)
         executor.tick_fairs(fairs)
@@ -47,8 +50,9 @@ def dummy_main():
     while True:
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
+        signals = aggregator.step(dummy_data)
         # cointegration_fairs = cointegrator_strategy.step(dummy_data)
-        kalman_fairs = kalman_strategy.tick(dummy_data)
+        kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
         # executor.tick_fairs(cointegration_fairs)
         executor.tick_fairs(fairs)

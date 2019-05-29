@@ -7,5 +7,5 @@ from trader.util import Gaussian
 class Dummy(Strategy):
     """A strategy that always returns a null prediction."""
 
-    def tick(self, frame):
+    def tick(self, frame, signals):
         return Gaussian(pd.Series([]), [])

@@ -16,6 +16,7 @@ KRAKEN = "kraken"
 USD = Currency("USD")
 USDT = Currency("USDT")
 BTC = Currency("BTC")
+BCH = Currency("BCH")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
 LTC = Currency("LTC")

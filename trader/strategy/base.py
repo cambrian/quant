@@ -7,7 +7,7 @@ class Strategy(ABC):
     # TODO: possibly do more during initialization, such as passing in the set of pairs/exchanges
 
     @abstractmethod
-    def tick(self, frame):
+    def tick(self, frame, signals):
         """The actual implementation of a strategy.
 
         Strategies should take the feed data received at each tick and incorporate it into their
