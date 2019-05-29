@@ -7,8 +7,7 @@ import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
-from trader.util.types import (Direction, ExchangePair, Order, TradingPair,
-                               ex_pair_from_str)
+from trader.util.types import Direction, ExchangePair, Order, TradingPair
 
 
 class Executor:
@@ -88,7 +87,7 @@ class Executor:
         fees = pd.Series(index=self.__latest_fairs.mean.index)
         balances = {}
         for exchange_pair_string in self.__latest_fairs.mean.index:
-            exchange_pair = ex_pair_from_str(exchange_pair_string)
+            exchange_pair = ExchangePair.parse(exchange_pair_string)
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
             bids[exchange_pair_string] = book.bid
@@ -104,7 +103,7 @@ class Executor:
         Log.info("executor_orders {}".format(orders))
 
         for exchange_pair, order_size in orders.items():
-            exchange = self.__exchanges[ex_pair_from_str(exchange_pair).exchange_id]
+            exchange = self.__exchanges[ExchangePair.parse(exchange_pair).exchange_id]
             if order_size < 0:
                 order_size = abs(order_size)
                 # if order_size > exchange.balances[exchange_pair.base]:
@@ -114,7 +113,7 @@ class Executor:
                         "executor-sell", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
-                        ex_pair_from_str(exchange_pair).pair,
+                        ExchangePair.parse(exchange_pair).pair,
                         Direction.SELL,
                         Order.Type.FOK,
                         bids[exchange_pair],
@@ -128,7 +127,7 @@ class Executor:
                         "executor-buy", {"pair": exchange_pair, "size": order_size}
                     )
                     exchange.add_order(
-                        ex_pair_from_str(exchange_pair).pair,
+                        ExchangePair.parse(exchange_pair).pair,
                         Direction.BUY,
                         Order.Type.IOC,
                         asks[exchange_pair],
@@ -160,7 +159,7 @@ class Executor:
         bid/asks at once.
         """
         mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
-        quote_currency = ex_pair_from_str(mids.index[0]).quote
+        quote_currency = ExchangePair.parse(mids.index[0]).quote
 
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)

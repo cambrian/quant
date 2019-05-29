@@ -77,15 +77,16 @@ class TradingPair:
     def __hash__(self):
         return hash((self.base, self.quote))
 
-def pair_from_str(string):
-    if not isinstance(string, str):
-        return None
-    pairs = string.split('-')
-    if len(pairs) != 2:
-        return None
-    base = Currency(pairs[0])
-    quote = Currency(pairs[1])
-    return TradingPair(base, quote)
+    @staticmethod
+    def parse(string):
+        if not isinstance(string, str):
+            return None
+        pairs = string.split('-')
+        if len(pairs) != 2:
+            return None
+        base = Currency(pairs[0])
+        quote = Currency(pairs[1])
+        return TradingPair(base, quote)
 
 class ExchangePair:
     """A tuple of Exchange and TradingPair"""
@@ -137,21 +138,20 @@ class ExchangePair:
     def json_value(self):
         return (self.exchange_id, self.pair.json_value())
 
-def ex_pair_from_str(string):
-    if isinstance(string, ExchangePair):
-        return string
-    if not isinstance(string, str):
-        return None
-    triple = string.split('-')
-    if len(triple) != 3:
-        return None
-    exchange = triple[0]
-    # Could call `pair_from_str`, but seems like more complexity for little reward
-    base = Currency(triple[1])
-    quote = Currency(triple[2])
-    return ExchangePair(exchange, TradingPair(base, quote))
-
-
+    @staticmethod
+    def parse(string):
+        if isinstance(string, ExchangePair):
+            return string
+        if not isinstance(string, str):
+            return None
+        triple = string.split('-')
+        if len(triple) != 3:
+            return None
+        exchange = triple[0]
+        # Could call `pair_from_str`, but seems like more complexity for little reward
+        base = Currency(triple[1])
+        quote = Currency(triple[2])
+        return ExchangePair(exchange, TradingPair(base, quote))
 
 class OrderBook:
     """An immutable order book.
