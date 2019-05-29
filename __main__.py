@@ -1,7 +1,7 @@
 import pandas as pd
 
 import trader.strategy as strategy
-from trader import Executor, SignalAggregator
+from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
@@ -16,9 +16,6 @@ data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
-# cointegrator_strategy = strategy.Cointegrator(
-#     train_size=1200, validation_size=600, cointegration_period=64
-# )
 window_size = 7500
 kalman_strategy = strategy.Kalman(
     window_size=window_size,
@@ -28,7 +25,8 @@ kalman_strategy = strategy.Kalman(
     maxlag=120,
 )
 pairs = [BTC_USD, ETH_USD]
-executor = Executor(thread_manager, {bitfinex: pairs}, size=10, min_edge=0.0005)
+execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})
 
@@ -65,13 +63,11 @@ def dummy_main():
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
         signals = aggregator.step(dummy_data)
-        # cointegration_fairs = cointegrator_strategy.step(dummy_data)
         kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
-        # executor.tick_fairs(cointegration_fairs)
         executor.tick_fairs(fairs)
 
 
-thread_manager.attach("main", main, should_terminate=True)
-# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+# thread_manager.attach("main", main, should_terminate=True)
+thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

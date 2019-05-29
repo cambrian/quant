@@ -22,21 +22,21 @@ class Executor:
             executor object.
         exchange_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
             that exchange to execute on.
+        execution_strategy (ExecutionStrategy)
 
     """
 
-    def __init__(self, thread_manager, exchange_pairs, size, min_edge):
+    def __init__(self, thread_manager, exchange_pairs, execution_strategy):
         self.__books_lock = Lock()
         self.__trade_lock = Lock()
         self.__latest_books = {}  # keyed by (Exchange.id, pair)
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
-        self.__size = size
-        self.__min_edge = min_edge
         self.__exchange_pairs = [
             ExchangePair(e.id, p) for e, ps in exchange_pairs.items() for p in ps
         ]
         self.__exchanges = {e.id: e for e in exchange_pairs}
+        self.execution_strategy = execution_strategy
 
         # Set up book feeds for every pair.
         for exchange_pair in self.__exchange_pairs:
@@ -97,9 +97,7 @@ class Executor:
         self.__books_lock.release()
         balances = pd.Series(balances)
 
-        orders = self.get_orders(
-            balances, bids, asks, self.__latest_fairs, self.__size, fees, self.__min_edge
-        )
+        orders = self.execution_strategy.tick(balances, bids, asks, self.__latest_fairs, fees)
         Log.info("executor_orders {}".format(orders))
 
         for exchange_pair, order_size in orders.items():
@@ -109,9 +107,7 @@ class Executor:
                 # if order_size > exchange.balances[exchange_pair.base]:
                 #     order_size = exchange.balances[exchange_pair.base]
                 if order_size > 0:
-                    Log.data(
-                        "executor-sell", {"pair": exchange_pair, "size": order_size}
-                    )
+                    Log.data("executor-sell", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
                         ExchangePair.parse(exchange_pair).pair,
                         Direction.SELL,
@@ -123,9 +119,7 @@ class Executor:
                 # if order_size * asks[exchange_pair] > exchange.balances[exchange_pair.quote]:
                 #     order_size = exchange.balances[exchange_pair.quote] / asks[exchange_pair]
                 if order_size > 0:
-                    Log.data(
-                        "executor-buy", {"pair": exchange_pair, "size": order_size}
-                    )
+                    Log.data("executor-buy", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
                         ExchangePair.parse(exchange_pair).pair,
                         Direction.BUY,
@@ -140,36 +134,3 @@ class Executor:
         self.__thread_manager.attach(
             "executor-fairs", lambda: self.__trade(wait_for_other_trade=True), should_terminate=True
         )
-
-    def order_size(self, direction, fees, balance, fair, price):
-        dir_ = 1 if direction == Direction.BUY else -1
-        edge = ((fair.mean / price - 1) * dir_ - fees) / fair.stddev
-        # Positive edge --> profitable order.
-        desired_balance_value = edge * self.__size * dir_
-        proposed_order_size = (desired_balance_value / price - balance) * dir_
-        return max(0, proposed_order_size)
-
-    def get_orders(self, balances, bids, asks, fairs, size, fees, min_edge):
-        """Takes fair as Gaussian, balances in base currency.
-        Returns orders in base currency (negative size indicates sell).
-
-        Since our fair estimate may have skewed uncertainty, it may be the case that
-        a price change for one trading pair causes us to desire positions in other
-        pairs. Therefore get_orders needs to consider the entire set of fairs and
-        bid/asks at once.
-        """
-        mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
-        quote_currency = ExchangePair.parse(mids.index[0]).quote
-
-        gradient = fairs.gradient(mids) * fairs.mean
-        balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
-        target_balance_values = balance_direction_vector * fairs.z_score(mids) * size
-        pair_balances = balances.set_axis(
-            [ExchangePair(e, TradingPair(b, quote_currency)) for e, b in balances.index],
-            inplace=False,
-        )[mids.index]
-        proposed_orders = target_balance_values / fairs.mean - pair_balances
-        prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
-        profitable = np.sign(proposed_orders) * (fairs.mean / prices - 1) > fees + min_edge
-        profitable_orders = proposed_orders * profitable
-        return profitable_orders
