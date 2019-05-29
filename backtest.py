@@ -94,7 +94,7 @@ def job(sc, input_path, working_dir):
     from trader.exchange import DummyExchange
     from trader.util.constants import BTC_USDT, ETH_USDT
     from trader.util.thread import ThreadManager
-    from research.util.optimizer import BasicGridSearch, optimize, aggregate
+    from research.util.optimizer import BasicGridSearch, aggregate
     from trader.util.gaussian import Gaussian
     from trader.strategy import Kalman
     from trader.executor import Executor

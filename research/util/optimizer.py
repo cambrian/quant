@@ -18,7 +18,7 @@ def _take(n, iterable):
     return list(islice(iterable, n))
 
 
-class Optimizer(ABC):
+class ParameterGenerator(ABC):
     """An abstract class for param search optimizers.
 
     Args:
@@ -52,7 +52,7 @@ class Optimizer(ABC):
         pass
 
 
-class BasicGridSearch(Optimizer):
+class BasicGridSearch(ParameterGenerator):
     def __init__(self, param_spaces, chunk_size=None):
         """Expects `param_spaces` to contain generator expressions for grid values."""
         self.__trials = _dict_product(param_spaces)
