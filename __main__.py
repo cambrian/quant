@@ -1,7 +1,7 @@
 import pandas as pd
 
 import trader.strategy as strategy
-from trader import Executor, SignalAggregator
+from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
@@ -23,7 +23,8 @@ kalman_strategy = strategy.Kalman(
     cointegration_period=60,
     maxlag=120,
 )
-executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]}, size=10, min_edge=0.0005)
+execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+executor = Executor(thread_manager, {bitfinex: [BTC_USD, ETH_USD]}, execution_strategy)
 # executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
 # metrics = Metrics(thread_manager, {bitfinex})
 
@@ -52,6 +53,6 @@ def dummy_main():
         executor.tick_fairs(fairs)
 
 
-thread_manager.attach("main", main, should_terminate=True)
-# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+# thread_manager.attach("main", main, should_terminate=True)
+thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()
