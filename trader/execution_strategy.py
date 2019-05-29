@@ -7,7 +7,7 @@ import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
 from trader.util.constants import BITFINEX, BTC, DUMMY, USD
-from trader.util.types import Direction, ExchangePair, Order, TradingPair, ex_pair_from_str
+from trader.util.types import Direction, ExchangePair, Order, TradingPair
 
 
 class ExecutionStrategy:
@@ -26,7 +26,7 @@ class ExecutionStrategy:
         bid/asks at once.
         """
         mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
-        quote_currency = ex_pair_from_str(mids.index[0]).quote
+        quote_currency = ExchangePair.parse(mids.index[0]).quote
 
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)

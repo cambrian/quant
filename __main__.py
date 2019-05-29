@@ -38,7 +38,7 @@ def warmup():
         tick_data = {}
         for pair in pairs:
             elem = warmup_data[pair][i]
-            tick_data[ExchangePair(bitfinex.id, pair)] = (elem[1], elem[4])
+            tick_data[repr(ExchangePair(bitfinex.id, pair))] = (elem[1], elem[4])
         tick_data = pd.DataFrame.from_dict(tick_data, orient='index', columns=['price', 'volume'])
         signals = aggregator.step(tick_data)
         kalman_strategy.tick(tick_data, signals)
@@ -68,6 +68,6 @@ def dummy_main():
         executor.tick_fairs(fairs)
 
 
-# thread_manager.attach("main", main, should_terminate=True)
-thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+thread_manager.attach("main", main, should_terminate=True)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()
