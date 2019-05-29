@@ -5,8 +5,7 @@ from trader import Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (BTC, BTC_USD, BTC_USDT, ETH, ETH_USD,
-                                   ETH_USDT, LTC_USDT, XRP_USDT)
+from trader.util.constants import BTC, BTC_USD, BTC_USDT, ETH, ETH_USD, ETH_USDT, LTC_USDT, XRP_USDT
 from trader.util.thread import Beat, ThreadManager
 from trader.util.types import Direction, Order
 
@@ -16,9 +15,6 @@ data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(thread_manager, data_min, {})
 
 # dummy_strategy = strategy.Dummy()
-# cointegrator_strategy = strategy.Cointegrator(
-#     train_size=1200, validation_size=600, cointegration_period=64
-# )
 window_size = 7500
 kalman_strategy = strategy.Kalman(
     window_size=window_size,
@@ -51,10 +47,8 @@ def dummy_main():
         dummy_exchange.step_time()
         dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
         signals = aggregator.step(dummy_data)
-        # cointegration_fairs = cointegrator_strategy.step(dummy_data)
         kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
-        # executor.tick_fairs(cointegration_fairs)
         executor.tick_fairs(fairs)
 
 
