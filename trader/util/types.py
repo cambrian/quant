@@ -130,7 +130,9 @@ class ExchangePair:
         return not self < other
 
     def __eq__(self, other):
-        return self.exchange_id == other.exchange_id and self.pair == other.pair
+        if isinstance(other, ExchangePair):
+            return self.exchange_id == other.exchange_id and self.pair == other.pair
+        return False
 
     def __hash__(self):
         return hash((self.exchange_id, self.pair))

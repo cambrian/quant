@@ -3,6 +3,7 @@ import pandas as pd
 
 from trader.util.constants import BCH, BTC, EOS, ETH, LTC, NEO, XRP
 from trader.util.stats import Ema
+from trader.util.types import TradingPair, ExchangePair
 
 # TODO: fetch this dynamically
 CIRCULATING_SUPPLY = pd.Series(
@@ -28,11 +29,11 @@ def aggregate_currency_quotes(moving_volumes, frame):
     trading volume moves back and forth between them. To combat this we weight quotes by a slow
     moving average of trading volume, but is there a better solution?
     """
-    currencies = {pair.base for pair in frame.index}
+    currencies = {ExchangePair.parse(pair).base for pair in frame.index}
     aggregates = pd.DataFrame(index=currencies, columns=frame.columns)
     for c in currencies:
-        components = frame.filter(regex="-" + c + "-.*", axis=0)
-        moving_volumes_c = moving_volumes.filter(regex="-" + c + "-.*") + 1e-10
+        components = frame.filter(regex="-" + repr(c) + "-.*", axis=0)
+        moving_volumes_c = moving_volumes.filter(regex="-" + repr(c) + "-.*") + 1e-10
         volume = components["volume"].sum()
         price = components["price"] @ moving_volumes_c / moving_volumes_c.sum()
         aggregates.loc[c] = (price, volume)

@@ -7,6 +7,7 @@ from collections import defaultdict
 from copy import deepcopy
 from queue import Queue
 
+import numpy as np
 import pandas as pd
 from bitfinex import ClientV1, ClientV2, WssClient
 from sortedcontainers import SortedList
@@ -14,7 +15,8 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 from trader.util.thread import MVar
 from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
@@ -234,33 +236,23 @@ class Bitfinex(Exchange):
     def fees(self):
         return self.__fees
 
-    # TODO: refactor in the following way:
-    # * change this fn to get_warmup_data(self, pairs, duration, resolution)
-    # * add code in __main__.py to process signals from aggregated data and tick the strategies.
-    def warm_up(self, pairs, window_size, strategy):
+    def get_warmup_data(self, pairs, duration, resolution):
         rows = 0
-        while rows < window_size:
-            data = {}
+        data = {}
+        while rows < duration:
             for pair in pairs:
                 trans_pair = self.__translate_to[pair]
                 if rows == 0:
-                    data[pair] = self.__bfxv2.candles("1m", trans_pair, "hist", limit="5000")
+                    data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit="5000")
                 else:
-                    data[pair] = self.__bfxv2.candles(
-                        "1m", trans_pair, "hist", limit="5000", end=last_time
-                    )[1:]
-
-            tick_data = {}
-            for i, elem in enumerate(data[pairs[0]]):
-                for j in range(0, len(pairs)):
-                    if j != 0:
-                        elem = data[pairs[j]][i]
-                    tick_data[repr(ExchangePair(self.id, pairs[j]))] = (elem[1], elem[4])
-                strategy.tick(
-                    pd.DataFrame.from_dict(tick_data, orient="index", columns=["price", "volume"])
-                )
+                    data[pair] = list(np.concatenate((data[pair], self.__bfxv2.candles(
+                        resolution, trans_pair, "hist", limit="5000", end=last_time
+                    )[1:]), axis=0))
             last_time = data[pairs[0]][-1][0]
             rows += len(data[pairs[0]])
+        for row in data:
+            data[row] = data[row][:duration]
+        return data
 
     def add_order(self, pair, side, order_type, price, volume, maker=False):
         # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
