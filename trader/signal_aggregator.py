@@ -29,7 +29,7 @@ def aggregate_currency_quotes(moving_volumes, frame):
     trading volume moves back and forth between them. To combat this we weight quotes by a slow
     moving average of trading volume, but is there a better solution?
     """
-    currencies = {ExchangePair.parse(pair).base for pair in frame.index}
+    currencies = {pair.base for pair in frame.index}
     aggregates = pd.DataFrame(index=currencies, columns=frame.columns)
     for c in currencies:
         components = frame.filter(regex="-" + repr(c) + "-.*", axis=0)

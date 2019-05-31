@@ -25,8 +25,8 @@ kalman_strategy = strategy.Kalman(
 )
 pairs = [BTC_USD, ETH_USD]
 execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
-# executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
-executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
+executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
+# executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
 # metrics = Metrics(thread_manager, {bitfinex})
 
 aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
@@ -34,11 +34,13 @@ aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
 
 def warmup():
     warmup_data = bitfinex.get_warmup_data(pairs, window_size, "1m")
+    # TODO: conversion logic belongs in the exchange get_warmup_data fn. What goes here should be
+    # related to stepping the strategy
     for i in range(0, len(warmup_data[pairs[0]])):
         tick_data = {}
         for pair in pairs:
             elem = warmup_data[pair][i]
-            tick_data[repr(ExchangePair(bitfinex.id, pair))] = (elem[1], elem[4])
+            tick_data[ExchangePair(bitfinex.id, pair)] = (elem[1], elem[4])
         tick_data = pd.DataFrame.from_dict(tick_data, orient="index", columns=["price", "volume"])
         signals = aggregator.step(tick_data)
         kalman_strategy.tick(tick_data, signals)
@@ -68,6 +70,6 @@ def dummy_main():
         executor.tick_fairs(fairs)
 
 
-# thread_manager.attach("main", main, should_terminate=True)
-thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+thread_manager.attach("main", main, should_terminate=True)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

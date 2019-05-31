@@ -18,7 +18,8 @@ from trader.util import Feed, Log
 from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
                                    XRP, XRP_USD)
 from trader.util.thread import MVar
-from trader.util.types import Direction, ExchangePair, Order, OrderBook
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook, Side)
 
 
 class Bitfinex(Exchange):
@@ -45,14 +46,7 @@ class Bitfinex(Exchange):
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
-        self.__translate_to = {
-            BTC: "tBTCUSD",
-            ETH: "tETHUSD",
-            XRP: "tXRPUSD",
-            BTC_USD: "tBTCUSD",
-            ETH_USD: "tETHUSD",
-            XRP_USD: "tXRPUSD",
-        }
+        self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__supported_pairs = self.__translate_to
         self.__order_types = {
@@ -84,62 +78,34 @@ class Bitfinex(Exchange):
         return self.__book_feeds[pair]
 
     def __generate_book_feed(self, pair):
-        trans_pair = self.__translate_to[pair]
-        book_queue = Queue()
+        msg_queue = Queue()
 
         def add_messages_to_queue(message):
             # Ignore status/subscription dicts.
             if isinstance(message, list):
-                book_queue.put(message)
-
-        def handle_snapshot(snapshot):
-            order_book = {
-                "bid": SortedList(key=lambda x: -x[0]),
-                "ask": SortedList(key=lambda x: x[0]),
-            }
-            for order in snapshot:
-                if order[2] > 0:
-                    order_book["bid"].add((order[1], abs(order[2]), order[0]))
-                else:
-                    order_book["ask"].add((order[1], abs(order[2]), order[0]))
-            return order_book
+                msg_queue.put(message)
 
         self.__ws_client.subscribe_to_orderbook(
-            trans_pair, precision="R0", callback=add_messages_to_queue
+            self.__translate_to[pair], precision="P0", callback=add_messages_to_queue
         )
-        last_trade_price = None
 
-        raw_book = book_queue.get()[1]
-        order_book = handle_snapshot(raw_book)
+        order_book = OrderBook(ExchangePair(self.id, pair))
+
+        def handle_update(order_book, update):
+            side = Side.BID if update[2] > 0 else Side.ASK
+            size = abs(update[2]) if update[1] != 0 else 0
+            order_book.update(side, BookLevel(update[0], size))
 
         while True:
-            if last_trade_price is not None:
-                yield OrderBook(
-                    ExchangePair(self.id, pair),
-                    last_trade_price,
-                    order_book["bid"][0][0] if len(order_book["bid"]) > 0 else None,
-                    order_book["ask"][0][0] if len(order_book["ask"]) > 0 else None,
-                )
-            change = book_queue.get()
-            # If WS has been reset (such that we are getting a snapshot back), update order_book
-            # with current snapshot:
-            if len(change) > 2 and isinstance(change[0], list):
-                order_book = handle_snapshot(change)
-            # Else handle update normally:
+            msg = msg_queue.get()
+            # see https://docs.bitfinex.com/v2/reference#ws-public-order-books for spec.
+            if len(msg) == 2 and isinstance(msg[1][0], list):
+                order_book.clear()
+                for update in msg[1]:
+                    handle_update(order_book, update)
             else:
-                delete = False
-                if len(change) > 1 and isinstance(change[1], list):
-                    for side in ["bid", "ask"]:
-                        for order in order_book[side]:
-                            if order[2] == change[1][0]:
-                                # Order was filled:
-                                if change[1][1] == 0:
-                                    delete = True
-                                    last_trade_price = float(order[0])
-                                order_book[side].discard(order)
-                                break
-                        if not delete:
-                            order_book[side].add((change[1][1], abs(change[1][2]), change[1][0]))
+                handle_update(order_book, msg[1])
+            yield order_book
 
     def prices(self, pairs, volume_time_frame):
         """
@@ -157,7 +123,7 @@ class Bitfinex(Exchange):
             # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
             ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
             # TODO: Is this volume lagged?
-            data[repr(ExchangePair(self.id, pair))] = (book.last_price, ochlv[4])
+            data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
         return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):
@@ -237,6 +203,9 @@ class Bitfinex(Exchange):
         return self.__fees
 
     def get_warmup_data(self, pairs, duration, resolution):
+        # TODO: handle duration < 5000 (set and use end in the first case)
+        # TODO: also convert to dataframe format here (where each row is a dataframe of
+        # exchangepair x (price, volume))
         rows = 0
         data = {}
         while rows < duration:
@@ -245,9 +214,17 @@ class Bitfinex(Exchange):
                 if rows == 0:
                     data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit="5000")
                 else:
-                    data[pair] = list(np.concatenate((data[pair], self.__bfxv2.candles(
-                        resolution, trans_pair, "hist", limit="5000", end=last_time
-                    )[1:]), axis=0))
+                    data[pair] = list(
+                        np.concatenate(
+                            (
+                                data[pair],
+                                self.__bfxv2.candles(
+                                    resolution, trans_pair, "hist", limit="5000", end=last_time
+                                )[1:],
+                            ),
+                            axis=0,
+                        )
+                    )
             last_time = data[pairs[0]][-1][0]
             rows += len(data[pairs[0]])
         for row in data:

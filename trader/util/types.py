@@ -6,6 +6,8 @@ Miscellaneous wrapper types.
 
 from enum import Enum
 
+from sortedcontainers import SortedList
+
 
 class Currency:
     """A currency."""
@@ -26,9 +28,7 @@ class Currency:
         return not self < other
 
     def __eq__(self, other):
-        if isinstance(other, Currency):
-            return self.__id == other.__id
-        return False
+        return isinstance(other, Currency) and self.__id == other.__id
 
     def __hash__(self):
         return hash(self.__id)
@@ -72,7 +72,9 @@ class TradingPair:
         return not self < other
 
     def __eq__(self, other):
-        return self.base == other.base and self.quote == other.quote
+        return (
+            isinstance(other, TradingPair) and self.base == other.base and self.quote == other.quote
+        )
 
     def __hash__(self):
         return hash((self.base, self.quote))
@@ -81,7 +83,7 @@ class TradingPair:
     def parse(string):
         if not isinstance(string, str):
             return None
-        pairs = string.split('-')
+        pairs = string.split("-")
         if len(pairs) != 2:
             return None
         base = Currency(pairs[0])
@@ -131,9 +133,11 @@ class ExchangePair:
         return not self < other
 
     def __eq__(self, other):
-        if isinstance(other, ExchangePair):
-            return self.exchange_id == other.exchange_id and self.pair == other.pair
-        return False
+        return (
+            isinstance(other, ExchangePair)
+            and self.exchange_id == other.exchange_id
+            and self.pair == other.pair
+        )
 
     def __hash__(self):
         return hash((self.exchange_id, self.pair))
@@ -147,45 +151,77 @@ class ExchangePair:
             return string
         if not isinstance(string, str):
             return None
-        triple = string.split('-')
+        triple = string.split("-")
         if len(triple) != 3:
             return None
         exchange = triple[0]
-        # Could call `pair_from_str`, but seems like more complexity for little reward
+        # Could call `TradingPair.parse`, but seems like more complexity for little reward
         base = Currency(triple[1])
         quote = Currency(triple[2])
         return ExchangePair(exchange, TradingPair(base, quote))
 
 
+class BookLevel:
+    """
+    TODO: decide how these things should compare (if at all)
+    """
+
+    def __init__(self, price, size):
+        self.__price = price
+        self.size = size
+
+    # def __eq__(self, other):
+    #     return isinstance(other, BookLevel) and self.__price == other.__price
+
+    # def __lt__(self, other):
+    #     return isinstance(other, BookLevel) and self.__price < other.__price
+
+    # def __le__(self, other):
+    #     return isinstance(other, BookLevel) and self.__price <= other.__price
+
+    # def __gt__(self, other):
+    #     return isinstance(other, BookLevel) and self.__price > other.__price
+
+    # def __ge__(self, other):
+    #     return isinstance(other, BookLevel) and self.__price >= other.__price
+
+    @property
+    def price(self):
+        return self.__price
+
+
+class Side(Enum):
+    """A standing order direction."""
+
+    BID = 1
+    ASK = 2
+
 
 class OrderBook:
     """An immutable order book.
 
-    TODO: Add actual levels to this book.
+    TODO: Add BookSide type and make this a real book.
 
     Attributes:
-        exchange_id (str): The id for this book's exchange.
-        pair (Constant): The pair being traded.
-        last_price (float): The last trade price.
-        bid (float): Best bid price.
-        ask (float): Best ask price.
+        exchange_pair (ExchangePair): exchange pair
+        bid (BookLevel): Best bid price.
+        ask (BookLevel): Best ask price.
 
     """
 
-    def __init__(self, exchange_pair, last_price, bid, ask):
+    def __init__(self, exchange_pair):
         self.__exchange_pair = exchange_pair
-        self.__last_price = last_price
-        self.__bid = bid
-        self.__ask = ask
+        self.__bid = SortedList(key=lambda x: -x.price)
+        self.__ask = SortedList(key=lambda x: x.price)
 
-    def __eq__(self, other):
-        return (
-            type(self) == type(other)
-            and self.__exchange_pair == other.__exchange_pair
-            and self.__last_price == other.__last_price
-            and self.__bid == other.__bid
-            and self.__ask == other.__ask
-        )
+    # You could probably implement __eq__, but when would you need it?
+    # def __eq__(self, other):
+    #     return (
+    #         isinstance(other, OrderBook)
+    #         and self.__exchange_pair == other.__exchange_pair
+    #         and self.__bid == other.__bid
+    #         and self.__ask == other.__ask
+    #     )
 
     @property
     def exchange_pair(self):
@@ -207,9 +243,21 @@ class OrderBook:
     def quote(self):
         return self.exchange_pair.quote
 
-    @property
-    def last_price(self):
-        return self.__last_price
+    def clear(self):
+        self.__bid.clear()
+        self.__ask.clear()
+
+    def update(self, side, level):
+        """if size is 0, then remove this level"""
+        side = self.__bid if side == Side.BID else self.__ask
+        i = side.bisect_left(level)
+        if side[i].price == level.price:
+            if level.size == 0:
+                side.pop(i)
+            else:
+                side[i].size = level.size
+        else:
+            side.add(level)
 
     @property
     def bid(self):
@@ -223,12 +271,7 @@ class OrderBook:
         return str(self.json_value())
 
     def json_value(self):
-        return {
-            "exchange_pair": self.exchange_pair.json_value(),
-            "last_price": self.last_price,
-            "bid": self.bid,
-            "ask": self.ask,
-        }
+        return {"exchange_pair": self.exchange_pair.json_value(), "bid": self.bid, "ask": self.ask}
 
 
 class Direction(Enum):

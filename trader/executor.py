@@ -86,13 +86,12 @@ class Executor:
         asks = pd.Series(index=self.__latest_fairs.mean.index)
         fees = pd.Series(index=self.__latest_fairs.mean.index)
         balances = {}
-        for exchange_pair_string in self.__latest_fairs.mean.index:
-            exchange_pair = ExchangePair.parse(exchange_pair_string)
+        for exchange_pair in self.__latest_fairs.mean.index:
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
-            bids[exchange_pair_string] = book.bid
-            asks[exchange_pair_string] = book.ask
-            fees[exchange_pair_string] = exchange.fees["taker"]
+            bids[exchange_pair] = book.bid
+            asks[exchange_pair] = book.ask
+            fees[exchange_pair] = exchange.fees["taker"]
             balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
         self.__books_lock.release()
         balances = pd.Series(balances)
@@ -101,7 +100,7 @@ class Executor:
         Log.info("executor_orders {}".format(orders))
 
         for exchange_pair, order_size in orders.items():
-            exchange = self.__exchanges[ExchangePair.parse(exchange_pair).exchange_id]
+            exchange = self.__exchanges[exchange_pair.exchange_id]
             if order_size < 0:
                 order_size = abs(order_size)
                 # if order_size > exchange.balances[exchange_pair.base]:
@@ -109,7 +108,7 @@ class Executor:
                 if order_size > 0:
                     Log.data("executor-sell", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
-                        ExchangePair.parse(exchange_pair).pair,
+                        exchange_pair.pair,
                         Direction.SELL,
                         Order.Type.IOC,
                         bids[exchange_pair],
@@ -121,7 +120,7 @@ class Executor:
                 if order_size > 0:
                     Log.data("executor-buy", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
-                        ExchangePair.parse(exchange_pair).pair,
+                        exchange_pair.pair,
                         Direction.BUY,
                         Order.Type.IOC,
                         asks[exchange_pair],
