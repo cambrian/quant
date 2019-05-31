@@ -14,39 +14,39 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
-                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
-                                   not_implemented)
-from trader.util.types import Direction, ExchangePair, Order, OrderBook
+from trader.util.constants import (
+    BTC,
+    BTC_USDT,
+    DUMMY,
+    ETH,
+    ETH_USDT,
+    LTC_USDT,
+    USD,
+    USDT,
+    XRP,
+    XRP_USDT,
+    not_implemented,
+)
+from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
 
 
-def dummy_books_from_frame(frame):
-    books = {}
-    for pair, (price, volume) in frame.items():
+def dummy_exchanges(data):
+    pass
 
 
-# TODO (remove this when the Exchange interface is stable and changes are complete)
 class DummyExchange(Exchange):
     """Dummy exchange. Uses historical data and executes orders at last trade price."""
 
-    # Allow only 1 instance. In the near future we should change the exchange classes to actually
-    # be singletons, but first we should extract common logic into the `Exchange` base class before
-    # making that change.
-    __instance_exists = False
-
     def __init__(self, thread_manager, data, fees={"maker": 0.001, "taker": 0.002}):
-        assert not DummyExchange.__instance_exists
-        DummyExchange.__instance_exists = True
         super().__init__(thread_manager)
         self.__data = data
-        self.__supported_exchange_pairs = data.iloc[0].index
+        self.__supported_pairs = data.iloc[0].index
         # `time` is not private to allow manual adjustment.
         self.time = 0
         self.__fees = fees
-        self.__book_queues = {pair: Queue() for pair in self.__supported_exchange_pairs}
+        self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__book_feeds = {}
         self.__latest_books = {}
-        self.__prices = {pair: (0, 0) for pair in self.__supported_exchange_pairs}
         self.__balances = defaultdict(float)
         self.__balances[BTC] = 2.43478623
         self.__balances[USDT] = 245.17003318
@@ -57,31 +57,28 @@ class DummyExchange(Exchange):
         return DUMMY
 
     def step_time(self):
-        data = self.__data.iloc[self.time]
-        for exchange_pair in data.index:
-            self.__book_queues[exchange_pair].put(data.loc[pair])
-            self.__prices[pair] = pair_data[i]
-        Log.data("dummy-debug", {"step": self.time, "prices": self.__prices})
+        frame = self.__data.iloc[self.time]
+        for pair, (price, _) in frame.items():
+            dummy_book = OrderBook(pair, [BookLevel(price, 1)], [BookLevel(price, 1)])
+            self.__book_queues[pair].put(dummy_book)
+            self.__latest_books[pair] = dummy_book
+        Log.data("dummy-debug", {"step": self.time, "frame": frame})
         self.time += 1
 
     def book_feed(self, pair):
         if pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        if trans_pair in self.__book_feeds:
-            return self.__book_feeds[trans_pair]
+        if pair in self.__book_feeds:
+            return self.__book_feeds[pair]
         else:
             pair_feed, runner = Feed.of(self.__book_generator(pair))
             self._thread_manager.attach("dummy-{}-book".format(pair), runner)
-            self.__book_feeds[trans_pair] = pair_feed
+            self.__book_feeds[pair] = pair_feed
             return pair_feed
 
     def __book_generator(self, pair):
         while True:
-            (price, _) = self.__book_queues[trans_pair].get()
-            # Spread is hard to manage generally across currencies
-            spread = 0  # random.random()
-            book = OrderBook(ExchangePair(self.id, pair), price, price - spread, price + spread)
-            self.__latest_books[pair] = book
+            book = self.__book_queues[pair].get()
             yield book
 
     def prices(self, pairs, time_frame=None):
@@ -90,20 +87,7 @@ class DummyExchange(Exchange):
         NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
 
         """
-        data = {}
-        for pair in pairs:
-            trans_pair = self.translate[repr(pair)]
-            if trans_pair not in self.__supported_pairs:
-                raise ExchangeError("pair not supported by Dummy")
-            if trans_pair in self.__prices:
-                val = self.__prices[trans_pair]
-            else:
-                # Prices should be tracked in `step_time`.
-                val = (0, 0)
-            data[ExchangePair(self.id, pair)] = val
-        Log.info("Dummy-prices {}".format(data))
-        # Log.data("Dummy-prices", {"data": data})
-        return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
+        return self.__data.iloc[self.time].loc[pairs]
 
     # TODO
     def balances_feed(self):

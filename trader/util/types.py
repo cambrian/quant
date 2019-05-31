@@ -163,27 +163,18 @@ class ExchangePair:
 
 class BookLevel:
     """
-    TODO: decide how these things should compare (if at all)
     """
 
     def __init__(self, price, size):
         self.__price = price
         self.size = size
 
-    # def __eq__(self, other):
-    #     return isinstance(other, BookLevel) and self.__price == other.__price
-
-    # def __lt__(self, other):
-    #     return isinstance(other, BookLevel) and self.__price < other.__price
-
-    # def __le__(self, other):
-    #     return isinstance(other, BookLevel) and self.__price <= other.__price
-
-    # def __gt__(self, other):
-    #     return isinstance(other, BookLevel) and self.__price > other.__price
-
-    # def __ge__(self, other):
-    #     return isinstance(other, BookLevel) and self.__price >= other.__price
+    def __eq__(self, other):
+        return (
+            isinstance(other, BookLevel)
+            and self.__price == other.__price
+            and self.size == other.size
+        )
 
     @property
     def price(self):
@@ -204,24 +195,24 @@ class OrderBook:
 
     Attributes:
         exchange_pair (ExchangePair): exchange pair
-        bid (BookLevel): Best bid price.
-        ask (BookLevel): Best ask price.
+        bids (SortedList<BookLevel>): Bids, sorted and aggregated.
+        asks (SortedList<BookLevel>): Asks, sorted and aggregated.
 
     """
 
-    def __init__(self, exchange_pair):
+    def __init__(self, exchange_pair, bids=[], asks=[]):
         self.__exchange_pair = exchange_pair
-        self.__bid = SortedList(key=lambda x: -x.price)
-        self.__ask = SortedList(key=lambda x: x.price)
+        self.__bids = SortedList(bids, key=lambda x: -x.price)
+        self.__asks = SortedList(asks, key=lambda x: x.price)
 
     # You could probably implement __eq__, but when would you need it?
-    # def __eq__(self, other):
-    #     return (
-    #         isinstance(other, OrderBook)
-    #         and self.__exchange_pair == other.__exchange_pair
-    #         and self.__bid == other.__bid
-    #         and self.__ask == other.__ask
-    #     )
+    def __eq__(self, other):
+        return (
+            isinstance(other, OrderBook)
+            and self.__exchange_pair == other.__exchange_pair
+            and self.__bids == other.__bids
+            and self.__asks == other.__asks
+        )
 
     @property
     def exchange_pair(self):
@@ -244,12 +235,12 @@ class OrderBook:
         return self.exchange_pair.quote
 
     def clear(self):
-        self.__bid.clear()
-        self.__ask.clear()
+        self.__bids.clear()
+        self.__asks.clear()
 
     def update(self, side, level):
         """if size is 0, then remove this level"""
-        side = self.__bid if side == Side.BID else self.__ask
+        side = self.__bids if side == Side.BID else self.__asks
         i = side.bisect_left(level)
         if side[i].price == level.price:
             if level.size == 0:
@@ -260,18 +251,22 @@ class OrderBook:
             side.add(level)
 
     @property
-    def bid(self):
-        return self.__bid
+    def bids(self):
+        return self.__bids
 
     @property
-    def ask(self):
-        return self.__ask
+    def asks(self):
+        return self.__asks
 
     def __repr__(self):
         return str(self.json_value())
 
     def json_value(self):
-        return {"exchange_pair": self.exchange_pair.json_value(), "bid": self.bid, "ask": self.ask}
+        return {
+            "exchange_pair": self.exchange_pair.json_value(),
+            "bids": self.bids,
+            "asks": self.asks,
+        }
 
 
 class Direction(Enum):

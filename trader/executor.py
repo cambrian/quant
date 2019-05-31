@@ -84,8 +84,8 @@ class Executor:
         for exchange_pair in self.__latest_fairs.mean.index:
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
-            bids[exchange_pair] = book.bid[0].price
-            asks[exchange_pair] = book.ask[0].price
+            bids[exchange_pair] = book.bids[0].price
+            asks[exchange_pair] = book.asks[0].price
             fees[exchange_pair] = exchange.fees["taker"]
             balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
         self.__books_lock.release()

@@ -33,7 +33,7 @@ class Bitfinex(Exchange):
     # making that change.
     __instance_exists = False
 
-    def __init__(self, thread_manager):
+    def __init__(self, thread_manager, pairs):
         assert not Bitfinex.__instance_exists
         Bitfinex.__instance_exists = True
         super().__init__(thread_manager)
@@ -46,7 +46,7 @@ class Bitfinex(Exchange):
         self.__ws_client.daemon = True
         self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
-        self.__supported_pairs = self.__translate_to
+        self.__pairs = pairs
         self.__order_types = {
             Order.Type.MARKET: "exchange market",
             Order.Type.LIMIT: "exchange limit",
@@ -61,18 +61,21 @@ class Bitfinex(Exchange):
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
+        self.__frame = pd.DataFrame(index=pairs, columns=["price", "volume"])  # TODO
+
+        for pair in pairs:
+            pair_feed, runner = Feed.of(self.__generate_book_feed(pair))
+            self._thread_manager.attach("bitfinex-{}-book".format(pair), runner)
+            self.__book_feeds[pair] = pair_feed
+            # TODO: also subscribe to trades for this pair, update self.__frame (set price, add to volume)
 
     @property
     def id(self):
         return BITFINEX
 
     def book_feed(self, pair):
-        if pair not in self.__supported_pairs:
+        if pair not in self.__pairs:
             raise ExchangeError("pair not supported by Bitfinex")
-        if pair not in self.__book_feeds:
-            pair_feed, runner = Feed.of(self.__generate_book_feed(pair))
-            self._thread_manager.attach("bitfinex-{}-book".format(pair), runner)
-            self.__book_feeds[pair] = pair_feed
         return self.__book_feeds[pair]
 
     def __generate_book_feed(self, pair):
@@ -105,24 +108,24 @@ class Bitfinex(Exchange):
                 handle_update(order_book, msg[1])
             yield order_book
 
-    def prices(self, pairs, volume_time_frame):
+    def prices(self):
         """
-
-        NOTE: `volume_time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
-
+        Returns frame for tracked pairs.
         """
-        data = {}
-        for pair in pairs:
-            if pair not in self.__supported_pairs:
-                raise ExchangeError("pair not supported by Bitfinex")
-            book = self.book_feed(pair).latest
-            trans_pair = self.__translate_to[pair]
-            # Ignore index [0] timestamp.
-            # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
-            ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
-            # TODO: Is this volume lagged?
-            data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
-        return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
+        frame = self.__frame.copy()
+        self.__frame["volume"] = 0
+        return frame
+        # for pair in pairs:
+        #     if pair not in self.__pairs:
+        #         raise ExchangeError("pair not supported by Bitfinex")
+        #     book = self.book_feed(pair).latest
+        #     trans_pair = self.__translate_to[pair]
+        #     # Ignore index [0] timestamp.
+        #     # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
+        #     ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
+        #     # TODO: Is this volume lagged?
+        #     data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
+        # return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):
         if self.__balances_feed is None:
