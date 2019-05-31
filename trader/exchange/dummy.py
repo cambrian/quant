@@ -17,7 +17,7 @@ from trader.util import Feed, Log
 from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
                                    LTC_USDT, USD, USDT, XRP, XRP_USDT,
                                    not_implemented)
-from trader.util.types import (Direction, ExchangePair, Order, OrderBook)
+from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)
@@ -29,7 +29,7 @@ class DummyExchange(Exchange):
     # making that change.
     __instance_exists = False
 
-    def __init__(self, thread_manager, data, fees):
+    def __init__(self, thread_manager, data, fees={"maker": 0.001, "taker": 0.002}):
         assert not DummyExchange.__instance_exists
         DummyExchange.__instance_exists = True
         super().__init__(thread_manager)
@@ -37,7 +37,7 @@ class DummyExchange(Exchange):
         self.__supported_pairs = data.iloc[0].index
         # `time` is not private to allow manual adjustment.
         self.time = 0
-        self.__fees = {"maker": 0.001, "taker": 0.002}
+        self.__fees = fees
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__books = {}
         self.__latest_books = {}
@@ -46,10 +46,10 @@ class DummyExchange(Exchange):
         self.__balances[BTC] = 2.43478623
         self.__balances[USDT] = 245.17003318
         self.translate = {
-            'BTC-USDT': "BTC_USDT",
-            'ETH-USDT': "ETH_USDT",
-            'XRP-USDT': "XRP_USDT",
-            'LTC-USDT': "LTC_USDT",
+            "BTC-USDT": "BTC_USDT",
+            "ETH-USDT": "ETH_USDT",
+            "XRP-USDT": "XRP_USDT",
+            "LTC-USDT": "LTC_USDT",
         }
         self.__order_id = 0
 

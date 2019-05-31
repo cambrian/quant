@@ -3,7 +3,7 @@ import pandas as pd
 
 from trader.util.constants import BCH, BTC, EOS, ETH, LTC, NEO, XRP
 from trader.util.stats import Ema
-from trader.util.types import TradingPair, ExchangePair
+from trader.util.types import ExchangePair, TradingPair
 
 # TODO: fetch this dynamically
 CIRCULATING_SUPPLY = pd.Series(

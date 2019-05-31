@@ -5,15 +5,14 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (BTC, BTC_USD, BTC_USDT, ETH, ETH_USD,
-                                   ETH_USDT, LTC_USDT, XRP_USDT)
+from trader.util.constants import BTC, BTC_USD, BTC_USDT, ETH, ETH_USD, ETH_USDT, LTC_USDT, XRP_USDT
 from trader.util.thread import Beat, ThreadManager
 from trader.util.types import Direction, ExchangePair, Order
 
 thread_manager = ThreadManager()
 bitfinex = Bitfinex(thread_manager)
 data_min = pd.read_hdf("research/data/1min.h5")
-dummy_exchange = DummyExchange(thread_manager, data_min, {})
+dummy_exchange = DummyExchange(thread_manager, data_min, {"maker": 0.00075, "taker": 0.00075})
 
 # dummy_strategy = strategy.Dummy()
 window_size = 7500
@@ -26,20 +25,21 @@ kalman_strategy = strategy.Kalman(
 )
 pairs = [BTC_USD, ETH_USD]
 execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
-executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
-# executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0)
+# executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
+executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
 # metrics = Metrics(thread_manager, {bitfinex})
 
 aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
 
+
 def warmup():
-    warmup_data = bitfinex.get_warmup_data(pairs, window_size, '1m')
+    warmup_data = bitfinex.get_warmup_data(pairs, window_size, "1m")
     for i in range(0, len(warmup_data[pairs[0]])):
         tick_data = {}
         for pair in pairs:
             elem = warmup_data[pair][i]
             tick_data[repr(ExchangePair(bitfinex.id, pair))] = (elem[1], elem[4])
-        tick_data = pd.DataFrame.from_dict(tick_data, orient='index', columns=['price', 'volume'])
+        tick_data = pd.DataFrame.from_dict(tick_data, orient="index", columns=["price", "volume"])
         signals = aggregator.step(tick_data)
         kalman_strategy.tick(tick_data, signals)
 
@@ -68,6 +68,6 @@ def dummy_main():
         executor.tick_fairs(fairs)
 
 
-thread_manager.attach("main", main, should_terminate=True)
-# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+# thread_manager.attach("main", main, should_terminate=True)
+thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()
