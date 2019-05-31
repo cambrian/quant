@@ -110,9 +110,11 @@ def optimize(sc, strategy, runner, param_spaces, parallelism, **kwargs):
         last_results = rdd.map(sim).collect()
     return optimizer.best_params()
 
+
 def aggregate(sc, runner, param_spaces, **kwargs):
     def sim(kwargs):
         return runner(**kwargs)
+
     rdd = sc.parallelize(_dict_product(param_spaces))
     res = rdd.map(sim).collect()
-    print(res)
+    return res

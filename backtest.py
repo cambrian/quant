@@ -89,34 +89,43 @@ def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
 #     backtester = BackTest(strategy, execution_model, data, params)
 
 
-def job(sc, input_path, working_dir):
+def spark_job(sc, input_path, working_dir):
     """Your entire job must go within the function definition (including imports)."""
     from trader.exchange import DummyExchange
-    from trader.util.constants import BTC_USDT, ETH_USDT
+    from trader.util.constants import BTC_USDT, ETH_USDT, BTC, ETH
     from trader.util.thread import ThreadManager
     from research.util.optimizer import BasicGridSearch, aggregate
     from trader.util.gaussian import Gaussian
     from trader.strategy import Kalman
     from trader.executor import Executor
-
+    from trader.execution_strategy import ExecutionStrategy
+    from trader.signal_aggregator import SignalAggregator
 
     def inside_job(strategy, executor, **kwargs):
         data = pd.read_hdf(input_path)
         thread_manager = ThreadManager()
         dummy_exchange = DummyExchange(thread_manager, data, {})
-        print(executor)
-        ex = executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, size=100, min_edge=0.0005)
+        execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+        executor = executor(
+            thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy
+        )
+        aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH]})
         strat = strategy(**kwargs)
 
         return_value = []
+
         def main():
             ticks = 0
             for row in data[:100]:
                 dummy_exchange.step_time()
-                dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], '1m')
-                kalman_fairs = strat.tick(dummy_data)
-                fairs = kalman_fairs & Gaussian(dummy_data['price'], [1e100 for _ in dummy_data['price']])
-                ex.tick_fairs(fairs)
+                dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
+                signals = aggregator.step(dummy_data)
+                print(signals)
+                kalman_fairs = strat.tick(dummy_data, signals)
+                fairs = kalman_fairs & Gaussian(
+                    dummy_data["price"], [1e100 for _ in dummy_data["price"]]
+                )
+                executor.tick_fairs(fairs)
                 return_value.append((ticks, dummy_exchange.balances, fairs))
                 ticks += 1
 
@@ -124,12 +133,53 @@ def job(sc, input_path, working_dir):
         thread_manager.run()
         return return_value
 
-
-    param_spaces = {"strategy": [Kalman], "executor": [Executor], "window_size": range(90, 91, 1), "movement_half_life": range(90, 92, 1), "trend_half_life": range(3000, 3001, 1),
-    "cointegration_period": range(60, 61, 1), "maxlag": range(120, 121, 1)}
-    # param_spaces = {"a": range(-100, 100, 1), "b": range(-50, 50, 1)}
-    aggregate(sc, inside_job, param_spaces, parallelism=2)
+    param_spaces = {
+        "strategy": [Kalman],
+        "executor": [Executor],
+        "window_size": range(90, 91, 1),
+        "movement_half_life": range(90, 92, 1),
+        "trend_half_life": range(3000, 3001, 1),
+        "cointegration_period": range(60, 61, 1),
+        "maxlag": range(120, 121, 1),
+    }
+    return aggregate(sc, inside_job, param_spaces, parallelism=2)
     # return optimize(sc, BasicGridSearch, inside_job, param_spaces, parallelism=2)
 
 
+def backtest():
+    # NOTE: Keep me at the top. (Sets up the module environment to run this script.)
+    import scripts.setup  # isort:skip, pylint: disable=import-error
+
+    import os
+    import sys
+    from importlib.machinery import SourceFileLoader
+
+    from pyspark import SparkContext
+
+    # Assumes you have JDK 1.8 as installed in the setup script.
+    os.environ["PYSPARK_PYTHON"] = "python3"
+    os.environ["JAVA_HOME"] = "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home"
+
+    # if len(sys.argv) < 2:
+    #     print("Script argument expected.")
+    #     sys.exit(1)
+
+    # if len(sys.argv) < 3:
+    #     input_path = "/dev/null"
+    # else:
+    #     input_path = sys.argv[2]
+
+    # Extract job name and job function from script file.
+    # name = os.path.splitext(os.path.basename(sys.argv[1]))[0]
+    # job = getattr(SourceFileLoader(name, sys.argv[1]).load_module(name), "job")
+    job = spark_job
+
+    # Run the job locally.
+    sc = SparkContext("local", "backtest")
+    print(job(sc, "research/data/1min.h5", os.getcwd()))
+
+    sc.stop()
+
+
+backtest()
 # thread_manager = ThreadManager()
