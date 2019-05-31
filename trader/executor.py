@@ -53,14 +53,9 @@ class Executor:
 
     def __tick_book(self, exchange_pair, book):
         self.__books_lock.acquire()
-        if exchange_pair in self.__latest_books:
-            latest_book = self.__latest_books[exchange_pair]
-            # Two order books can have the same bid/ask but different last trade price.
-            if latest_book.bid == book.bid and latest_book.ask == book.ask:
-                self.__books_lock.release()
-                return
         self.__latest_books[exchange_pair] = book
         self.__books_lock.release()
+        # TODO: remove this, right?
         if exchange_pair.exchange_id != DUMMY and exchange_pair.exchange_id != BITFINEX:
             self.__trade()
         Log.data("executor-book", book)
@@ -89,8 +84,8 @@ class Executor:
         for exchange_pair in self.__latest_fairs.mean.index:
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
-            bids[exchange_pair] = book.bid
-            asks[exchange_pair] = book.ask
+            bids[exchange_pair] = book.bid[0].price
+            asks[exchange_pair] = book.ask[0].price
             fees[exchange_pair] = exchange.fees["taker"]
             balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
         self.__books_lock.release()
