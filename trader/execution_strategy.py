@@ -24,17 +24,18 @@ class ExecutionStrategy:
         a price change for one trading pair causes us to desire positions in other
         pairs. Therefore get_orders needs to consider the entire set of fairs and
         bid/asks at once.
+
+        TODO: generalize to multiple quotes
+        TODO: use books instead of just the best bid/ask price
         """
         mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
-        quote_currency = ExchangePair.parse(mids.index[0]).quote
 
         gradient = fairs.gradient(mids) * fairs.mean
         balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
         target_balance_values = balance_direction_vector * fairs.z_score(mids) * self.size
-        pair_balances = balances.set_axis(
-            [ExchangePair(e, TradingPair(b, quote_currency)) for e, b in balances.index],
-            inplace=False,
-        )[mids.index]
+        pair_balances = balances[[(ep.exchange_id, ep.base) for ep in mids.index]].set_axis(
+            mids.index, inplace=False
+        )
         proposed_orders = target_balance_values / fairs.mean - pair_balances
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
         edge = fairs.mean / prices - 1

@@ -57,7 +57,7 @@ class TradingPair:
         return f"{self.base}-{self.quote}"
 
     def json_value(self):
-        return (self.base.json_value(), self.quote.json_value())
+        return repr(self)
 
     def __lt__(self, other):
         if self.base < other.base:
@@ -143,7 +143,7 @@ class ExchangePair:
         return hash((self.exchange_id, self.pair))
 
     def json_value(self):
-        return (self.exchange_id, self.pair.json_value())
+        return repr(self)
 
     @staticmethod
     def parse(string):
@@ -242,7 +242,7 @@ class OrderBook:
         """if size is 0, then remove this level"""
         side = self.__bids if side == Side.BID else self.__asks
         i = side.bisect_left(level)
-        if side[i].price == level.price:
+        if i < len(side) and side[i].price == level.price:
             if level.size == 0:
                 side.pop(i)
             else:

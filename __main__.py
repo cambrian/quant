@@ -9,8 +9,9 @@ from trader.util.constants import BTC, BTC_USD, BTC_USDT, ETH, ETH_USD, ETH_USDT
 from trader.util.thread import Beat, ThreadManager
 from trader.util.types import Direction, ExchangePair, Order
 
+pairs = [BTC_USD, ETH_USD]
 thread_manager = ThreadManager()
-bitfinex = Bitfinex(thread_manager)
+# bitfinex = Bitfinex(thread_manager, pairs)
 data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(thread_manager, data_min, {"maker": 0.00075, "taker": 0.00075})
 
@@ -23,10 +24,9 @@ kalman_strategy = strategy.Kalman(
     cointegration_period=60,
     maxlag=120,
 )
-pairs = [BTC_USD, ETH_USD]
 execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
-executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
-# executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
+# executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
+executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
 # metrics = Metrics(thread_manager, {bitfinex})
 
 aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
@@ -52,7 +52,7 @@ def main():
     Log.info("Warmup Complete")
 
     while beat.loop():
-        bitfinex_data = bitfinex.prices([BTC_USD, ETH_USD], "1m")
+        bitfinex_data = bitfinex.frame([BTC_USD, ETH_USD])
         signals = aggregator.step(bitfinex_data)
         kalman_fairs = kalman_strategy.tick(bitfinex_data, signals)
         fairs = Gaussian.intersect([kalman_fairs])
@@ -63,13 +63,13 @@ def main():
 def dummy_main():
     while True:
         dummy_exchange.step_time()
-        dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
+        dummy_data = dummy_exchange.frame([BTC_USDT, ETH_USDT])
         signals = aggregator.step(dummy_data)
         kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
         executor.tick_fairs(fairs)
 
 
-thread_manager.attach("main", main, should_terminate=True)
-# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+# thread_manager.attach("main", main, should_terminate=True)
+thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

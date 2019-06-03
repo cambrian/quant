@@ -109,7 +109,7 @@ class Bitfinex(Exchange):
                 handle_update(order_book, msg[1])
             yield order_book
 
-    def prices(self):
+    def frame(self):
         """
         Returns frame for tracked pairs.
         """

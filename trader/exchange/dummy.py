@@ -14,20 +14,11 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (
-    BTC,
-    BTC_USDT,
-    DUMMY,
-    ETH,
-    ETH_USDT,
-    LTC_USDT,
-    USD,
-    USDT,
-    XRP,
-    XRP_USDT,
-    not_implemented,
-)
-from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
+from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
+                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
+                                   not_implemented)
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook)
 
 
 def dummy_exchanges(data):
@@ -35,12 +26,17 @@ def dummy_exchanges(data):
 
 
 class DummyExchange(Exchange):
-    """Dummy exchange. Uses historical data and executes orders at last trade price."""
+    """
+    Dummy exchange. Uses historical data and executes orders at last trade price.
+
+    TODO: check that all pairs in data have the same exchange id
+    """
 
     def __init__(self, thread_manager, data, fees={"maker": 0.001, "taker": 0.002}):
         super().__init__(thread_manager)
         self.__data = data
-        self.__supported_pairs = data.iloc[0].index
+        self.__base_exchange_id = data.iloc[0].index[0].exchange_id
+        self.__supported_pairs = [ep.pair for ep in data.iloc[0].index]
         # `time` is not private to allow manual adjustment.
         self.time = 0
         self.__fees = fees
@@ -48,20 +44,23 @@ class DummyExchange(Exchange):
         self.__book_feeds = {}
         self.__latest_books = {}
         self.__balances = defaultdict(float)
-        self.__balances[BTC] = 2.43478623
-        self.__balances[USDT] = 245.17003318
         self.__order_id = 0
 
     @property
+    def base_exchange_id(self):
+        return self.__base_exchange_id
+
+    @property
     def id(self):
-        return DUMMY
+        return self.__base_exchange_id + "(dummy)"
 
     def step_time(self):
         frame = self.__data.iloc[self.time]
-        for pair, (price, _) in frame.items():
-            dummy_book = OrderBook(pair, [BookLevel(price, 1)], [BookLevel(price, 1)])
-            self.__book_queues[pair].put(dummy_book)
-            self.__latest_books[pair] = dummy_book
+        for ep, (price, _) in frame.iterrows():
+            ep = ExchangePair(self.id, ep.pair)
+            dummy_book = OrderBook(ep, [BookLevel(price, 1)], [BookLevel(price, 1)])
+            self.__book_queues[ep.pair].put(dummy_book)
+            self.__latest_books[ep.pair] = dummy_book
         Log.data("dummy-debug", {"step": self.time, "frame": frame})
         self.time += 1
 
@@ -81,13 +80,10 @@ class DummyExchange(Exchange):
             book = self.__book_queues[pair].get()
             yield book
 
-    def prices(self, pairs, time_frame=None):
-        """
-
-        NOTE: `time_frame` expected as Bitfinex-specific string representation (e.g. '1m').
-
-        """
-        return self.__data.iloc[self.time].loc[pairs]
+    def frame(self, pairs):
+        eps = [ExchangePair(self.base_exchange_id, pair) for pair in pairs]
+        frame = self.__data.iloc[self.time].loc[eps]
+        return frame.set_axis([ExchangePair(self.id, pair) for pair in pairs], inplace=False)
 
     # TODO
     def balances_feed(self):

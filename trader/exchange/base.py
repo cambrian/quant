@@ -47,17 +47,12 @@ class Exchange(ABC):
         pass
 
     @abstractmethod
-    def prices(self, pairs, volume_time_frame):
-        """Queries prices and volumes for the given pairs. Reads the latest tracked prices from the
-        exchange object.
-
-        NOTE: If a currency (rather than a pair) is passed in, this function should make a best
-        effort to price the currency in USD (or a USD equivalent).
+    def frame(self, pairs):
+        """Queries prices and volumes for the given pairs. Reads the latest trade prices and
+        volumes from the exchange object.
 
         Args:
             pairs (list): A list of pairs to query.
-            volume_time_frame (type depends on exchange): Granularity of volume data, in the
-                exchange's format. If None is passed, volume is not included.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
