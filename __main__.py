@@ -13,7 +13,9 @@ pairs = [BTC_USD, ETH_USD]
 thread_manager = ThreadManager()
 # bitfinex = Bitfinex(thread_manager, pairs)
 data_min = pd.read_hdf("research/data/1min.h5")
-dummy_exchange = DummyExchange(thread_manager, data_min, {"maker": 0.00075, "taker": 0.00075})
+dummy_exchange = DummyExchange(
+    thread_manager, "Binance", data_min, {"maker": 0.00075, "taker": 0.00075}
+)
 
 # dummy_strategy = strategy.Dummy()
 window_size = 7500

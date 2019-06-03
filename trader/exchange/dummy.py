@@ -14,15 +14,25 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
-                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
-                                   not_implemented)
-from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
-                               OrderBook)
+from trader.util.constants import (
+    BTC,
+    BTC_USDT,
+    DUMMY,
+    ETH,
+    ETH_USDT,
+    LTC_USDT,
+    USD,
+    USDT,
+    XRP,
+    XRP_USDT,
+    not_implemented,
+)
+from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
 
 
-def dummy_exchanges(data):
-    pass
+def dummy_exchanges(thread_manager, data):
+    exchange_ids = {ep.exchange_id for ep in data.iloc[0].index}
+    return [DummyExchange(thread_manager, e, data) for e in exchange_ids]
 
 
 class DummyExchange(Exchange):
@@ -32,10 +42,12 @@ class DummyExchange(Exchange):
     TODO: check that all pairs in data have the same exchange id
     """
 
-    def __init__(self, thread_manager, data, fees={"maker": 0.001, "taker": 0.002}):
+    def __init__(
+        self, thread_manager, base_exchange_id, data, fees={"maker": 0.001, "taker": 0.002}
+    ):
         super().__init__(thread_manager)
         self.__data = data
-        self.__base_exchange_id = data.iloc[0].index[0].exchange_id
+        self.__base_exchange_id = base_exchange_id
         self.__supported_pairs = [ep.pair for ep in data.iloc[0].index]
         # `time` is not private to allow manual adjustment.
         self.time = 0
@@ -57,6 +69,8 @@ class DummyExchange(Exchange):
     def step_time(self):
         frame = self.__data.iloc[self.time]
         for ep, (price, _) in frame.iterrows():
+            if ep.exchange_id != self.base_exchange_id:
+                continue
             ep = ExchangePair(self.id, ep.pair)
             dummy_book = OrderBook(ep, [BookLevel(price, 1)], [BookLevel(price, 1)])
             self.__book_queues[ep.pair].put(dummy_book)
