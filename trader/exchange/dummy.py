@@ -14,20 +14,11 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (
-    BTC,
-    BTC_USDT,
-    DUMMY,
-    ETH,
-    ETH_USDT,
-    LTC_USDT,
-    USD,
-    USDT,
-    XRP,
-    XRP_USDT,
-    not_implemented,
-)
-from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
+from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
+                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
+                                   not_implemented)
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook)
 
 
 def dummy_exchanges(thread_manager, data):
@@ -37,9 +28,9 @@ def dummy_exchanges(thread_manager, data):
 
 class DummyExchange(Exchange):
     """
-    Dummy exchange. Uses historical data and executes orders at last trade price.
-
-    TODO: check that all pairs in data have the same exchange id
+    Dummy exchange to simulate a single base exchange. Uses historical data and executes orders at
+    last trade price.
+    data may contain pairs for other base exchanges but they will be ignored.
     """
 
     def __init__(
