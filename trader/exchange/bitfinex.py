@@ -233,14 +233,15 @@ class Bitfinex(Exchange):
             data[row] = data[row][:duration]
         return data
 
-    def add_order(self, pair, side, order_type, price, volume, maker=False):
+    # TODO: use order type in argument
+    def add_order(self, pair, side, order_type, price, size, maker=False):
         # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
         pair = self.__translate_to[pair][1:]
         payload = {
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),
             "symbol": pair,
-            "amount": str(volume),
+            "amount": str(size),
             "price": str(price),
             "exchange": "bitfinex",
             "side": "buy" if side == Direction.BUY else "sell",
@@ -248,9 +249,9 @@ class Bitfinex(Exchange):
             "is_postonly": maker,
         }
         new_order = self.__bfxv1._post("/order/new", payload=payload, verify=True)
-        Log.info("Bitfinex-order {}".format(new_order))
+        Log.info("Bitfinex-order", new_order)
         if "id" in new_order:
-            order = Order(new_order["id"], self.id, pair, side, order_type, price, volume)
+            order = Order(new_order["id"], self.id, pair, side, order_type, price, size)
             if new_order["is_live"] == False:
                 order.update_status(Order.Status.REJECTED)
             elif new_order["is_cancelled"] == False:

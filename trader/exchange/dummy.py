@@ -15,7 +15,8 @@ from websocket import create_connection
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook)
 
 
 def dummy_exchanges(thread_manager, data):
@@ -99,20 +100,20 @@ class DummyExchange(Exchange):
     def fees(self):
         return self.__fees
 
-    def add_order(self, pair, side, order_type, price, volume, maker=False):
+    def add_order(self, pair, side, order_type, price, size, maker=False):
         if side == Direction.BUY:
             # if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
             #     Log.info("dummy-buy - order not filled because price is not most recent.")
             #     return None
-            self.__balances[pair.base] += volume
-            self.__balances[pair.quote] -= volume * price
+            self.__balances[pair.base] += size
+            self.__balances[pair.quote] -= size * price
         else:
             # if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
             #     Log.info("dummy-sell - order not filled because price is not most recent.")
             #     return None
-            self.__balances[pair.base] -= volume
-            self.__balances[pair.quote] += volume * price
-        order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
+            self.__balances[pair.base] -= size
+            self.__balances[pair.quote] += size * price
+        order = Order(self.__order_id, self.id, pair, side, order_type, price, size)
         Log.info("dummy order", order)
         self.__order_id += 1
         Log.info("dummy balances", self.__balances)

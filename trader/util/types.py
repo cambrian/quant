@@ -264,7 +264,7 @@ class Direction(Enum):
 
 
 class Order:
-    """An exchange_id agnostic representation of an order.
+    """An exchange agnostic representation of an order.
 
     Attributes:
         id (int): The order's exchange_id ID
@@ -273,7 +273,7 @@ class Order:
         side (Direction): Side of the order book.
         order_type (Order.Type): Order fill type.
         price (float): Desired price to fill order (depends on order_type)
-        volume (float): Desired volume to fill at price.
+        size (float): Desired size (in base currency) to fill at price.
 
     """
 
@@ -284,21 +284,21 @@ class Order:
         FILLED = 4
 
     class Type(Enum):
-        """An enum to be translated by each exchange_id."""
+        """An enum to be translated by each exchange."""
 
         MARKET = 1
         LIMIT = 2
         IOC = 3
         FOK = 4
 
-    def __init__(self, id, exchange_id, pair, side, order_type, price, volume):
+    def __init__(self, id, exchange_id, pair, side, order_type, price, size):
         self.__id = id
         self.__exchange_id = exchange_id
         self.__pair = pair
         self.__side = side
         self.__order_type = order_type
         self.__price = price
-        self.__volume = volume
+        self.__size = size
         self.__status = self.Status.OPEN
 
     @property
@@ -326,8 +326,8 @@ class Order:
         return self.__price
 
     @property
-    def volume(self):
-        return self.__volume
+    def size(self):
+        return self.__size
 
     @property
     def status(self):
@@ -339,13 +339,13 @@ class Order:
         self.__status = status
 
     def __repr__(self):
-        return "({}, {}, Order: #{}, Side: {}, Order Type: {}, Price: {}, Volume: {}, Status: {})".format(
+        return "({}, {}, Order: #{}, Side: {}, Order Type: {}, Price: {}, Size: {}, Status: {})".format(
             self.__exchange_id,
             self.__pair,
             self.__id,
             self.__side,
             self.__order_type,
             self.__price,
-            self.__volume,
+            self.__size,
             self.__status,
         )

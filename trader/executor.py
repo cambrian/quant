@@ -92,6 +92,7 @@ class Executor:
         orders = self.execution_strategy.tick(balances, bids, asks, self.__latest_fairs, fees)
         Log.info("executor_orders {}".format(orders))
 
+        # TODO: use order type
         for exchange_pair, order_size in orders.items():
             exchange = self.__exchanges[exchange_pair.exchange_id]
             if order_size < 0:
