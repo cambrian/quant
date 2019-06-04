@@ -18,9 +18,6 @@ class Currency:
     def __repr__(self):
         return self.__id
 
-    def json_value(self):
-        return repr(self)
-
     def __lt__(self, other):
         return self.__id < other.__id
 
@@ -55,9 +52,6 @@ class TradingPair:
 
     def __repr__(self):
         return f"{self.base}-{self.quote}"
-
-    def json_value(self):
-        return repr(self)
 
     def __lt__(self, other):
         if self.base < other.base:
@@ -142,9 +136,6 @@ class ExchangePair:
     def __hash__(self):
         return hash((self.exchange_id, self.pair))
 
-    def json_value(self):
-        return repr(self)
-
     @staticmethod
     def parse(string):
         if isinstance(string, ExchangePair):
@@ -179,6 +170,9 @@ class BookLevel:
     @property
     def price(self):
         return self.__price
+
+    def __repr__(self):
+        return f"BookLevel(price={self.price}, size={self.size})"
 
 
 class Side(Enum):
@@ -259,14 +253,7 @@ class OrderBook:
         return self.__asks
 
     def __repr__(self):
-        return str(self.json_value())
-
-    def json_value(self):
-        return {
-            "exchange_pair": self.exchange_pair.json_value(),
-            "bids": self.bids,
-            "asks": self.asks,
-        }
+        return f'OrderBook("{self.exchange_pair}", bids={[(x.price, x.size) for x in self.bids]}, asks={[(x.price, x.size) for x in self.asks]})'
 
 
 class Direction(Enum):

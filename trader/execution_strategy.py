@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import BITFINEX, BTC, DUMMY, USD
 from trader.util.types import Direction, ExchangePair, Order, TradingPair
 
 

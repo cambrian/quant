@@ -3,6 +3,7 @@ import json
 import sys
 from datetime import datetime
 from enum import Enum
+from pprint import pformat
 
 import colorful
 
@@ -56,72 +57,43 @@ class Log:
     def _log(
         log_level,
         message,
+        data,
         context=_get_caller_context(),
         color_level=_no_color,
-        color_time=_no_color,
-        color_message=_no_color,
-        color_context=_no_color,
+        color_time=_colorize.cyan,
+        color_context=_colorize.violet,
     ):
-        log_message = [color_level(log_level.value), color_time(_time())]
-        log_message.append(color_context(context))
-        log_message.append(color_message(str(message).replace("\n", "\\n").replace("\t", "\\t")))
+        log_message = [
+            color_level(log_level.value),
+            color_time(_time()),
+            color_context(context),
+            color_level(message),
+        ]
+        if data:
+            log_message.append(pformat(data, compact=True))
+            # .replace("\n", "\\n").replace("\t", "\\t")
         print("\t".join(str(x) for x in log_message), file=sys.stderr)
 
     @staticmethod
-    def info(message):
+    def info(message, data=None):
         """Logs messages that are part of normal program operation."""
         Log._log(
             Log.Level.INFO,
             message,
+            data,
             context=_get_caller_context(),
             color_level=_colorize.green,
-            color_time=_colorize.cyan,
-            color_context=_colorize.violet,
         )
 
     @staticmethod
-    def warn(message):
+    def warn(message, data=None):
         """Logs messages that indicate potential (non-fatal) issues."""
         Log._log(
             Log.Level.WARN,
             message,
+            data,
             context=_get_caller_context(),
             color_level=_colorize.orange,
-            color_time=_colorize.cyan,
-            color_context=_colorize.violet,
-        )
-
-    @staticmethod
-    def data(key, value):
-        """Logs values that comprise a data stream."""
-        warning = None
-        json_value = None
-        if isinstance(value, _serializable_types):
-            json_value = value
-        elif callable(getattr(value, "json_value", None)):
-            try:
-                json_value = value.json_value()
-                if not isinstance(json_value, _serializable_types):
-                    warning = "json_value for type {} returned a JSON-incompatible object"
-            except TypeError as e:
-                warning = "json_value for type {} has a bad signature"
-        else:
-            warning = "could not figure out how to serialize value"
-        try:
-            json_message = json.dumps({"key": key, "value": json_value})
-        except TypeError:
-            # Unfortunately the `json_value` hack is not recursive by default.
-            warning = "inner fields of this object are JSON-incompatible"
-        if warning:
-            json_message = repr(value)
-            Log.warn(warning.format(type(value).__name__) + " (falling back to repr)")
-        Log._log(
-            Log.Level.DATA,
-            json_message,
-            context=_get_caller_context(),
-            color_level=_colorize.blue,
-            color_time=_colorize.cyan,
-            color_context=_colorize.violet,
         )
 
     class Entry:
@@ -159,7 +131,9 @@ class Log:
 
         @staticmethod
         def parse(line):
-            """Parses a log line into a log entry."""
+            """Parses a log line into a log entry.
+            TODO: update after stabilizing _log
+            """
             lines = line.split("\n")
             if len(lines) != 2 or lines[1] != "":
                 raise Log.Entry.Error("expected a single log line")

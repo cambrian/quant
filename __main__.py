@@ -5,8 +5,8 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (BTC, BTC_USD, BTC_USDT, ETH, ETH_USD,
-                                   ETH_USDT, LTC_USDT, XRP_USDT)
+from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, ETH,
+                                   ETH_USD, ETH_USDT, LTC_USDT, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 from trader.util.types import Direction, ExchangePair, Order
 
@@ -15,7 +15,7 @@ thread_manager = ThreadManager()
 # bitfinex = Bitfinex(thread_manager, pairs)
 data_min = pd.read_hdf("research/data/1min.h5")
 dummy_exchange = DummyExchange(
-    thread_manager, "Binance", data_min, {"maker": 0.00075, "taker": 0.00075}
+    thread_manager, BINANCE, data_min, {"maker": 0.00075, "taker": 0.00075}
 )
 
 # dummy_strategy = strategy.Dummy()

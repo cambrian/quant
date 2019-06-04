@@ -14,11 +14,8 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
-                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
-                                   not_implemented)
-from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
-                               OrderBook)
+from trader.util.constants import not_implemented
+from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
 
 
 def dummy_exchanges(thread_manager, data):
@@ -66,7 +63,7 @@ class DummyExchange(Exchange):
             dummy_book = OrderBook(ep, [BookLevel(price, 1)], [BookLevel(price, 1)])
             self.__book_queues[ep.pair].put(dummy_book)
             self.__latest_books[ep.pair] = dummy_book
-        Log.data("dummy-debug", {"step": self.time, "frame": frame})
+        Log.info("dummy-debug", {"step": self.time, "frame": frame})
         self.time += 1
 
     def book_feed(self, pair):
@@ -107,19 +104,18 @@ class DummyExchange(Exchange):
             # if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
             #     Log.info("dummy-buy - order not filled because price is not most recent.")
             #     return None
-            Log.data("dummy-buy", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] += volume
             self.__balances[pair.quote] -= volume * price
         else:
             # if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
             #     Log.info("dummy-sell - order not filled because price is not most recent.")
             #     return None
-            Log.data("dummy-sell", {"size": volume, "pair": pair.json_value(), "price": price})
             self.__balances[pair.base] -= volume
             self.__balances[pair.quote] += volume * price
         order = Order(self.__order_id, self.id, pair, side, order_type, price, volume)
+        Log.info("dummy order", order)
         self.__order_id += 1
-        Log.info("dummy-balances {}".format(self.__balances))
+        Log.info("dummy balances", self.__balances)
         return order
 
     # Unnecessary since orders are immediate.

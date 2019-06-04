@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import BITFINEX, BTC, DUMMY, USD
 from trader.util.types import Direction, ExchangePair, Order, TradingPair
 
 
@@ -55,10 +54,9 @@ class Executor:
         self.__books_lock.acquire()
         self.__latest_books[exchange_pair] = book
         self.__books_lock.release()
-        # TODO: remove this, right?
-        if exchange_pair.exchange_id != DUMMY and exchange_pair.exchange_id != BITFINEX:
-            self.__trade()
-        Log.data("executor-book", book)
+        # TODO: think about how to do this
+        # self.__thread_manager.attach("executor-book", lambda: self.__trade(), should_terminate=True)
+        Log.info("executor-book", book)
 
     def __trade(self, wait_for_other_trade=False):
         """
@@ -101,7 +99,7 @@ class Executor:
                 # if order_size > exchange.balances[exchange_pair.base]:
                 #     order_size = exchange.balances[exchange_pair.base]
                 if order_size > 0:
-                    Log.data("executor-sell", {"pair": exchange_pair, "size": order_size})
+                    Log.info("executor-sell", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
                         exchange_pair.pair,
                         Direction.SELL,
@@ -113,7 +111,7 @@ class Executor:
                 # if order_size * asks[exchange_pair] > exchange.balances[exchange_pair.quote]:
                 #     order_size = exchange.balances[exchange_pair.quote] / asks[exchange_pair]
                 if order_size > 0:
-                    Log.data("executor-buy", {"pair": exchange_pair, "size": order_size})
+                    Log.info("executor-buy", {"pair": exchange_pair, "size": order_size})
                     exchange.add_order(
                         exchange_pair.pair,
                         Direction.BUY,

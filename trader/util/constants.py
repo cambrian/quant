@@ -8,8 +8,8 @@ from trader.util.types import Currency, TradingPair
 
 # Exchanges.
 BITFINEX = "bitfinex"
-DUMMY = "dummy"
 KRAKEN = "kraken"
+BINANCE = "Binance"
 
 
 # Currencies.
