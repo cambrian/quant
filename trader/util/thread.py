@@ -197,12 +197,12 @@ class ThreadManager:
             (name, exc) = self.__termination_queue.get()
             self.__completed_threads += 1
             if exc is None:
-                Log.info("thread <{}> terminated".format(name))
+                Log.debug(f"thread <{name}> terminated")
                 if self.__completed_threads == self.__finite_thread_count:
                     self.__state == ThreadManager.State.FINISHED
                     break
             else:
-                print("Thread <{}> terminated unexpectedly!".format(name))
+                print(f"Thread <{name}> terminated unexpectedly!")
                 if exc is not None:
                     print(exc[:-1], file=sys.stderr)
                 raise ThreadManager.Error("see stderr for details")

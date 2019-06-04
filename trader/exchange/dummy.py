@@ -15,8 +15,7 @@ from websocket import create_connection
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
-                               OrderBook)
+from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
 
 
 def dummy_exchanges(thread_manager, data):
@@ -56,6 +55,9 @@ class DummyExchange(Exchange):
         return self.__base_exchange_id + "(dummy)"
 
     def step_time(self):
+        """Returns False if all data has been exhausted."""
+        if self.time >= len(self.__data.index):
+            return False
         frame = self.__data.iloc[self.time]
         for ep, (price, _) in frame.iterrows():
             if ep.exchange_id != self.base_exchange_id:
@@ -64,8 +66,9 @@ class DummyExchange(Exchange):
             dummy_book = OrderBook(ep, [BookLevel(price, 1)], [BookLevel(price, 1)])
             self.__book_queues[ep.pair].put(dummy_book)
             self.__latest_books[ep.pair] = dummy_book
-        Log.info("dummy-debug", {"step": self.time, "frame": frame})
+        Log.info("dummy-step", self.time)
         self.time += 1
+        return True
 
     def book_feed(self, pair):
         if pair not in self.__supported_pairs:

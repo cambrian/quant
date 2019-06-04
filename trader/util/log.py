@@ -49,13 +49,15 @@ class Log:
     """
 
     class Level(Enum):
-        INFO = "INFO"
-        WARN = "WARN"
-        DATA = "DATA"
+        DEBUG = 0
+        INFO = 1
+        WARN = 2
+
+    level_cutoff = Level.INFO
 
     @staticmethod
     def _log(
-        log_level,
+        level,
         message,
         data,
         context=_get_caller_context(),
@@ -63,8 +65,10 @@ class Log:
         color_time=_colorize.cyan,
         color_context=_colorize.violet,
     ):
+        if level.value < Log.level_cutoff.value:
+            return
         log_message = [
-            color_level(log_level.value),
+            color_level(level.name),
             color_time(_time()),
             color_context(context),
             color_level(message),
@@ -73,6 +77,17 @@ class Log:
             log_message.append(pformat(data, compact=True))
             # .replace("\n", "\\n").replace("\t", "\\t")
         print("\t".join(str(x) for x in log_message), file=sys.stderr)
+
+    @staticmethod
+    def debug(message, data=None):
+        """Logs messages that are part of normal program operation."""
+        Log._log(
+            Log.Level.DEBUG,
+            message,
+            data,
+            context=_get_caller_context(),
+            color_level=_colorize.blue,
+        )
 
     @staticmethod
     def info(message, data=None):
@@ -105,13 +120,14 @@ class Log:
         class Error(Exception):
             pass
 
-        def __init__(self, private, level, timestamp, context, message):
+        def __init__(self, private, level, timestamp, context, message, data):
             if private != Log.Entry.__private:
                 raise Log.Entry.Error("constructor is private")
             self.__level = level
             self.__timestamp = timestamp
             self.__context = context
             self.__message = message
+            self.__data = data
 
         @property
         def level(self):
@@ -128,6 +144,10 @@ class Log:
         @property
         def message(self):
             return self.__message
+
+        @property
+        def data(self):
+            return self.__data
 
         @staticmethod
         def parse(line):
@@ -167,15 +187,11 @@ class Log:
                 raise Log.Entry.Error("malformed line number for context")
             context = (context_file, context_line)
 
-            if level == Log.Level.DATA:
-                try:
-                    message = json.loads(fields[3])
-                except json.decoder.JSONDecodeError:
-                    raise Log.Entry.Error("could not JSON-decode data message")
-            else:
-                message = fields[3]
+            # TODO: do something about serialization being roundtrippable?
+            message = fields[3]
+            data = fields[4] if len(fields) > 4 else None
 
-            return Log.Entry(Log.Entry.__private, level, timestamp, context, message)
+            return Log.Entry(Log.Entry.__private, level, timestamp, context, message, data)
 
     @staticmethod
     def stream(file, levels=None):
