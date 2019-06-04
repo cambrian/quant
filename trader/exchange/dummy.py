@@ -15,7 +15,8 @@ from websocket import create_connection
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook)
 
 
 def dummy_exchanges(thread_manager, data):
@@ -38,7 +39,7 @@ class DummyExchange(Exchange):
         self.__base_exchange_id = base_exchange_id
         self.__supported_pairs = [ep.pair for ep in data.iloc[0].index]
         # `time` is not private to allow manual adjustment.
-        self.time = 0
+        self.time = -1
         self.__fees = fees
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__book_feeds = {}
@@ -56,6 +57,7 @@ class DummyExchange(Exchange):
 
     def step_time(self):
         """Returns False if all data has been exhausted."""
+        self.time += 1
         if self.time >= len(self.__data.index):
             return False
         frame = self.__data.iloc[self.time]
@@ -67,7 +69,6 @@ class DummyExchange(Exchange):
             self.__book_queues[ep.pair].put(dummy_book)
             self.__latest_books[ep.pair] = dummy_book
         Log.info("dummy-step", self.time)
-        self.time += 1
         return True
 
     def book_feed(self, pair):
