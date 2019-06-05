@@ -6,9 +6,17 @@ from sqlalchemy import create_engine
 import research.util.credentials as creds
 
 
-def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
+def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
     """
-    prepare_test_data('binance', ['BTC-USDT', 'ETH-USDT'], '2017-08-18 08:00:00, '2017-08-20 09:00:00', 5)
+    prepare_test_data(
+        {
+            'binance': ['BTC/USDT', 'ETH/USDT'],
+            'bitfinex': ['BTC/USD'],
+        },
+        '2017-08-18 08:00:00',
+        '2017-08-20 09:00:00',
+        5
+    )
     returns a `DataFrame` of the form
 
     timestamp                                    pv
@@ -19,13 +27,10 @@ def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
 
     where each `pv_i` is a `DataFrame` of the form
 
-      timestamp                  pair      price     volume
-    0 2017-08-18 08:00:00+00:00  BTC-USDT  4291.100  2.605985
-    1 2017-08-18 08:00:00+00:00  ETH-USDT   307.494  8.248910
-
-    with pricing data fetched from the `binance` table in Postgres.
-
-    TODO: Extend to multiple exchanges.
+      timestamp                  pair              price     volume
+    0 2017-08-18 08:00:00+00:00  binance-BTC-USDT  4291.100  2.605985
+    1 2017-08-18 08:00:00+00:00  binance-ETH-USDT   307.494  8.248910
+    2 2017-08-18 08:00:00+00:00  bitfinex-BTC-USD  4302.242  0.421329
     """
     pg_uri = "postgresql+psycopg2://{}:{}@{}:{}/{}".format(
         creds.PG_USERNAME,
@@ -36,36 +41,55 @@ def prepare_test_data(exchange, pairs, begin_time, end_time, tick_size_in_min):
     )
     engine = create_engine(pg_uri)
 
-    query = """
-        SELECT
-            TO_TIMESTAMP(
-                FLOOR(
-                    EXTRACT(EPOCH FROM "timestamp") / (60 * {tick_size})
-                ) * 60 * {tick_size}
-            ) AS tick_begin,
-            pair,
-            AVG("open")   AS price,
-            SUM("volume") AS volume
-        FROM {exchange}
-        WHERE
-            timestamp >= '{begin_time}' AND
-            timestamp <= '{end_time}' AND
-            pair IN ({pairs})
-        GROUP BY tick_begin, pair
-        HAVING COUNT(*) = {tick_size}
-    """.format(
-        exchange=exchange,
-        tick_size=tick_size_in_min,
-        begin_time=begin_time,
-        end_time=end_time,
-        pairs=", ".join(["'{}'".format(pair) for pair in pairs]),
-    )
+    raw_test_data = pd.DataFrame()
+    for exchange in exchange_pairs:
+        pairs = [p.replace("/", "-") for p in exchange_pairs[exchange]]
+        query = """
+            SELECT
+                TO_TIMESTAMP(
+                    FLOOR(
+                        EXTRACT(EPOCH FROM "timestamp") / (60 * {tick_size})
+                    ) * 60 * {tick_size}
+                ) AS tick_begin,
+                pair,
+                AVG("open")   AS price,
+                SUM("volume") AS volume
+            FROM {exchange}
+            WHERE
+                timestamp >= '{begin_time}' AND
+                timestamp <= '{end_time}' AND
+                pair IN ({pairs})
+            GROUP BY tick_begin, pair
+            HAVING COUNT(*) = {tick_size}
+        """.format(
+            exchange=exchange,
+            tick_size=tick_size_in_min,
+            begin_time=begin_time,
+            end_time=end_time,
+            pairs=", ".join(["'{}'".format(p) for p in pairs]),
+        )
 
-    raw_df = pd.read_sql(query, con=engine).rename({"tick_begin": "timestamp"}, axis=1)
-    grouped_df = pd.DataFrame(raw_df.groupby("timestamp"))
-    grouped_df.columns = ["timestamp", "pv"]
-    grouped_df.set_index("timestamp", inplace=True)
-    return grouped_df
+        raw_df = pd.read_sql(query, con=engine).rename({"tick_begin": "timestamp"}, axis=1)
+        # Prepend name of exchange to trading pair
+        raw_df["pair"] = exchange + "-" + raw_df["pair"]
+        raw_test_data = pd.concat([raw_test_data, raw_df])
+
+    # Transform DataFrame into df of dfs, indexed by timestamp
+    test_data = pd.DataFrame(raw_test_data.groupby("timestamp"))
+    test_data.columns = ["timestamp", "pv"]
+    test_data.set_index("timestamp", inplace=True)
+    return test_data
+
+
+# td = prepare_test_data(
+#     {"binance": ["BTC/USDT", "ETH/USDT"], "bitfinex": ["BTC/USD"]},
+#     "2017-05-06 13:09:00",
+#     "2019-05-06 13:16:00",
+#     5,
+# )
+# print(td.head())
+# print(td.iloc[0]["pv"])
+# print(td.iloc[-1]["pv"])
 
 
 # class BackTest:
@@ -181,5 +205,5 @@ def backtest():
     sc.stop()
 
 
-backtest()
+# backtest()
 # thread_manager = ThreadManager()
