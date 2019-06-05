@@ -8,6 +8,11 @@ import research.util.credentials as creds
 
 def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
     """
+    Pulls test data from Postgres, in the form of a `DataFrame` of `DataFrame`s, for given exchanges
+    and trading pairs, time interval, and tick size (over which by-the-minute trading data is
+    aggregated by averaging prices and summing volumes). Fails for exchanges not present in DB,
+    but silently ignores pairs with no trading data for corresponding exchange.
+
     prepare_test_data(
         {
             'binance': ['BTC/USDT', 'ETH/USDT'],
@@ -82,8 +87,8 @@ def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
 
 
 # td = prepare_test_data(
-#     {"binance": ["BTC/USDT", "ETH/USDT"], "bitfinex": ["BTC/USD"]},
-#     "2017-05-06 13:09:00",
+#     {"binance": ["BTC/USDT", "ETH/USDT", "dsfj/dgs"], "bitfinex": ["BTC/USD", "ETH/USD"]},
+#     "2019-05-06 13:09:00",
 #     "2019-05-06 13:16:00",
 #     5,
 # )
