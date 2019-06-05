@@ -15,11 +15,8 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.thread import MVar
-from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
-                               OrderBook, Side)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
 
 
 class Bitfinex(Exchange):
@@ -91,25 +88,22 @@ class Bitfinex(Exchange):
     def __generate_book_feed(self, pair):
         msg_queue = Queue()
 
-        def add_messages_to_queue(message):
-            # Ignore status/subscription dicts.
-            if isinstance(message, list):
-                msg_queue.put(message)
-
         self.__ws_client.subscribe_to_orderbook(
-            self.__translate_to[pair], precision="P0", callback=add_messages_to_queue
+            self.__translate_to[pair], precision="P0", callback=msg_queue.put
         )
 
         order_book = OrderBook(ExchangePair(self.id, pair))
 
         def handle_update(order_book, update):
-            if update != "hb":
-                side = Side.BID if update[2] > 0 else Side.ASK
-                size = abs(update[2]) if update[1] != 0 else 0
-                order_book.update(side, BookLevel(update[0], size))
+            side = Side.BUY if update[2] > 0 else Side.SELL
+            size = abs(update[2]) if update[1] != 0 else 0
+            order_book.update(side, BookLevel(update[0], size))
 
         while True:
             msg = msg_queue.get()
+            # Ignore status/subscription dicts, heartbeats
+            if not isinstance(msg, list) or msg[1] == "hb":
+                continue
             # see https://docs.bitfinex.com/v2/reference#ws-public-order-books for spec.
             if len(msg) == 2 and isinstance(msg[1][0], list):
                 order_book.clear()
@@ -122,21 +116,16 @@ class Bitfinex(Exchange):
     def __generate_trade_feed(self, pair):
         msg_queue = Queue()
 
-        def add_messages_to_queue(message):
-            msg_queue.put(message)
-
-        self.__ws_client.subscribe_to_trades(
-            self.__translate_to[pair], callback=add_messages_to_queue
-        )
+        self.__ws_client.subscribe_to_trades(self.__translate_to[pair], callback=msg_queue.put)
 
         while True:
             msg = msg_queue.get()
-            # First two check if msg is a 'te' or 'tu' message
+            # We only track 'te' trade executions (ignoring "tu" trade updates)
             # see https://docs.bitfinex.com/v2/reference for spec.
-            if isinstance(msg, list) and len(msg) == 3 and msg[1] == "te":
-                # We only track 'te' trade executions
-                self.__frame.loc[ExchangePair(self.id, pair), "price"] = float(msg[2][3])
-                self.__frame.loc[ExchangePair(self.id, pair), "volume"] += abs(float(msg[2][2]))
+            if not isinstance(msg, list) or msg[1] != "te":
+                continue
+            self.__frame.loc[ExchangePair(self.id, pair), "price"] = float(msg[2][3])
+            self.__frame.loc[ExchangePair(self.id, pair), "volume"] += abs(float(msg[2][2]))
 
             yield self.__frame
 
@@ -180,21 +169,22 @@ class Bitfinex(Exchange):
         def on_message(ws, msg):
             msg = json.loads(msg)
 
+            # Ignore heartbeats or other irrelevant msgs
+            if not isinstance(msg, list) or len(msg) <= 1 or msg[1] == "hb":
+                return
+
             def update_balances(update):
                 # Only track exchange (trading) wallet.
                 if len(update) >= 3 and update[0] == "exchange":
                     balances[self.__translate_from[update[1]]] = update[2]
                     self.__balances_queue.put(deepcopy(balances))
 
-            if isinstance(msg, list):
-                # Ignore heartbeats.
-                if len(msg) > 1 and msg[1] != "hb":
-                    # Disambiguate wallet snapshot/update:
-                    if msg[1] == "ws":
-                        for update in msg[2]:
-                            update_balances(update)
-                    elif msg[1] == "wu":
-                        update_balances(msg[2])
+            # Disambiguate wallet snapshot/update:
+            if msg[1] == "ws":
+                for update in msg[2]:
+                    update_balances(update)
+            elif msg[1] == "wu":
+                update_balances(msg[2])
 
         def on_error(ws, error):
             Log.warn("WS error within __track_balances for exchange {}: {}".format(self.id, error))
@@ -252,6 +242,10 @@ class Bitfinex(Exchange):
             rows += len(data[pairs[0]])
 
         # Prune data to only # duration elements
+        # TODO: this is still incorrect for durations that are not multiples of 5k. Do you see why?
+        # (when does the data start/end and which portion are you taking from?)
+        # TODO: a more elegant solution than this hack is to correctly set the limit values above.
+        # so do that.
         for row in data:
             data[row] = data[row][:duration]
 
@@ -268,28 +262,28 @@ class Bitfinex(Exchange):
             prepped.append(tick_data)
         return prepped
 
-    # TODO: use order type in argument
-    def add_order(self, pair, side, order_type, price, size, maker=False):
-        # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
-        pair = self.__translate_to[pair][1:]
+    def add_order(self, order):
+        assert order.exchange_id == self.id
         payload = {
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),
-            "symbol": pair,
-            "amount": str(size),
-            "price": str(price),
+            # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
+            "symbol": self.__translate_to[order.pair][1:],
+            "amount": str(order.size),
+            "price": str(order.price),
             "exchange": "bitfinex",
-            "side": "buy" if side == Direction.BUY else "sell",
-            "type": self.__order_types[order_type],
-            "is_postonly": maker,
+            "side": order.side.name.lower(),
+            "type": self.__order_types[order.order_type],
+            "is_postonly": order.maker_only,
         }
-        new_order = self.__bfxv1._post("/order/new", payload=payload, verify=True)
-        Log.info("Bitfinex-order", new_order)
-        if "id" in new_order:
-            order = Order(new_order["id"], self.id, pair, side, order_type, price, size)
-            if new_order["is_live"] == False:
+        response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        # TODO: don't ignore error responses
+        Log.info("Bitfinex-order-response", response)
+        if "id" in response:
+            order = OpenOrder(order, response["id"])
+            if response["is_live"] == False:
                 order.update_status(Order.Status.REJECTED)
-            elif new_order["is_cancelled"] == False:
+            elif response["is_cancelled"] == False:
                 order.update_status(Order.Status.CANCELLED)
             return order
         return None

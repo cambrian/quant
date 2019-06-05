@@ -178,8 +178,13 @@ class BookLevel:
 class Side(Enum):
     """A standing order direction."""
 
-    BID = 1
-    ASK = 2
+    BUY = 1
+    SELL = 2
+
+    def opposite(self):
+        if self == Side.BUY:
+            return Side.SELL
+        return Side.BUY
 
 
 class OrderBook:
@@ -234,7 +239,7 @@ class OrderBook:
 
     def update(self, side, level):
         """if size is 0, then remove this level"""
-        side = self.__bids if side == Side.BID else self.__asks
+        side = self.__bids if side == Side.BUY else self.__asks
         i = side.bisect_left(level)
         if i < len(side) and side[i].price == level.price:
             if level.size == 0:
@@ -256,21 +261,13 @@ class OrderBook:
         return f'OrderBook("{self.exchange_pair}", bids={[(x.price, x.size) for x in self.bids]}, asks={[(x.price, x.size) for x in self.asks]})'
 
 
-class Direction(Enum):
-    """A trade direction."""
-
-    BUY = 1
-    SELL = 2
-
-
 class Order:
     """An exchange agnostic representation of an order.
 
     Attributes:
-        id (int): The order's exchange_id ID
-        exchange_id (Exchange): The order's exchange_id.
-        pair (Constant): The order's traded pair.
-        side (Direction): Side of the order book.
+        id (int): The order's internal ID
+        exchange_pair (ExchangePair): The order's exchange pair.
+        side (SIDE): BUY or SELL for this order.
         order_type (Order.Type): Order fill type.
         price (float): Desired price to fill order (depends on order_type)
         size (float): Desired size (in base currency) to fill at price.
@@ -278,10 +275,11 @@ class Order:
     """
 
     class Status(Enum):
-        OPEN = 1
-        CANCELLED = 2
-        REJECTED = 3
-        FILLED = 4
+        IN_FLIGHT = 1
+        OPEN = 2
+        CANCELLED = 3
+        REJECTED = 4
+        FILLED = 5
 
     class Type(Enum):
         """An enum to be translated by each exchange."""
@@ -291,27 +289,41 @@ class Order:
         IOC = 3
         FOK = 4
 
-    def __init__(self, id, exchange_id, pair, side, order_type, price, size):
+    def __init__(
+        self,
+        id,
+        exchange_pair,
+        side,
+        order_type,
+        price,
+        size,
+        maker_only=False,
+        status=Status.IN_FLIGHT,
+    ):
         self.__id = id
-        self.__exchange_id = exchange_id
-        self.__pair = pair
+        self.__exchange_pair = exchange_pair
         self.__side = side
         self.__order_type = order_type
         self.__price = price
         self.__size = size
-        self.__status = self.Status.OPEN
+        self.__maker_only = maker_only
+        self.__status = Status.IN_FLIGHT
 
     @property
     def id(self):
         return self.__id
 
     @property
+    def exchange_pair(self):
+        return self.__exchange_pair
+
+    @property
     def exchange_id(self):
-        return self.__exchange_id
+        return self.__exchange_pair.exchange_id
 
     @property
     def pair(self):
-        return self.__pair
+        return self.__exchange_pair.pair
 
     @property
     def side(self):
@@ -330,6 +342,10 @@ class Order:
         return self.__size
 
     @property
+    def maker_only(self):
+        return self.__maker_only
+
+    @property
     def status(self):
         return self.__status
 
@@ -339,13 +355,40 @@ class Order:
         self.__status = status
 
     def __repr__(self):
-        return "({}, {}, Order: #{}, Side: {}, Order Type: {}, Price: {}, Size: {}, Status: {})".format(
-            self.__exchange_id,
-            self.__pair,
+        return "Order({}, {}, {}, {}, {}, price={}, size={})".format(
             self.__id,
+            self.__exchange_pair,
             self.__side,
             self.__order_type,
+            self.__status,
             self.__price,
             self.__size,
+        )
+
+
+class OpenOrder(Order):
+    """
+    Subclass of Order with an extra field for the counterparty's order id.
+    """
+
+    def __init__(self, order, counterparty_id):
+        self.__id = order.id
+        self.__exchange_pair = order.exchange_pair
+        self.__side = order.side
+        self.__order_type = order.order_type
+        self.__price = order.price
+        self.__size = order.size
+        self.__status = Order.Status.OPEN
+        self.__counterparty_id = counterparty_id
+
+    def __repr__(self):
+        return "OpenOrder(id={}, {}, {}, {}, {}, counterparty_id={}, price={}, size={})".format(
+            self.__id,
+            self.__exchange_pair,
+            self.__side,
+            self.__order_type,
             self.__status,
+            self.__counterparty_id,
+            self.__price,
+            self.__size,
         )

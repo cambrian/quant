@@ -76,7 +76,7 @@ class Log:
         if data:
             log_message.append(pformat(data, compact=True))
             # .replace("\n", "\\n").replace("\t", "\\t")
-        print("\t".join(str(x) for x in log_message), file=sys.stderr)
+        print("\t".join(str(x) for x in log_message), file=sys.stderr, flush=True)
 
     @staticmethod
     def debug(message, data=None):

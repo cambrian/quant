@@ -15,8 +15,7 @@ from websocket import create_connection
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
-                               OrderBook)
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
 
 
 def dummy_exchanges(thread_manager, data):
@@ -104,24 +103,15 @@ class DummyExchange(Exchange):
     def fees(self):
         return self.__fees
 
-    def add_order(self, pair, side, order_type, price, size, maker=False):
-        if side == Direction.BUY:
-            # if pair not in self.__latest_books or price != self.__latest_books[pair].ask:
-            #     Log.info("dummy-buy - order not filled because price is not most recent.")
-            #     return None
-            self.__balances[pair.base] += size
-            self.__balances[pair.quote] -= size * price
-        else:
-            # if pair not in self.__latest_books or price != self.__latest_books[pair].bid:
-            #     Log.info("dummy-sell - order not filled because price is not most recent.")
-            #     return None
-            self.__balances[pair.base] -= size
-            self.__balances[pair.quote] += size * price
-        order = Order(self.__order_id, self.id, pair, side, order_type, price, size)
+    def add_order(self, order):
+        net_size = order.size * 1 if order.size == Side.BUY else -1
+        self.__balances[order.pair.base] += net_size
+        self.__balances[order.pair.quote] -= net_size * order.price + order.size * (
+            1 + self.__fees["taker"]
+        )
         Log.info("dummy order", order)
-        self.__order_id += 1
         Log.info("dummy balances", self.__balances)
-        return order
+        return OpenOrder(order, order.id)
 
     # Unnecessary since orders are immediate.
     def cancel_order(self, order_id):

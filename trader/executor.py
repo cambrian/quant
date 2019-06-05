@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from trader.util import Feed, Gaussian, Log
-from trader.util.types import Direction, ExchangePair, Order, TradingPair
+from trader.util.types import ExchangePair, Order, Side, TradingPair
 
 
 class Executor:
@@ -19,22 +19,23 @@ class Executor:
     Args:
         thread_manager (ThreadManager): A thread manager to attach any child threads for this
             executor object.
-        exchange_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
+        exchanges_and_pairs (dict): A dictionary indexed by exchange, consisting of the pairs from
             that exchange to execute on.
         execution_strategy (ExecutionStrategy)
 
     """
 
-    def __init__(self, thread_manager, exchange_pairs, execution_strategy):
+    def __init__(self, thread_manager, exchanges_and_pairs, execution_strategy):
         self.__books_lock = Lock()
         self.__trade_lock = Lock()
         self.__latest_books = {}  # keyed by (Exchange.id, pair)
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
         self.__exchange_pairs = [
-            ExchangePair(e.id, p) for e, ps in exchange_pairs.items() for p in ps
+            ExchangePair(e.id, p) for e, ps in exchanges_and_pairs.items() for p in ps
         ]
-        self.__exchanges = {e.id: e for e in exchange_pairs}
+        self.__exchanges = {e.id: e for e in exchanges_and_pairs}
+        self.__order_id_counter = 0
         self.execution_strategy = execution_strategy
 
         # Set up book feeds for every pair.
@@ -69,6 +70,12 @@ class Executor:
         if self.__latest_fairs is None:
             return
 
+        # component warmup may not be synchronized
+        # TODO: warn?
+        for ep in self.__latest_fairs.mean.index:
+            if not ep in self.__latest_books:
+                return
+
         if wait_for_other_trade:
             self.__trade_lock.acquire()
         elif not self.__trade_lock.acquire(blocking=False):
@@ -93,32 +100,16 @@ class Executor:
 
         # TODO: use order type
         for exchange_pair, order_size in order_sizes.items():
+            if order_size == 0:
+                continue
             exchange = self.__exchanges[exchange_pair.exchange_id]
-            if order_size < 0:
-                order_size = abs(order_size)
-                # if order_size > exchange.balances[exchange_pair.base]:
-                #     order_size = exchange.balances[exchange_pair.base]
-                if order_size > 0:
-                    Log.info("executor-sell", {"pair": exchange_pair, "size": order_size})
-                    exchange.add_order(
-                        exchange_pair.pair,
-                        Direction.SELL,
-                        Order.Type.IOC,
-                        bids[exchange_pair],
-                        order_size,
-                    )
-            elif order_size > 0:
-                # if order_size * asks[exchange_pair] > exchange.balances[exchange_pair.quote]:
-                #     order_size = exchange.balances[exchange_pair.quote] / asks[exchange_pair]
-                if order_size > 0:
-                    Log.info("executor-buy", {"pair": exchange_pair, "size": order_size})
-                    exchange.add_order(
-                        exchange_pair.pair,
-                        Direction.BUY,
-                        Order.Type.IOC,
-                        asks[exchange_pair],
-                        order_size,
-                    )
+            side = Side.BUY if order_size > 0 else Side.SELL
+            price = (asks if order_size > 0 else bids)[exchange_pair]
+            order = Order(
+                self.__next_order_id(), exchange_pair, side, Order.Type.IOC, price, abs(order_size)
+            )
+            exchange.add_order(order)  # TODO: require this to be async?
+            Log.info("sent order", order)
         self.__trade_lock.release()
 
     def tick_fairs(self, fairs):
@@ -126,3 +117,7 @@ class Executor:
         self.__thread_manager.attach(
             "executor-fairs", lambda: self.__trade(wait_for_other_trade=True), should_terminate=True
         )
+
+    def __next_order_id(self):
+        self.__order_id_counter += 1
+        return self.__order_id_counter

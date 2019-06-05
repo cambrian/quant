@@ -17,14 +17,9 @@ from trader.util.constants import (
     XRP_USDT,
 )
 from trader.util.thread import Beat, ThreadManager
-from trader.util.types import Direction, ExchangePair, Order
 
-pairs = [BTC_USD, ETH_USD]
 thread_manager = ThreadManager()
-bitfinex = Bitfinex(thread_manager, pairs)
-# data_min = pd.read_hdf("research/data/1min.h5")
 
-# dummy_strategy = strategy.Dummy()
 window_size = 500
 kalman_strategy = strategy.Kalman(
     window_size=window_size,
@@ -39,29 +34,34 @@ execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_clos
 aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
 
 
-def warmup():
+# TODO: generalize over exchanges
+def warmup(bitfinex, pairs, strategy):
     warmup_data = bitfinex.get_warmup_data(pairs, window_size, "1m")
     for row in warmup_data:
         signals = aggregator.step(row)
-        kalman_strategy.tick(row, signals)
+        strategy.tick(row, signals)
 
 
 def main():
     beat = Beat(60000)
-    warmup()
+    pairs = [BTC_USD, ETH_USD]
+    bitfinex = Bitfinex(thread_manager, pairs)
+    warmup(bitfinex, pairs, kalman_strategy)
     Log.info("Warmup Complete")
 
     executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
     while beat.loop():
-        bitfinex_data = bitfinex.frame([BTC_USD, ETH_USD])
+        Log.info("Beat")
+        bitfinex_data = bitfinex.frame(pairs)
         signals = aggregator.step(bitfinex_data)
         kalman_fairs = kalman_strategy.tick(bitfinex_data, signals)
         fairs = Gaussian.intersect([kalman_fairs])
-        Log.info(fairs)
+        Log.info("fairs", fairs)
         executor.tick_fairs(fairs)
 
 
 def dummy_main():
+    data_min = pd.read_hdf("research/data/1min.h5")
     dummy_exchange = DummyExchange(
         thread_manager,
         BINANCE,
@@ -76,6 +76,7 @@ def dummy_main():
         signals = aggregator.step(dummy_data)
         kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
+        Log.info("fairs", fairs)
         executor.tick_fairs(fairs)
     # TODO: analysis stuff
 
