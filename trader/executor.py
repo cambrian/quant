@@ -56,7 +56,7 @@ class Executor:
         self.__books_lock.release()
         # TODO: think about how to do this.
         # self.__thread_manager.attach("executor-book", lambda: self.__trade(), should_terminate=True)
-        Log.info("executor-book", book)
+        # Log.info("executor-book", book)
 
     def __trade(self, wait_for_other_trade=False):
         """

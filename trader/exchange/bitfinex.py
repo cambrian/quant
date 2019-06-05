@@ -15,9 +15,11 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
 from trader.util.thread import MVar
-from trader.util.types import BookLevel, Direction, ExchangePair, Order, OrderBook, Side
+from trader.util.types import (BookLevel, Direction, ExchangePair, Order,
+                               OrderBook, Side)
 
 
 class Bitfinex(Exchange):
@@ -55,6 +57,7 @@ class Bitfinex(Exchange):
             Order.Type.FOK: "exchange fill-or-kill",
         }
         self.__book_feeds = {}
+        self.__trade_feeds = {}
         self.__balances_queue = Queue()
         self.__balances_feed = None
         thread_manager.attach("bitfinex-balances-queue", self.__track_balances)
@@ -62,13 +65,19 @@ class Bitfinex(Exchange):
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
-        self.__frame = pd.DataFrame(index=pairs, columns=["price", "volume"])  # TODO
+        self.__frame = pd.DataFrame(
+            0.0,
+            index=list(map(lambda x: ExchangePair(self.id, x), pairs)),
+            columns=["price", "volume"],
+        )
 
         for pair in pairs:
-            pair_feed, runner = Feed.of(self.__generate_book_feed(pair))
-            self._thread_manager.attach("bitfinex-{}-book".format(pair), runner)
-            self.__book_feeds[pair] = pair_feed
-            # TODO: also subscribe to trades for this pair, update self.__frame (set price, add to volume)
+            pair_feed_book, runner_book = Feed.of(self.__generate_book_feed(pair))
+            self._thread_manager.attach("bitfinex-{}-book".format(pair), runner_book)
+            self.__book_feeds[pair] = pair_feed_book
+            pair_feed_trade, runner_trade = Feed.of(self.__generate_trade_feed(pair))
+            self._thread_manager.attach("bitfinex-{}-trade".format(pair), runner_trade)
+            self.__trade_feeds[pair] = pair_feed_trade
 
     @property
     def id(self):
@@ -94,9 +103,10 @@ class Bitfinex(Exchange):
         order_book = OrderBook(ExchangePair(self.id, pair))
 
         def handle_update(order_book, update):
-            side = Side.BID if update[2] > 0 else Side.ASK
-            size = abs(update[2]) if update[1] != 0 else 0
-            order_book.update(side, BookLevel(update[0], size))
+            if update != "hb":
+                side = Side.BID if update[2] > 0 else Side.ASK
+                size = abs(update[2]) if update[1] != 0 else 0
+                order_book.update(side, BookLevel(update[0], size))
 
         while True:
             msg = msg_queue.get()
@@ -109,24 +119,35 @@ class Bitfinex(Exchange):
                 handle_update(order_book, msg[1])
             yield order_book
 
-    def frame(self):
+    def __generate_trade_feed(self, pair):
+        msg_queue = Queue()
+
+        def add_messages_to_queue(message):
+            msg_queue.put(message)
+
+        self.__ws_client.subscribe_to_trades(
+            self.__translate_to[pair], callback=add_messages_to_queue
+        )
+
+        while True:
+            msg = msg_queue.get()
+            # First two check if msg is a 'te' or 'tu' message
+            # see https://docs.bitfinex.com/v2/reference for spec.
+            if isinstance(msg, list) and len(msg) == 3 and msg[1] == "te":
+                # We only track 'te' trade executions
+                self.__frame.loc[ExchangePair(self.id, pair), "price"] = float(msg[2][3])
+                self.__frame.loc[ExchangePair(self.id, pair), "volume"] += abs(float(msg[2][2]))
+
+            yield self.__frame
+
+    # TODO: return only pairs? If this is a feature we want
+    def frame(self, _pairs):
         """
         Returns frame for tracked pairs.
         """
         frame = self.__frame.copy()
         self.__frame["volume"] = 0
         return frame
-        # for pair in pairs:
-        #     if pair not in self.__pairs:
-        #         raise ExchangeError("pair not supported by Bitfinex")
-        #     book = self.book_feed(pair).latest
-        #     trans_pair = self.__translate_to[pair]
-        #     # Ignore index [0] timestamp.
-        #     # NOTE: Careful with this call; Bitfinex rate limits pretty aggressively.
-        #     ochlv = self.__bfxv2.candles(volume_time_frame, trans_pair, "last")[1:]
-        #     # TODO: Is this volume lagged?
-        #     data[ExchangePair(self.id, pair)] = (book.last_price, ochlv[4])
-        # return pd.DataFrame.from_dict(data, orient="index", columns=["price", "volume"])
 
     def balances_feed(self):
         if self.__balances_feed is None:
@@ -204,12 +225,12 @@ class Bitfinex(Exchange):
     def fees(self):
         return self.__fees
 
+    # Note: could be more efficient but this function isn't very important
     def get_warmup_data(self, pairs, duration, resolution):
-        # TODO: handle duration < 5000 (set and use end in the first case)
-        # TODO: also convert to dataframe format here (where each row is a dataframe of
-        # exchangepair x (price, volume))
         rows = 0
         data = {}
+
+        # Collect data from bitfinex API
         while rows < duration:
             for pair in pairs:
                 trans_pair = self.__translate_to[pair]
@@ -229,9 +250,23 @@ class Bitfinex(Exchange):
                     )
             last_time = data[pairs[0]][-1][0]
             rows += len(data[pairs[0]])
+
+        # Prune data to only # duration elements
         for row in data:
             data[row] = data[row][:duration]
-        return data
+
+        # Prep data for strategy consumption
+        prepped = []
+        for i in range(0, len(data[pairs[0]])):
+            tick_data = {}
+            for pair in pairs:
+                elem = data[pair][i]
+                tick_data[ExchangePair(self.id, pair)] = (elem[1], elem[4])
+            tick_data = pd.DataFrame.from_dict(
+                tick_data, orient="index", columns=["price", "volume"]
+            )
+            prepped.append(tick_data)
+        return prepped
 
     # TODO: use order type in argument
     def add_order(self, pair, side, order_type, price, size, maker=False):
