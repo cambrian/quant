@@ -114,7 +114,11 @@ def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
 
 
 def spark_job(sc, input_path, working_dir):
-    """Your entire job must go within the function definition (including imports)."""
+    """
+    Your entire job must go within the function definition (including imports).
+
+    TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
+    """
     from trader.exchange import DummyExchange
     from trader.util.constants import BTC_USDT, ETH_USDT, BTC, ETH
     from trader.util.thread import ThreadManager
