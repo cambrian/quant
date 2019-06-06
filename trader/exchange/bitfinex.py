@@ -10,13 +10,14 @@ from queue import Queue
 import numpy as np
 import pandas as pd
 from bitfinex import ClientV1, ClientV2, WssClient
-from sortedcontainers import SortedList
 from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
+                               OrderBook, Side)
 
 
 class Bitfinex(Exchange):
@@ -281,9 +282,9 @@ class Bitfinex(Exchange):
         Log.info("Bitfinex-order-response", response)
         if "id" in response:
             order = OpenOrder(order, response["id"])
-            if response["is_live"] == False:
+            if not response["is_live"]:
                 order.update_status(Order.Status.REJECTED)
-            elif response["is_cancelled"] == False:
+            elif not response["is_cancelled"]:
                 order.update_status(Order.Status.CANCELLED)
             return order
         return None

@@ -307,7 +307,7 @@ class Order:
         self.__price = price
         self.__size = size
         self.__maker_only = maker_only
-        self.__status = Order.Status.IN_FLIGHT
+        self.__status = status
 
     @property
     def id(self):
@@ -371,14 +371,16 @@ class OpenOrder(Order):
     Subclass of Order with an extra field for the counterparty's order id.
     """
 
-    def __init__(self, order, counterparty_id):
-        self.__id = order.id
-        self.__exchange_pair = order.exchange_pair
-        self.__side = order.side
-        self.__order_type = order.order_type
-        self.__price = order.price
-        self.__size = order.size
-        self.__status = Order.Status.OPEN
+    def __init__(self, order, counterparty_id, status=Order.Status.OPEN):
+        super().__init__(
+            order.id,
+            order.exchange_pair,
+            order.side,
+            order.order_type,
+            order.price,
+            order.size,
+            status,
+        )
         self.__counterparty_id = counterparty_id
 
     def __repr__(self):

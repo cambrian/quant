@@ -13,6 +13,7 @@ numpy>=1.16.2
 numpy-ringbuffer>=0.2.1
 pandas>=0.24.1
 pprint>=0.1
+pylint>=1.6.5
 pyspark>=2.4.1
 pytest>=4.3.1
 pytest-testmon>=0.9.16

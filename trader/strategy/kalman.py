@@ -8,7 +8,6 @@ from statsmodels.tsa.stattools import coint
 from trader.strategy.base import Strategy
 from trader.util import Gaussian
 from trader.util.stats import Ema, HoltEma
-from trader.util.types import ExchangePair
 
 
 def bhattacharyya_multi(a, b):

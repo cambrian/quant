@@ -15,7 +15,7 @@ def orthogonal_projection(a, b):
     """
     b = np.array(b)
     dims = len(np.shape(a))
-    assert dims == 1 or dims == 2
+    assert dims in (1, 2)
     s = a @ b / np.sum(b * b)
     if dims == 2:
         result = b * s[:, np.newaxis]

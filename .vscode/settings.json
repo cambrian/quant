@@ -15,21 +15,20 @@
     },
     "files.trimTrailingWhitespace": true,
     "python.linting.pylintEnabled": true,
-    "python.formatting.autopep8Args": [
-        "--max-line-length=100"
-    ],
     "python.formatting.provider": "black",
     "python.jediEnabled": true,
     "python.formatting.blackArgs": [
         "--line-length",
         "100"
     ],
-    "python.linting.pep8Args": [
-        "--max-line-length=100"
-    ],
     "python.pythonPath": "python3",
     "python.sortImports.args": [
         "-ns",
         "__init__.py"
+    ],
+    "python.linting.pylintArgs": [
+        "--disable=bad-continuation,dangerous-default-value,too-many-branches,too-many-arguments,too-many-locals,too-many-instance-attributes,too-few-public-methods,missing-docstring,redefined-outer-name,redefined-builtin,protected-access",
+        "--enable=unused-import",
+        "--good-names=i,j,k,x,y,z,a,b,c,t,u,v,s,xs,id,f,fn,ep,df,ws,A,Q,U,V"
     ]
 }

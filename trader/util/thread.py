@@ -5,7 +5,6 @@ Primitives and infrastructure for multithreading.
 """
 
 import datetime
-import os
 import sys
 import time
 import traceback
@@ -188,8 +187,7 @@ class ThreadManager:
         if self.__state != ThreadManager.State.INITIALIZED:
             if self.__state == ThreadManager.State.RUNNING:
                 raise ThreadManager.Error("ThreadManager is currently running")
-            else:
-                raise ThreadManager.Error("ThreadManager has finished")
+            raise ThreadManager.Error("ThreadManager has finished")
         self.__state = ThreadManager.State.RUNNING
         for runner in self.__thread_runners:
             self.__run_daemon(runner)
@@ -199,7 +197,7 @@ class ThreadManager:
             if exc is None:
                 Log.debug(f"thread <{name}> terminated")
                 if self.__completed_threads == self.__finite_thread_count:
-                    self.__state == ThreadManager.State.FINISHED
+                    self.__state = ThreadManager.State.FINISHED
                     break
             else:
                 print(f"Thread <{name}> terminated unexpectedly!")

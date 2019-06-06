@@ -25,4 +25,3 @@ class Strategy(ABC):
             Gaussian: A multivariate Gaussian (over a DataFrame) with a variable per currency pair.
 
         """
-        pass

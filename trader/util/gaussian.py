@@ -12,7 +12,7 @@ from scipy.stats import multivariate_normal
 def _is_labeled(x):
     if isinstance(x, pd.Series):
         return x.empty or not isinstance(x.index, RangeIndex)
-    elif isinstance(x, pd.DataFrame):
+    if isinstance(x, pd.DataFrame):
         return x.empty or not isinstance(x.columns, RangeIndex)
     return False
 
@@ -196,7 +196,7 @@ class Gaussian:
         45
 
         >>> Gaussian.sum([ \
-                Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b'])), \
+                Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b'])),\
                 Gaussian(pd.Series([1, 1], index=['a', 'b']), pd.Series([1, 1], index=['a', 'b'])) \
             ])
         Gaussian:
@@ -679,7 +679,7 @@ class Gaussian:
                 result = np.array([self.cdf(a[i], b[i]) for i in range(len(a))])
 
             # Restore row labels as necessary.
-            if isinstance(a, pd.DataFrame) or isinstance(a, pd.Series):
+            if isinstance(a, (pd.DataFrame, pd.Series)):
                 return pd.Series(result, index=a.index)
             return result
         elif b is None:

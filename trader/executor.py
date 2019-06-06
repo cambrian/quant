@@ -1,12 +1,9 @@
-from collections import defaultdict
-from queue import Queue
 from threading import Lock
 
-import numpy as np
 import pandas as pd
 
-from trader.util import Feed, Gaussian, Log
-from trader.util.types import ExchangePair, Order, Side, TradingPair
+from trader.util import Log
+from trader.util.types import ExchangePair, Order, Side
 
 
 class Executor:

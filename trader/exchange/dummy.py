@@ -1,21 +1,11 @@
-import hashlib
-import hmac
-import json
-import os
-import random
-import time
 from collections import defaultdict
 from queue import Queue
-
-import pandas as pd
-from bitfinex import ClientV1, ClientV2, WssClient
-from sortedcontainers import SortedList
-from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, OrderBook,
+                               Side)
 
 
 def dummy_exchanges(thread_manager, data):

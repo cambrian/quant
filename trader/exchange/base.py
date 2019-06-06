@@ -1,7 +1,4 @@
 from abc import ABC, abstractmethod
-from enum import Enum
-
-from trader.util import Feed
 
 
 class ExchangeError(Exception):
@@ -30,7 +27,6 @@ class Exchange(ABC):
             string: Exchange id.
 
         """
-        pass
 
     @abstractmethod
     def book_feed(self, pair):
@@ -44,7 +40,6 @@ class Exchange(ABC):
             Feed: A feed of `OrderBook`.
 
         """
-        pass
 
     @abstractmethod
     def frame(self, pairs):
@@ -58,7 +53,6 @@ class Exchange(ABC):
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.
 
         """
-        pass
 
     @abstractmethod
     def balances_feed(self):
@@ -69,7 +63,6 @@ class Exchange(ABC):
             Feed: A feed of maps from currency to held size.
 
         """
-        pass
 
     @property
     @abstractmethod
@@ -80,7 +73,6 @@ class Exchange(ABC):
             dict: Map of currency to held size.
 
         """
-        pass
 
     @property
     @abstractmethod
@@ -91,13 +83,9 @@ class Exchange(ABC):
             dict: Map of maker/taker to fee set by exchange.
 
         """
-        pass
 
     @abstractmethod
-    def add_order(self, pair, side, order_type, price, volume):
-        # Param side is buy/sell.
-        # Param order_type is limit/market/other exchange specific options.
-        # TODO: Unify formats across exchanges.
+    def add_order(self, order):
         pass
 
     @abstractmethod

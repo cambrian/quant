@@ -4,9 +4,10 @@ import trader.strategy as strategy
 from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
-from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, ETH,
-                                   ETH_USD, ETH_USDT, LTC_USDT, XRP_USDT)
+from trader.util import Gaussian, Log
+from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, EOS_USDT,
+                                   ETH, ETH_USD, ETH_USDT, LTC_USDT, NEO_USDT,
+                                   XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 thread_manager = ThreadManager()
@@ -53,17 +54,18 @@ def main():
 
 def dummy_main():
     data_min = pd.read_hdf("research/data/1min.h5")
+    pairs = [BTC_USDT, ETH_USDT, XRP_USDT, LTC_USDT, NEO_USDT, EOS_USDT]
     dummy_exchange = DummyExchange(
         thread_manager,
         BINANCE,
         data_min.resample("15Min").first(),
         {"maker": 0.00075, "taker": 0.00075},
     )
-    executor = Executor(thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy)
+    executor = Executor(thread_manager, {dummy_exchange: pairs}, execution_strategy)
     while True:
         if not dummy_exchange.step_time():
             break
-        dummy_data = dummy_exchange.frame([BTC_USDT, ETH_USDT])
+        dummy_data = dummy_exchange.frame(pairs)
         signals = aggregator.step(dummy_data)
         kalman_fairs = kalman_strategy.tick(dummy_data, signals)
         fairs = kalman_fairs & Gaussian(dummy_data["price"], [1e100 for _ in dummy_data["price"]])
