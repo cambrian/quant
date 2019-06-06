@@ -17,6 +17,9 @@
     "python.linting.pylintEnabled": true,
     "python.formatting.provider": "black",
     "python.jediEnabled": true,
+    "python.linting.pep8Args": [
+        "--max-line-length=100"
+    ],
     "python.formatting.blackArgs": [
         "--line-length",
         "100"
