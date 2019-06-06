@@ -307,7 +307,7 @@ class Order:
         self.__price = price
         self.__size = size
         self.__maker_only = maker_only
-        self.__status = Status.IN_FLIGHT
+        self.__status = Order.Status.IN_FLIGHT
 
     @property
     def id(self):

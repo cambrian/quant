@@ -5,17 +5,8 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Feed, Gaussian, Log
-from trader.util.constants import (
-    BINANCE,
-    BTC,
-    BTC_USD,
-    BTC_USDT,
-    ETH,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USDT,
-    XRP_USDT,
-)
+from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, ETH,
+                                   ETH_USD, ETH_USDT, LTC_USDT, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 thread_manager = ThreadManager()
@@ -84,6 +75,6 @@ def dummy_main():
 #     Log.info("final balances", executor.)
 
 
-thread_manager.attach("main", main, should_terminate=True)
-# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+# thread_manager.attach("main", main, should_terminate=True)
+thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()
