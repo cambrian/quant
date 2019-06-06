@@ -4,8 +4,7 @@ from queue import Queue
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import (BookLevel, ExchangePair, OpenOrder, OrderBook,
-                               Side)
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, OrderBook, Side
 
 
 def dummy_exchanges(thread_manager, data):
@@ -93,11 +92,11 @@ class DummyExchange(Exchange):
         return self.__fees
 
     def add_order(self, order):
-        net_size = order.size * 1 if order.size == Side.BUY else -1
+        net_size = order.size * (1 if order.side == Side.BUY else -1)
         self.__balances[order.pair.base] += net_size
-        self.__balances[order.pair.quote] -= net_size * order.price + order.size * (
-            1 + self.__fees["taker"]
-        )
+        self.__balances[order.pair.quote] -= (
+            net_size + order.size * self.__fees["taker"]
+        ) * order.price
         Log.info("dummy order", order)
         Log.info("dummy balances", self.__balances)
         return OpenOrder(order, order.id)
