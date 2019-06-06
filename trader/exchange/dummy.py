@@ -65,11 +65,10 @@ class DummyExchange(Exchange):
             raise ExchangeError("pair not supported by " + self.id)
         if pair in self.__book_feeds:
             return self.__book_feeds[pair]
-        else:
-            pair_feed, runner = Feed.of(self.__book_generator(pair))
-            self._thread_manager.attach("dummy-{}-book".format(pair), runner)
-            self.__book_feeds[pair] = pair_feed
-            return pair_feed
+        pair_feed, runner = Feed.of(self.__book_generator(pair))
+        self._thread_manager.attach("dummy-{}-book".format(pair), runner)
+        self.__book_feeds[pair] = pair_feed
+        return pair_feed
 
     def __book_generator(self, pair):
         while True:

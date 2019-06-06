@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import os
 import time
 from collections import defaultdict
 from copy import deepcopy
@@ -14,10 +13,8 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
-                               OrderBook, Side)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
 
 
 class Bitfinex(Exchange):
@@ -33,12 +30,15 @@ class Bitfinex(Exchange):
     # making that change.
     __instance_exists = False
 
-    def __init__(self, thread_manager, pairs):
+    def __init__(self, thread_manager, keys, pairs):
+        """
+        keys as parsed from keys/bitfinex.json
+        """
         assert not Bitfinex.__instance_exists
         Bitfinex.__instance_exists = True
         super().__init__(thread_manager)
-        self.__api_key = os.getenv("BITFINEX_API_KEY", "")
-        self.__api_secret = os.getenv("BITFINEX_SECRET", "")
+        self.__api_key = keys["key"]
+        self.__api_secret = keys["secret"]
         self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret, 2.0)
         self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)

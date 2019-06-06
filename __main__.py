@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 
 import trader.strategy as strategy
@@ -5,9 +7,19 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, EOS_USDT,
-                                   ETH, ETH_USD, ETH_USDT, LTC_USDT, NEO_USDT,
-                                   XRP_USDT)
+from trader.util.constants import (
+    BINANCE,
+    BTC,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USDT,
+    ETH,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 thread_manager = ThreadManager()
@@ -37,7 +49,9 @@ def warmup(bitfinex, pairs, strategy):
 def main():
     beat = Beat(60000)
     pairs = [BTC_USD, ETH_USD]
-    bitfinex = Bitfinex(thread_manager, pairs)
+    with open("keys/bitfinex.json") as bitfinex_key_file:
+        bitfinex_keys = json.load(bitfinex_key_file)
+    bitfinex = Bitfinex(thread_manager, bitfinex_keys, pairs)
     warmup(bitfinex, pairs, kalman_strategy)
     Log.info("Warmup Complete")
 
@@ -77,6 +91,6 @@ def dummy_main():
 #     Log.info("final balances", executor.)
 
 
-# thread_manager.attach("main", main, should_terminate=True)
-thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+thread_manager.attach("main", main, should_terminate=True)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()
