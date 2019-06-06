@@ -219,35 +219,30 @@ class Bitfinex(Exchange):
     def get_warmup_data(self, pairs, duration, resolution):
         rows = 0
         data = {}
+        last_time = None
 
         # Collect data from bitfinex API
         while rows < duration:
             for pair in pairs:
                 trans_pair = self.__translate_to[pair]
-                if rows == 0:
-                    data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit="5000")
+                limit = duration - rows if duration - rows < 5000 else 5000
+                if last_time == None:
+                    data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit=limit)
                 else:
+                    limit = limit + 1 if limit < 5000 else limit
                     data[pair] = list(
                         np.concatenate(
                             (
                                 data[pair],
                                 self.__bfxv2.candles(
-                                    resolution, trans_pair, "hist", limit="5000", end=last_time
+                                    resolution, trans_pair, "hist", limit=limit, end=last_time
                                 )[1:],
                             ),
                             axis=0,
                         )
                     )
             last_time = data[pairs[0]][-1][0]
-            rows += len(data[pairs[0]])
-
-        # Prune data to only # duration elements
-        # TODO: this is still incorrect for durations that are not multiples of 5k. Do you see why?
-        # (when does the data start/end and which portion are you taking from?)
-        # TODO: a more elegant solution than this hack is to correctly set the limit values above.
-        # so do that.
-        for row in data:
-            data[row] = data[row][:duration]
+            rows = len(data[pairs[0]])
 
         # Prep data for strategy consumption
         prepped = []
