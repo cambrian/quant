@@ -79,6 +79,9 @@ class DummyExchange(Exchange):
         frame = self.__data.iloc[self.time].loc[eps]
         return frame.set_axis([ExchangePair(self.id, pair) for pair in pairs], inplace=False)
 
+    def get_warmup_data(self, pairs, duration, resolution):
+        return []
+
     # TODO
     def balances_feed(self):
         pass

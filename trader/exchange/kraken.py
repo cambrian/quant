@@ -4,7 +4,8 @@ import krakenex
 import pandas as pd
 
 from trader.exchange.base import Exchange
-from trader.util.constants import BTC_USD, ETH_USD, KRAKEN, XRP_USD, not_implemented
+from trader.util.constants import (BTC_USD, ETH_USD, KRAKEN, XRP_USD,
+                                   not_implemented)
 
 
 class Kraken(Exchange):
@@ -60,6 +61,9 @@ class Kraken(Exchange):
     # TODO
     def balances_feed(self):
         pass
+
+    def get_warmup_data(self, pairs, duration, resolution):
+        not_implemented()
 
     # TODO
     @property

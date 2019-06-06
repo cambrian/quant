@@ -216,7 +216,6 @@ class Bitfinex(Exchange):
     def fees(self):
         return self.__fees
 
-    # Note: could be more efficient but this function isn't very important
     def get_warmup_data(self, pairs, duration, resolution):
         rows = 0
         data = {}

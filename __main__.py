@@ -38,9 +38,8 @@ execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_clos
 aggregator = SignalAggregator(window_size, {"total_market": [BTC, ETH]})
 
 
-# TODO: generalize over exchanges
-def warmup(bitfinex, pairs, strategy):
-    warmup_data = bitfinex.get_warmup_data(pairs, window_size, "1m")
+def warmup(exchange, pairs, strategy):
+    warmup_data = exchange.get_warmup_data(pairs, window_size, "1m")
     for row in warmup_data:
         signals = aggregator.step(row)
         strategy.tick(row, signals)

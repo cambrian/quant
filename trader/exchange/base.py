@@ -95,3 +95,7 @@ class Exchange(ABC):
     @abstractmethod
     def get_open_positions(self):
         pass
+
+    @abstractmethod
+    def get_warmup_data(self, pairs, duration, resolution):
+        pass
