@@ -90,6 +90,6 @@ def dummy_main():
 #     Log.info("final balances", executor.)
 
 
-# thread_manager.attach("main", main, should_terminate=True)
-thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
+thread_manager.attach("main", main, should_terminate=True)
+# thread_manager.attach("dummy_main", dummy_main, should_terminate=True)
 thread_manager.run()

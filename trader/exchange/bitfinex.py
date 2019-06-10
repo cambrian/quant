@@ -13,8 +13,10 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
+                               OrderBook, Side)
 
 
 class Bitfinex(Exchange):
@@ -49,10 +51,10 @@ class Bitfinex(Exchange):
         self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
         self.__pairs = pairs
         self.__order_types = {
-            Order.Type.MARKET: "exchange market",
-            Order.Type.LIMIT: "exchange limit",
-            Order.Type.IOC: "exchange immediate-or-cancel",
-            Order.Type.FOK: "exchange fill-or-kill",
+            Order.Type.MARKET: "market",
+            Order.Type.LIMIT: "limit",
+            Order.Type.IOC: "immediate-or-cancel",
+            Order.Type.FOK: "fill-or-kill",
         }
         self.__book_feeds = {}
         self.__trade_feeds = {}
