@@ -4,7 +4,8 @@ from queue import Queue
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, OrderBook, Side
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, OrderBook,
+                               Side)
 
 
 def dummy_exchanges(thread_manager, data):
@@ -32,7 +33,7 @@ class DummyExchange(Exchange):
         self.__book_queues = {pair: Queue() for pair in self.__supported_pairs}
         self.__book_feeds = {}
         self.__latest_books = {}
-        self.__balances = defaultdict(float)
+        self.__positions = defaultdict(float)
         self.__order_id = 0
 
     @property
@@ -83,12 +84,12 @@ class DummyExchange(Exchange):
         return []
 
     # TODO
-    def balances_feed(self):
+    def positions_feed(self):
         pass
 
     @property
-    def balances(self):
-        return self.__balances
+    def positions(self):
+        return self.__positions
 
     @property
     def fees(self):
@@ -96,12 +97,12 @@ class DummyExchange(Exchange):
 
     def add_order(self, order):
         net_size = order.size * (1 if order.side == Side.BUY else -1)
-        self.__balances[order.pair.base] += net_size
-        self.__balances[order.pair.quote] -= (
+        self.__positions[order.pair.base] += net_size
+        self.__positions[order.pair.quote] -= (
             net_size + order.size * self.__fees["taker"]
         ) * order.price
         Log.info("dummy order", order)
-        Log.info("dummy balances", self.__balances)
+        Log.info("dummy positions", self.__positions)
         return OpenOrder(order, order.id)
 
     # Unnecessary since orders are immediate.
