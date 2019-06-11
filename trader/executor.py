@@ -82,18 +82,18 @@ class Executor:
         bids = pd.Series(index=self.__latest_fairs.mean.index)
         asks = pd.Series(index=self.__latest_fairs.mean.index)
         fees = pd.Series(index=self.__latest_fairs.mean.index)
-        balances = {}
+        positions = {}
         for exchange_pair in self.__latest_fairs.mean.index:
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
             bids[exchange_pair] = book.bids[0].price
             asks[exchange_pair] = book.asks[0].price
             fees[exchange_pair] = exchange.fees["taker"]
-            balances[exchange.id, exchange_pair.base] = exchange.balances[exchange_pair.base] or 0
+            positions[exchange.id, exchange_pair.base] = exchange.positions[exchange_pair.base] or 0
         self.__books_lock.release()
-        balances = pd.Series(balances)
+        positions = pd.Series(positions)
 
-        order_sizes = self.execution_strategy.tick(balances, bids, asks, self.__latest_fairs, fees)
+        order_sizes = self.execution_strategy.tick(positions, bids, asks, self.__latest_fairs, fees)
 
         # TODO: use order type
         for exchange_pair, order_size in order_sizes.items():

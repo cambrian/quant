@@ -55,8 +55,8 @@ class Exchange(ABC):
         """
 
     @abstractmethod
-    def balances_feed(self):
-        """Runs and returns a `Feed` of balances for the exchange account. This function should
+    def positions_feed(self):
+        """Runs and returns a `Feed` of positions for the exchange account. This function should
         behave in an idempotent manner.
 
         Returns:
@@ -66,8 +66,8 @@ class Exchange(ABC):
 
     @property
     @abstractmethod
-    def balances(self):
-        """Reads the latest tracked balances from the exchange object.
+    def positions(self):
+        """Reads the latest tracked positions from the exchange object.
 
         Returns:
             dict: Map of currency to held size.

@@ -14,8 +14,10 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
+                               OrderBook, Side)
 
 
 class Bitfinex(Exchange):
@@ -47,7 +49,15 @@ class Bitfinex(Exchange):
         self.__ws_client.daemon = True
         # TODO: these should probably be functions
         self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
-        self.__translate_from = {"USD": USD, "BTC": BTC, "ETH": ETH, "XRP": XRP}
+        self.__translate_from = {
+            "USD": USD,
+            "BTC": BTC,
+            "ETH": ETH,
+            "XRP": XRP,
+            "tBTCUSD": BTC_USD,
+            "tETHUSD": ETH_USD,
+            "tXRPUSD": XRP_USD,
+        }
         self.__pairs = pairs
         self.__order_types = {
             Order.Type.MARKET: "market",
@@ -57,9 +67,9 @@ class Bitfinex(Exchange):
         }
         self.__book_feeds = {}
         self.__trade_feeds = {}
-        self.__balances_queue = Queue()
-        self.__balances_feed = None
-        thread_manager.attach("bitfinex-balances-queue", self.__track_balances)
+        self.__positions_queue = Queue()
+        self.__positions_feed = None
+        thread_manager.attach("bitfinex-positions-queue", self.__track_positions)
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
@@ -140,16 +150,16 @@ class Bitfinex(Exchange):
         self.__frame["volume"] = 0
         return frame
 
-    def balances_feed(self):
-        if self.__balances_feed is None:
-            balances_feed, runner = Feed.of(iter(self.__balances_queue.get, None))
-            self._thread_manager.attach("bitfinex-balances-feed", runner)
-            self.__balances_feed = balances_feed
-        return self.__balances_feed
+    def positions_feed(self):
+        if self.__positions_feed is None:
+            positions_feed, runner = Feed.of(iter(self.__positions_queue.get, None))
+            self._thread_manager.attach("bitfinex-positions-feed", runner)
+            self.__positions_feed = positions_feed
+        return self.__positions_feed
 
-    def __track_balances(self):
-        """Thread function to constantly track exchange's balance."""
-        balances = defaultdict(float)
+    def __track_positions(self):
+        """Thread function to constantly track exchange's positions."""
+        positions = defaultdict(float)
 
         def on_open(ws):
             nonce = int(time.time() * 1000000)
@@ -164,7 +174,7 @@ class Bitfinex(Exchange):
                 "authPayload": auth_payload,
                 "authNonce": nonce,
                 "authSig": signature,
-                "filter": ["wallet"],
+                "filter": ["trading"],
             }
             ws.send(json.dumps(payload))
 
@@ -175,26 +185,34 @@ class Bitfinex(Exchange):
             if not isinstance(msg, list) or len(msg) <= 1 or msg[1] == "hb":
                 return
 
-            def update_balances(update):
+            def update_positions(update, value=None):
                 # Only track exchange (trading) wallet.
-                if len(update) >= 3 and update[0] == "exchange":
-                    balances[self.__translate_from[update[1]]] = update[2]
-                    self.__balances_queue.put(deepcopy(balances))
+                if len(update) >= 6:
+                    # If position is inactive, zero out balance
+                    if update[1] != "ACTIVE":
+                        value = 0.0
+                    if value is None:
+                        positions[self.__translate_from[update[0]].base] = float(update[2])
+                    else:
+                        positions[self.__translate_from[update[0]].base] = value
+                self.__positions_queue.put(deepcopy(positions))
 
-            # Disambiguate wallet snapshot/update:
-            if msg[1] == "ws":
+            # Disambiguate positions snapshot/update/new/closed:
+            if msg[1] == "ps":
                 for update in msg[2]:
-                    update_balances(update)
-            elif msg[1] == "wu":
-                update_balances(msg[2])
+                    update_positions(update)
+            elif msg[1] == "pn" or msg[1] == "pu":
+                update_positions(msg[2])
+            elif msg[1] == "pc":
+                update_positions(msg[2], 0.0)
 
         def on_error(ws, error):
-            Log.warn("WS error within __track_balances for exchange {}: {}".format(self.id, error))
+            Log.warn("WS error within __track_positions for exchange {}: {}".format(self.id, error))
 
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
             Log.info("restarting WS for exchange {}".format(self.id))
-            self.__track_balances()
+            self.__track_positions()
 
         ws = WebSocketApp(
             "wss://api.bitfinex.com/ws/",
@@ -208,10 +226,10 @@ class Bitfinex(Exchange):
         ws.close()
 
     @property
-    def balances(self):
-        if self.__balances_feed is None:
-            return self.balances_feed().latest
-        return self.__balances_feed.latest
+    def positions(self):
+        if self.__positions_feed is None:
+            return self.positions_feed().latest
+        return self.__positions_feed.latest
 
     @property
     def fees(self):

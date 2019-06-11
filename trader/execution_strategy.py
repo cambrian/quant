@@ -7,8 +7,8 @@ class ExecutionStrategy:
         self.min_edge = min_edge
         self.min_edge_to_close = min_edge_to_close
 
-    def tick(self, balances, bids, asks, fairs, fees):
-        """Takes fair as Gaussian, balances in base currency.
+    def tick(self, positions, bids, asks, fairs, fees):
+        """Takes fair as Gaussian, positions in base currency.
         Returns orders in base currency (negative size indicates sell).
 
         Since our fair estimate may have skewed uncertainty, it may be the case that
@@ -19,21 +19,21 @@ class ExecutionStrategy:
         TODO: generalize to multiple quotes
         TODO: use books instead of just the best bid/ask price
         """
-        mids = (bids + asks) / 2  # Use mid price for target balance value calculations.
+        mids = (bids + asks) / 2  # Use mid price for target position value calculations.
 
         gradient = fairs.gradient(mids) * fairs.mean
-        balance_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
-        target_balance_values = balance_direction_vector * fairs.z_score(mids) * self.size
-        pair_balances = balances[[(ep.exchange_id, ep.base) for ep in mids.index]].set_axis(
+        position_direction_vector = gradient / (np.linalg.norm(gradient) + 1e-100)
+        target_position_values = position_direction_vector * fairs.z_score(mids) * self.size
+        pair_positions = positions[[(ep.exchange_id, ep.base) for ep in mids.index]].set_axis(
             mids.index, inplace=False
         )
-        proposed_orders = target_balance_values / fairs.mean - pair_balances
+        proposed_orders = target_position_values / fairs.mean - pair_positions
         prices = (proposed_orders >= 0) * asks + (proposed_orders < 0) * bids
         edge = fairs.mean / prices - 1
         profitable = np.sign(proposed_orders) * edge > fees + self.min_edge
         profitable_orders = proposed_orders * profitable
 
-        should_close = -np.sign(pair_balances) * edge > fees + self.min_edge_to_close
-        balance_closing_orders = -pair_balances * (1 - profitable) * should_close
+        should_close = -np.sign(pair_positions) * edge > fees + self.min_edge_to_close
+        position_closing_orders = -pair_positions * (1 - profitable) * should_close
 
-        return profitable_orders + balance_closing_orders
+        return profitable_orders + position_closing_orders
