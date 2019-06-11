@@ -4,6 +4,7 @@ import json
 import time
 from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime
 from queue import Queue
 
 import numpy as np
@@ -13,10 +14,8 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
-                               OrderBook, Side)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, Order, OrderBook, Side
 
 
 class Bitfinex(Exchange):
@@ -227,36 +226,28 @@ class Bitfinex(Exchange):
         while rows < duration:
             for pair in pairs:
                 trans_pair = self.__translate_to[pair]
-                limit = duration - rows if duration - rows < 5000 else 5000
-                if last_time == None:
+                limit = min(duration - rows, 5000)
+                if last_time is None:
                     data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit=limit)
                 else:
-                    limit = limit + 1 if limit < 5000 else limit
-                    data[pair] = list(
-                        np.concatenate(
-                            (
-                                data[pair],
-                                self.__bfxv2.candles(
-                                    resolution, trans_pair, "hist", limit=limit, end=last_time
-                                )[1:],
-                            ),
-                            axis=0,
-                        )
-                    )
+                    limit = min(limit + 1, 5000)
+                    data[pair] += self.__bfxv2.candles(
+                        resolution, trans_pair, "hist", limit=limit, end=last_time
+                    )[1:]
             last_time = data[pairs[0]][-1][0]
             rows = len(data[pairs[0]])
 
         # Prep data for strategy consumption
-        prepped = []
+        prepped = pd.Series()
         for i in range(0, len(data[pairs[0]])):
-            tick_data = {}
+            frame = {}
             for pair in pairs:
                 elem = data[pair][i]
-                tick_data[ExchangePair(self.id, pair)] = (elem[1], elem[4])
-            tick_data = pd.DataFrame.from_dict(
-                tick_data, orient="index", columns=["price", "volume"]
-            )
-            prepped.append(tick_data)
+                frame[ExchangePair(self.id, pair)] = (elem[2], elem[4])
+            frame = pd.DataFrame.from_dict(frame, orient="index", columns=["price", "volume"])
+            time = datetime.fromtimestamp(elem[0] / 1000)  # hacky but elem will still be in scope
+            prepped[time] = frame
+        prepped = prepped.iloc[::-1]
         return prepped
 
     def add_order(self, order):
