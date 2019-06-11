@@ -103,7 +103,7 @@ class Executor:
             side = Side.BUY if order_size > 0 else Side.SELL
             price = (asks if order_size > 0 else bids)[exchange_pair]
             order = Order(
-                self.__next_order_id(), exchange_pair, side, Order.Type.FOK, price, abs(order_size)
+                self.__next_order_id(), exchange_pair, side, Order.Type.IOC, price, abs(order_size)
             )
             exchange.add_order(order)  # TODO: require this to be async?
             Log.info("sent order", order)
