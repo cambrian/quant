@@ -7,19 +7,9 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (
-    BINANCE,
-    BTC,
-    BTC_USD,
-    BTC_USDT,
-    EOS_USDT,
-    ETH,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USDT,
-    NEO_USDT,
-    XRP_USDT,
-)
+from trader.util.constants import (BINANCE, BTC, BTC_USD, BTC_USDT, EOS_USDT,
+                                   ETH, ETH_USD, ETH_USDT, LTC_USDT, NEO_USDT,
+                                   XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 thread_manager = ThreadManager()
@@ -43,6 +33,7 @@ def warmup(exchange, pairs, strategy):
     for row in warmup_data:
         signals = aggregator.step(row)
         strategy.tick(row, signals)
+    Log.info("Warmup Complete")
 
 
 def main():
@@ -52,7 +43,6 @@ def main():
         bitfinex_keys = json.load(bitfinex_key_file)
     bitfinex = Bitfinex(thread_manager, bitfinex_keys, pairs)
     warmup(bitfinex, pairs, kalman_strategy)
-    Log.info("Warmup Complete")
 
     executor = Executor(thread_manager, {bitfinex: pairs}, execution_strategy)
     while beat.loop():

@@ -243,9 +243,9 @@ class Bitfinex(Exchange):
             frame = {}
             for pair in pairs:
                 elem = data[pair][i]
-                frame[ExchangePair(self.id, pair)] = (elem[2], elem[4])
+                frame[ExchangePair(self.id, pair)] = (elem[2], elem[5])
             frame = pd.DataFrame.from_dict(frame, orient="index", columns=["price", "volume"])
-            time = datetime.fromtimestamp(elem[0] / 1000)  # hacky but elem will still be in scope
+            time = datetime.fromtimestamp(data[pairs[0]][i][0] / 1000)
             prepped[time] = frame
         prepped = prepped.iloc[::-1]
         return prepped
