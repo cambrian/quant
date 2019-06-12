@@ -18,6 +18,7 @@ pyspark>=2.4.1
 pytest>=4.3.1
 pytest-testmon>=0.9.16
 pytest-watch>=4.2.0
+rx>=3.0.0b4
 s3fs>=0.2.1
 sklearn>=0.0
 sortedcontainers>=2.1.0

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from threading import Lock
 
 import pandas as pd
@@ -23,9 +24,8 @@ class Executor:
     """
 
     def __init__(self, thread_manager, exchanges_and_pairs, execution_strategy):
-        self.__books_lock = Lock()
         self.__trade_lock = Lock()
-        self.__latest_books = {}  # keyed by (Exchange.id, pair)
+        self.__books_lock = Lock()
         self.__latest_fairs = None
         self.__thread_manager = thread_manager
         self.__exchange_pairs = [
@@ -33,28 +33,21 @@ class Executor:
         ]
         self.__exchanges = {e.id: e for e in exchanges_and_pairs}
         self.__order_id_counter = 0
+        self.__latest_books = {ep: None for ep in self.__exchange_pairs}
         self.execution_strategy = execution_strategy
 
         # Set up book feeds for every pair.
-        for exchange_pair in self.__exchange_pairs:
+        for ep in self.__exchange_pairs:
             thread_manager.attach(
-                "executor-{}".format(exchange_pair),
-                self.__exchanges[exchange_pair.exchange_id]
-                .book_feed(exchange_pair.pair)
-                .subscribe(
-                    # Ugly but otherwise the values of exchange/pair will get overwritten in
-                    # the closure at every iteration...
-                    lambda book, exchange_pair=exchange_pair: self.__tick_book(exchange_pair, book)
-                ),
+                "executor-{}".format(ep),
+                self.__exchanges[ep.exchange_id].book_feed(ep.pair).subscribe(self.__tick_book),
             )
 
-    def __tick_book(self, exchange_pair, book):
+    def __tick_book(self, book):
         self.__books_lock.acquire()
-        self.__latest_books[exchange_pair] = book
+        self.__latest_books[book.exchange_pair] = book
+        # Log.warn("new book", book.exchange_pair)
         self.__books_lock.release()
-        # TODO: think about how to do this.
-        # self.__thread_manager.attach("executor-book", lambda: self.__trade(), should_terminate=True)
-        # Log.info("executor-book", book)
 
     def __trade(self, wait_for_other_trade=False):
         """
@@ -65,24 +58,27 @@ class Executor:
         this explicit or don't require it.
         """
         if self.__latest_fairs is None:
+            Log.warn("Attempted to trade but latest_fairs is None.")
             return
 
         # component warmup may not be synchronized
-        # TODO: warn?
         for ep in self.__latest_fairs.mean.index:
-            if not ep in self.__latest_books:
+            if self.__latest_books[ep] is None:
+                Log.warn("No book data for exchange pair:", ep)
                 return
 
         if wait_for_other_trade:
             self.__trade_lock.acquire()
         elif not self.__trade_lock.acquire(blocking=False):
+            Log.debug("Other thread trading.")
             return
+        Log.info("Trading.")
 
-        self.__books_lock.acquire()
         bids = pd.Series(index=self.__latest_fairs.mean.index)
         asks = pd.Series(index=self.__latest_fairs.mean.index)
         fees = pd.Series(index=self.__latest_fairs.mean.index)
         positions = {}
+        # self.__books_lock.acquire()
         for exchange_pair in self.__latest_fairs.mean.index:
             exchange = self.__exchanges[exchange_pair.exchange_id]
             book = self.__latest_books[exchange_pair]
@@ -90,12 +86,12 @@ class Executor:
             asks[exchange_pair] = book.asks[0].price
             fees[exchange_pair] = exchange.fees["taker"]
             positions[exchange.id, exchange_pair.base] = exchange.positions[exchange_pair.base] or 0
-        self.__books_lock.release()
+        # self.__books_lock.release()
         positions = pd.Series(positions)
+        Log.info("positions", positions)
 
         order_sizes = self.execution_strategy.tick(positions, bids, asks, self.__latest_fairs, fees)
 
-        # TODO: use order type
         for exchange_pair, order_size in order_sizes.items():
             if order_size == 0:
                 continue
@@ -111,9 +107,7 @@ class Executor:
 
     def tick_fairs(self, fairs):
         self.__latest_fairs = fairs
-        self.__thread_manager.attach(
-            "executor-fairs", lambda: self.__trade(wait_for_other_trade=True), should_terminate=True
-        )
+        self.__thread_manager.attach("executor-fairs", self.__trade, should_terminate=True)
 
     def __next_order_id(self):
         self.__order_id_counter += 1

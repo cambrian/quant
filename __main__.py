@@ -7,10 +7,21 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BCH_USD, BINANCE, BTC_USD, BTC_USDT,
-                                   EOS_USD, EOS_USDT, ETH_USD, ETH_USDT,
-                                   LTC_USD, LTC_USDT, NEO_USDT, XRP_USD,
-                                   XRP_USDT)
+from trader.util.constants import (
+    BCH_USD,
+    BINANCE,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USD,
+    EOS_USDT,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USD,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USD,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -18,11 +29,11 @@ THREAD_MANAGER = ThreadManager()
 
 
 def warmup(exchange, pairs, strategy, signal_aggregator, window_size):
+    Log.info("Warming up strategy from recent data...")
     warmup_data = exchange.get_warmup_data(pairs, window_size, "1m")
     for row in warmup_data:
         signals = signal_aggregator.step(row)
         strategy.tick(row, signals)
-    Log.info("Warmup Complete")
 
 
 def main():
@@ -45,15 +56,15 @@ def main():
     with open("keys/bitfinex.json") as bitfinex_key_file:
         bitfinex_keys = json.load(bitfinex_key_file)
     bitfinex = Bitfinex(THREAD_MANAGER, bitfinex_keys, pairs)
-    warmup(bitfinex, pairs, kalman_strategy, aggregator, window_size)
+    warmup(bitfinex, pairs, kalman_strategy, aggregator, window_size / 4)
 
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
     while beat.loop():
         Log.info("Beat")
-        bitfinex_data = bitfinex.frame(pairs)
-        signals = aggregator.step(bitfinex_data)
-        kalman_fairs = kalman_strategy.tick(bitfinex_data, signals)
-        fairs = Gaussian.intersect([kalman_fairs])
+        bfx_frame = bitfinex.frame(pairs)
+        signals = aggregator.step(bfx_frame)
+        kalman_fairs = kalman_strategy.tick(bfx_frame, signals)
+        fairs = kalman_fairs & Gaussian(bfx_frame["price"], [1e100 for _ in bfx_frame["price"]])
         Log.info("fairs", fairs)
         executor.tick_fairs(fairs)
 

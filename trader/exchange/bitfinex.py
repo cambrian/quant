@@ -14,10 +14,17 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
-                               Order, OrderBook, Side, TradingPair)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import (
+    BookLevel,
+    Currency,
+    ExchangePair,
+    OpenOrder,
+    Order,
+    OrderBook,
+    Side,
+    TradingPair,
+)
 
 
 class Bitfinex(Exchange):
@@ -71,10 +78,10 @@ class Bitfinex(Exchange):
 
         for pair in pairs:
             pair_feed_book, runner_book = Feed.of(self.__generate_book_feed(pair))
-            self._thread_manager.attach("bitfinex-{}-book".format(pair), runner_book)
+            self._thread_manager.attach(f"bitfinex-{pair}-book", runner_book)
             self.__book_feeds[pair] = pair_feed_book
             pair_feed_trade, runner_trade = Feed.of(self.__generate_trade_feed(pair))
-            self._thread_manager.attach("bitfinex-{}-trade".format(pair), runner_trade)
+            self._thread_manager.attach(f"bitfinex-{pair}-trade", runner_trade)
             self.__trade_feeds[pair] = pair_feed_trade
 
     @property
@@ -83,15 +90,17 @@ class Bitfinex(Exchange):
 
     @staticmethod
     def encode_trading_pair(pair):
-        return f"t{pair.base}{pair.quote}"
+        base = pair.base if pair.base != Currency("BCH") else Currency("BAB")
+        return f"t{base}{pair.quote}"
 
     @staticmethod
     def decode_trading_pair(pair_string):
-        return TradingPair(Currency(pair_string[1:4]), Currency(pair_string[4:7]))
+        base_string = pair_string[1:4] if pair_string[1:4] != "BAB" else "BCH"
+        return TradingPair(Currency(base_string), Currency(pair_string[4:7]))
 
     def book_feed(self, pair):
         if pair not in self.__pairs:
-            raise ExchangeError("pair not supported by Bitfinex")
+            raise ExchangeError("pair not supported by this Bitfinex client")
         return self.__book_feeds[pair]
 
     def __generate_book_feed(self, pair):
