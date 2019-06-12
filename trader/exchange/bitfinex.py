@@ -64,7 +64,7 @@ class Bitfinex(Exchange):
         self.__book_feeds = {}
         self.__trade_feeds = {}
         self.__positions_queue = Queue()
-        self.__positions_feed = None
+        self.__positions_feed = self.positions_feed()
         thread_manager.attach("bitfinex-positions-queue", self.__track_positions)
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
@@ -168,6 +168,9 @@ class Bitfinex(Exchange):
     def __track_positions(self):
         """Thread function to constantly track exchange's positions."""
         positions = defaultdict(float)
+        for pair in self.__pairs:
+            positions[self.__translate_from[pair]] = 0.0
+        self.__positions_queue.put(deepcopy(positions))
 
         def on_open(ws):
             nonce = int(time.time() * 1000000)
@@ -231,8 +234,6 @@ class Bitfinex(Exchange):
         )
         ws.on_open = on_open
         ws.run_forever()
-        time.sleep(10)
-        ws.close()
 
     @property
     def positions(self):
