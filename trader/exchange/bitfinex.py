@@ -16,8 +16,8 @@ from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
                                    XRP, XRP_USD)
-from trader.util.types import (BookLevel, ExchangePair, OpenOrder, Order,
-                               OrderBook, Side)
+from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
+                               Order, OrderBook, Side, TradingPair)
 
 
 class Bitfinex(Exchange):
@@ -47,17 +47,6 @@ class Bitfinex(Exchange):
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
         self.__ws_client.authenticate(lambda x: None)
         self.__ws_client.daemon = True
-        # TODO: these should probably be functions
-        self.__translate_to = {BTC_USD: "tBTCUSD", ETH_USD: "tETHUSD", XRP_USD: "tXRPUSD"}
-        self.__translate_from = {
-            "USD": USD,
-            "BTC": BTC,
-            "ETH": ETH,
-            "XRP": XRP,
-            "tBTCUSD": BTC_USD,
-            "tETHUSD": ETH_USD,
-            "tXRPUSD": XRP_USD,
-        }
         self.__pairs = pairs
         self.__order_types = {
             Order.Type.MARKET: "market",
@@ -92,6 +81,14 @@ class Bitfinex(Exchange):
     def id(self):
         return BITFINEX
 
+    @staticmethod
+    def encode_trading_pair(pair):
+        return f"t{pair.base}{pair.quote}"
+
+    @staticmethod
+    def decode_trading_pair(pair_string):
+        return TradingPair(Currency(pair_string[1:4]), Currency(pair_string[4:7]))
+
     def book_feed(self, pair):
         if pair not in self.__pairs:
             raise ExchangeError("pair not supported by Bitfinex")
@@ -101,7 +98,7 @@ class Bitfinex(Exchange):
         msg_queue = Queue()
 
         self.__ws_client.subscribe_to_orderbook(
-            self.__translate_to[pair], precision="P0", callback=msg_queue.put
+            Bitfinex.encode_trading_pair(pair), precision="P0", callback=msg_queue.put
         )
 
         order_book = OrderBook(ExchangePair(self.id, pair))
@@ -128,7 +125,9 @@ class Bitfinex(Exchange):
     def __generate_trade_feed(self, pair):
         msg_queue = Queue()
 
-        self.__ws_client.subscribe_to_trades(self.__translate_to[pair], callback=msg_queue.put)
+        self.__ws_client.subscribe_to_trades(
+            Bitfinex.encode_trading_pair(pair), callback=msg_queue.put
+        )
 
         while True:
             msg = msg_queue.get()
@@ -186,15 +185,16 @@ class Bitfinex(Exchange):
                 return
 
             def update_positions(update, value=None):
+                currency = Bitfinex.decode_trading_pair(update[0]).base
                 # Only track exchange (trading) wallet.
                 if len(update) >= 6:
                     # If position is inactive, zero out balance
                     if update[1] != "ACTIVE":
                         value = 0.0
                     if value is None:
-                        positions[self.__translate_from[update[0]].base] = float(update[2])
+                        positions[currency] = float(update[2])
                     else:
-                        positions[self.__translate_from[update[0]].base] = value
+                        positions[currency] = value
                 self.__positions_queue.put(deepcopy(positions))
 
             # Disambiguate positions snapshot/update/new/closed:
@@ -243,14 +243,14 @@ class Bitfinex(Exchange):
         # Collect data from bitfinex API
         while rows < duration:
             for pair in pairs:
-                trans_pair = self.__translate_to[pair]
+                bfx_pair = Bitfinex.encode_trading_pair(pair)
                 limit = min(duration - rows, 5000)
                 if last_time is None:
-                    data[pair] = self.__bfxv2.candles(resolution, trans_pair, "hist", limit=limit)
+                    data[pair] = self.__bfxv2.candles(resolution, bfx_pair, "hist", limit=limit)
                 else:
                     limit = min(limit + 1, 5000)
                     data[pair] += self.__bfxv2.candles(
-                        resolution, trans_pair, "hist", limit=limit, end=last_time
+                        resolution, bfx_pair, "hist", limit=limit, end=last_time
                     )[1:]
             last_time = data[pairs[0]][-1][0]
             rows = len(data[pairs[0]])
@@ -274,7 +274,7 @@ class Bitfinex(Exchange):
             "request": "/v1/order/new",
             "nonce": self.__bfxv1._nonce(),
             # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
-            "symbol": self.__translate_to[order.pair][1:],
+            "symbol": Bitfinex.encode_trading_pair(order.pair)[1:],
             "amount": str(order.size),
             "price": str(order.price),
             "exchange": "bitfinex",

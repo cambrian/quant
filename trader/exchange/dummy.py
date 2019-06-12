@@ -4,8 +4,7 @@ from queue import Queue
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import (BookLevel, ExchangePair, OpenOrder, OrderBook,
-                               Side)
+from trader.util.types import BookLevel, ExchangePair, OpenOrder, OrderBook, Side
 
 
 def dummy_exchanges(thread_manager, data):
@@ -43,6 +42,16 @@ class DummyExchange(Exchange):
     @property
     def id(self):
         return self.__base_exchange_id + "(dummy)"
+
+    @staticmethod
+    def encode_trading_pair(pair):
+        not_implemented()
+        # return repr(pair)
+
+    @staticmethod
+    def decode_trading_pair(pair_string):
+        not_implemented()
+        # return TradingPair.parse(pair_string)
 
     def step_time(self):
         """Returns False if all data has been exhausted."""

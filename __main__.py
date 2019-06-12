@@ -7,17 +7,10 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (
-    BINANCE,
-    BTC_USD,
-    BTC_USDT,
-    EOS_USDT,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USDT,
-    NEO_USDT,
-    XRP_USDT,
-)
+from trader.util.constants import (BCH_USD, BINANCE, BTC_USD, BTC_USDT,
+                                   EOS_USD, EOS_USDT, ETH_USD, ETH_USDT,
+                                   LTC_USD, LTC_USDT, NEO_USDT, XRP_USD,
+                                   XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -33,7 +26,7 @@ def warmup(exchange, pairs, strategy, signal_aggregator, window_size):
 
 
 def main():
-    pairs = [BTC_USD, ETH_USD]
+    pairs = [BTC_USD, ETH_USD, XRP_USD, LTC_USD, EOS_USD, BCH_USD]
 
     window_size = 7500
     kalman_strategy = strategy.Kalman(
@@ -102,6 +95,6 @@ def dummy_main():
 #     Log.info("final positions", executor.)
 
 
-# THREAD_MANAGER.attach("main", main, should_terminate=True)
-THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
+THREAD_MANAGER.attach("main", main, should_terminate=True)
+# THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
 THREAD_MANAGER.run()

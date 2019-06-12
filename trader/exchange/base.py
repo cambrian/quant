@@ -28,6 +28,16 @@ class Exchange(ABC):
 
         """
 
+    @staticmethod
+    @abstractmethod
+    def encode_trading_pair(pair):
+        """Encode a TradingPair to a string recognizable by the exchange"""
+
+    @staticmethod
+    @abstractmethod
+    def decode_trading_pair(pair_string):
+        """Parse a Tradingpair from a string given by the exchange"""
+
     @abstractmethod
     def book_feed(self, pair):
         """Runs and returns a `Feed` of order books for the given pair. If this function is called

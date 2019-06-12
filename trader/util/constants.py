@@ -22,16 +22,19 @@ XRP = Currency("XRP")
 LTC = Currency("LTC")
 EOS = Currency("EOS")
 NEO = Currency("NEO")
+LEO = Currency("LEO")
 STABLECOINS = {USD, USDT}
 
 
 # USD quotes.
 BTC_USD = TradingPair(BTC, USD)
+BCH_USD = TradingPair(BCH, USD)
 ETH_USD = TradingPair(ETH, USD)
 XRP_USD = TradingPair(XRP, USD)
 LTC_USD = TradingPair(LTC, USD)
 EOS_USD = TradingPair(EOS, USD)
 NEO_USD = TradingPair(NEO, USD)
+LEO_USD = TradingPair(LEO, USD)
 
 # USDT quotes.
 BTC_USDT = TradingPair(BTC, USDT)
