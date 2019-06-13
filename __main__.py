@@ -7,21 +7,10 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (
-    BCH_USD,
-    BINANCE,
-    BTC_USD,
-    BTC_USDT,
-    EOS_USD,
-    EOS_USDT,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USD,
-    LTC_USDT,
-    NEO_USDT,
-    XRP_USD,
-    XRP_USDT,
-)
+from trader.util.constants import (BCH_USD, BINANCE, BTC_USD, BTC_USDT,
+                                   EOS_USD, EOS_USDT, ETH_USD, ETH_USDT,
+                                   LTC_USD, LTC_USDT, NEO_USDT, XRP_USD,
+                                   XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -47,7 +36,7 @@ def main():
         cointegration_period=60,
         maxlag=120,
     )
-    execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+    execution_strategy = ExecutionStrategy(size=100, min_edge=0.002, min_edge_to_close=0.0005)
     # metrics = Metrics(thread_manager, {bitfinex})
 
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
@@ -56,7 +45,7 @@ def main():
     with open("keys/bitfinex.json") as bitfinex_key_file:
         bitfinex_keys = json.load(bitfinex_key_file)
     bitfinex = Bitfinex(THREAD_MANAGER, bitfinex_keys, pairs)
-    warmup(bitfinex, pairs, kalman_strategy, aggregator, window_size / 4)
+    warmup(bitfinex, pairs, kalman_strategy, aggregator, window_size)
 
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
     while beat.loop():

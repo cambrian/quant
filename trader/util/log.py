@@ -72,7 +72,7 @@ class Log:
             color_context(context),
             color_level(message),
         ]
-        if data:
+        if not data is None:
             log_message.append(pformat(data, compact=True))
             # .replace("\n", "\\n").replace("\t", "\\t")
         print("\t".join(str(x) for x in log_message), file=sys.stderr, flush=True)
