@@ -159,7 +159,7 @@ class Bitfinex(Exchange):
         return frame
 
     def positions_feed(self):
-        if self.__positions_feed is None:
+        if not hasattr(self, '__positions_feed') or self.__positions_feed is None:
             positions_feed, runner = Feed.of(iter(self.__positions_queue.get, None))
             self._thread_manager.attach("bitfinex-positions-feed", runner)
             self.__positions_feed = positions_feed
@@ -169,7 +169,8 @@ class Bitfinex(Exchange):
         """Thread function to constantly track exchange's positions."""
         positions = defaultdict(float)
         for pair in self.__pairs:
-            positions[self.__translate_from[pair]] = 0.0
+            currency = pair.base
+            positions[currency] = 0.0
         self.__positions_queue.put(deepcopy(positions))
 
         def on_open(ws):
