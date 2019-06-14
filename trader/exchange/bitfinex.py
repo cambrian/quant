@@ -295,7 +295,7 @@ class Bitfinex(Exchange):
         }
         response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
         # TODO: don't ignore error responses
-        Log.info("Bitfinex-order-response", response)
+        Log.debug("Bitfinex-order-response", response)
         if "id" in response:
             order = OpenOrder(order, response["id"])
             if not response["is_live"]:

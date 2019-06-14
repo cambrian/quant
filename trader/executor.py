@@ -93,7 +93,7 @@ class Executor:
         order_sizes = self.execution_strategy.tick(
             positions, bids, asks, self.__latest_fairs, fees
         ).fillna(0.0)
-        Log.info("Order size", order_sizes)
+        Log.debug("Order size", order_sizes)
 
         for exchange_pair, order_size in order_sizes.items():
             if order_size == 0:

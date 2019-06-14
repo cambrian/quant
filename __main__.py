@@ -48,18 +48,15 @@ def main():
         cointegration_period=60,
         maxlag=120,
     )
-    execution_strategy = ExecutionStrategy(size=5000, min_edge=0.002, min_edge_to_close=0.0005)
-    # metrics = Metrics(thread_manager, {bitfinex})
-
+    execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
-
-    beat = Beat(60000)
     with open("keys/bitfinex.json") as bitfinex_key_file:
         bitfinex_keys = json.load(bitfinex_key_file)
     bitfinex = Bitfinex(THREAD_MANAGER, bitfinex_keys, pairs)
+    executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
     warmup(bitfinex, pairs, kalman_strategy, aggregator, window_size)
 
-    executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
+    beat = Beat(60000)
     while beat.loop():
         Log.info("Beat")
         bfx_frame = bitfinex.frame(pairs)
