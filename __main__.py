@@ -48,7 +48,7 @@ def main():
         cointegration_period=60,
         maxlag=120,
     )
-    execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
+    execution_strategy = ExecutionStrategy(size=5000, min_edge=0.002, min_edge_to_close=0.0005)
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
     with open("keys/bitfinex.json") as bitfinex_key_file:
         bitfinex_keys = json.load(bitfinex_key_file)
