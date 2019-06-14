@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 
-from trader.util.constants import BCH, BTC, EOS, ETH, LTC, NEO, XRP
+from trader.util.constants import BCH, BSV, BTC, EOS, ETH, LTC, NEO, XRP
 from trader.util.stats import Ema
 
 # TODO: fetch this dynamically
 CIRCULATING_SUPPLY = pd.Series(
-    {BTC: 18e6, ETH: 106e6, XRP: 42e9, BCH: 18e6, EOS: 913e6, LTC: 62e6, NEO: 65e6}
+    {BTC: 18e6, ETH: 106e6, XRP: 42e9, BCH: 18e6, EOS: 913e6, LTC: 62e6, NEO: 65e6, BSV: 18e6}
 )
 
 # TODO:

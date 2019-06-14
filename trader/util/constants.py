@@ -17,18 +17,21 @@ USD = Currency("USD")
 USDT = Currency("USDT")
 BTC = Currency("BTC")
 BCH = Currency("BCH")  # BCHABC
+BSV = Currency("BSV")
 ETH = Currency("ETH")
 XRP = Currency("XRP")
 LTC = Currency("LTC")
 EOS = Currency("EOS")
 NEO = Currency("NEO")
 LEO = Currency("LEO")
+
 STABLECOINS = {USD, USDT}
 
 
 # USD quotes.
 BTC_USD = TradingPair(BTC, USD)
 BCH_USD = TradingPair(BCH, USD)
+BSV_USD = TradingPair(BSV, USD)
 ETH_USD = TradingPair(ETH, USD)
 XRP_USD = TradingPair(XRP, USD)
 LTC_USD = TradingPair(LTC, USD)
