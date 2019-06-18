@@ -23,15 +23,15 @@ def principal_market_movements(prices):
 def max_abs_drawdown(pnls):
     """Maximum peak-to-trough distance before a new peak is attained. The usual metric, expressed
     as a fraction of peak value, does not make sense in the infinite-leverage context."""
-    mdd = 0
+    max_drawdown = 0
     peak = -np.inf
     for pnl in pnls:
         if pnl > peak:
             peak = pnl
-        dd = peak - pnl
-        if dd > mdd:
-            mdd = dd
-    return mdd
+        drawdown = peak - pnl
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+    return max_drawdown
 
 
 def analyze(results, plot=True):
@@ -41,8 +41,8 @@ def analyze(results, plot=True):
     Note: RoRs are per-tick. They are NOT comparable across time scales."""
     # Balance values
     price_data = results["data"].apply(lambda x: x["price"])
-    quote_currency = price_data.columns[0].partition("_")[2]
-    prices_ = price_data.rename(columns=lambda pair: pair.partition("_")[0])
+    quote_currency = price_data.columns[0].quote
+    prices_ = price_data.rename(columns=lambda pair: pair.base)
     prices_[quote_currency] = 1
     balance_values = results["balances"] * prices_
 
@@ -51,10 +51,8 @@ def analyze(results, plot=True):
 
     # Market risk
     (pmms, pmm_weights) = principal_market_movements(price_data)
-    balances_ = (
-        results["balances"]
-        .drop(columns=[quote_currency])
-        .rename(columns=lambda c: "{}_{}".format(c, quote_currency))
+    balances_ = results["balances"][[pair.base for pair in price_data.columns]].set_axis(
+        price_data.columns, axis=1, inplace=False
     )
     component_risks = np.abs(balances_ @ pmms.T)
     risks = component_risks @ pmm_weights
