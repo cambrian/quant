@@ -97,27 +97,6 @@ def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
 # print(td.iloc[-1]["pv"])
 
 
-# class BackTest:
-#     def __init__(self, _strategy, _execution_model, _data, _params):
-#         self.strategy = _strategy
-#         self.execution_model = _execution_model
-#         self.data = _data
-#         self.params = _params
-
-
-# #             executor.tick_fairs(fairs)
-# #         def foo():
-
-# #         # Test output
-# #         def bar():
-# #         param_spaces = {}
-# #         return bar(sc, foo, param_spaces)
-
-# backtester = None
-# def backtest(strategy, execution_model, data, params):
-#     backtester = BackTest(strategy, execution_model, data, params)
-
-
 def spark_job(sc, input_path, working_dir):
     """
     Your entire job must go within the function definition (including imports).
@@ -149,11 +128,10 @@ def spark_job(sc, input_path, working_dir):
 
         def main():
             ticks = 0
-            for row in data[:100]:
+            for row in data[:1]:
                 dummy_exchange.step_time()
                 dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
                 signals = aggregator.step(dummy_data)
-                print(signals)
                 kalman_fairs = strat.tick(dummy_data, signals)
                 fairs = kalman_fairs & Gaussian(
                     dummy_data["price"], [1e100 for _ in dummy_data["price"]]
@@ -170,7 +148,7 @@ def spark_job(sc, input_path, working_dir):
         "strategy": [Kalman],
         "executor": [Executor],
         "window_size": range(90, 91, 1),
-        "movement_half_life": range(90, 92, 1),
+        "movement_half_life": range(90, 91, 1),
         "trend_half_life": range(3000, 3001, 1),
         "cointegration_period": range(60, 61, 1),
         "maxlag": range(120, 121, 1),
@@ -209,10 +187,60 @@ def backtest():
 
     # Run the job locally.
     sc = SparkContext("local", "backtest")
-    print(job(sc, "research/data/1min.h5", os.getcwd()))
-
+    value = job(sc, "research/data/1min.h5", os.getcwd())
     sc.stop()
 
+    return value
 
-# backtest()
-# thread_manager = ThreadManager()
+
+# balances = ticks x currency, each row is (tick, {currency: balance}, Gaussian fairs)
+# test_data = ticks of data
+# Pass to analyze a dictionary of {'data': ['price', 'volume'], 'balances': []]
+def analyze(test_data, balances):
+    return_value = []
+    for i, row in enumerate(balances):
+        bal = dict(row[1])  # defaultdict { btc: 2., usdt: 245, eth: 0.0}
+        prices = test_data[i]
+        quote_currency = prices.index[0].partition("_")[2]
+        prices.loc[quote_currency] = (1.0, 0.0)
+        prices = prices.rename(index=lambda pair: pair.partition("_")[0])
+        bal = {repr(key): bal[key] for key in bal}
+        balance_values = prices.loc[bal.keys()]["price"] * pd.Series(bal)
+        pnl = balance_values.sum()
+
+    # TODO
+    # # Market risk
+    # (pmms, pmm_weights) = principal_market_movements(price_data)
+    # balances_ = (
+    #     results["balances"]
+    #     .drop(columns=[quote_currency])
+    #     .rename(columns=lambda c: "{}_{}".format(c, quote_currency))
+    # )
+    # component_risks = np.abs(balances_ @ pmms.T)
+    # risks = component_risks @ pmm_weights
+
+    # total_positions = np.abs(balance_values.drop(columns=[quote_currency]).values).sum()
+
+    # if plot:
+    #     fig, axs = plt.subplots(1, 2, figsize=(16, 4))
+    #     balance_values.plot(ax=axs[0])
+    #     pd.DataFrame(pnls, columns=["P/L"]).plot(ax=axs[0])
+    #     pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
+    #     axs[1].axhline(0, color="grey")
+    #     plt.show()
+    #     print("Return on maximum market risk: {0}".format(pnl / (risks.values.max() + 1e-10)))
+    #     print("Return on total market risk:   {0}".format(pnl / (risks.values.sum() + 1e-10)))
+    #     print("Return on total positions:     {0}".format(pnl / (total_positions + 1e-10)))
+    #     print("Sharpe ratio:                  {0}".format(pnl / (pnls.std() + 1e-10)))
+    #     print("Final P/L:                     {0}".format(pnl))
+    #     print("Maximum absolute drawdown:     {0}".format(max_abs_drawdown(pnls)))
+    #     print("Maximum market risk:           {0}".format(risks.values.max()))
+    #     print("Final balances:")
+    #     print(results["balances"].iloc[-1])
+
+    # return pnl / (risks.values.max() + 1e-10)
+
+
+results = backtest()[0]
+data = pd.read_hdf("research/data/1min.h5")
+analyze(data, results)
