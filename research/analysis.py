@@ -41,8 +41,8 @@ def analyze(results, plot=True):
     Note: RoRs are per-tick. They are NOT comparable across time scales."""
     # Balance values
     price_data = results["data"].apply(lambda x: x["price"])
-    quote_currency = price_data.columns[0].quote
-    prices_ = price_data.rename(columns=lambda pair: pair.base)
+    quote_currency = (price_data.columns[0].exchange_id, price_data.columns[0].quote)
+    prices_ = price_data.rename(columns=lambda pair: (pair.exchange_id, pair.base))
     prices_[quote_currency] = 1
     balance_values = results["balances"] * prices_
 
@@ -51,9 +51,9 @@ def analyze(results, plot=True):
 
     # Market risk
     (pmms, pmm_weights) = principal_market_movements(price_data)
-    balances_ = results["balances"][[pair.base for pair in price_data.columns]].set_axis(
-        price_data.columns, axis=1, inplace=False
-    )
+    balances_ = results["balances"][
+        [(pair.exchange_id, pair.base) for pair in price_data.columns]
+    ].set_axis(price_data.columns, axis=1, inplace=False)
     component_risks = np.abs(balances_ @ pmms.T)
     risks = component_risks @ pmm_weights
 

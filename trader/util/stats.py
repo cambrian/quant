@@ -1,4 +1,4 @@
-"""The `statistics` module.
+"""The `stats` module.
 
 Helpful statistical models and indicators.
 
@@ -8,10 +8,6 @@ Note: In literature on moving averages, you'll see "value" referred to as "level
 
 import numpy as np
 import pandas as pd
-from pandas.core.indexes.range import RangeIndex
-from scipy.spatial.distance import mahalanobis
-from scipy.special import binom as choose
-from scipy.stats import multivariate_normal
 
 
 class Ema:
