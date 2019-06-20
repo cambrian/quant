@@ -7,22 +7,10 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (
-    BCH_USD,
-    BINANCE,
-    BSV_USD,
-    BTC_USD,
-    BTC_USDT,
-    EOS_USD,
-    EOS_USDT,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USD,
-    LTC_USDT,
-    NEO_USDT,
-    XRP_USD,
-    XRP_USDT,
-)
+from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
+                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
+                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
+                                   XRP_USD, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -78,7 +66,7 @@ def dummy_main():
         cointegration_period=32,
         maxlag=8,
     )
-    execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+    execution_strategy = ExecutionStrategy(size=10, min_edge=0.005, min_edge_to_close=0.0005)
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
 
     data_min = pd.read_hdf("research/data/1min.h5")
