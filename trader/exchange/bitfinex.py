@@ -216,6 +216,7 @@ class Bitfinex(Exchange):
         def on_error(ws, error):
             Log.warn("WS error within __track_positions for exchange {}: {}".format(self.id, error))
 
+        # TODO: refactor to not be recursive (bc of stack growth)
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
             Log.info("restarting WS for exchange {}".format(self.id))
