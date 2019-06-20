@@ -58,6 +58,7 @@ def analyze(results, plot=True):
     risks = component_risks @ pmm_weights
 
     total_positions = np.abs(balance_values.drop(columns=[quote_currency]).values).sum()
+    max_drawdown = max_abs_drawdown(pnls)
 
     if plot:
         fig, axs = plt.subplots(1, 2, figsize=(16, 4))
@@ -66,14 +67,15 @@ def analyze(results, plot=True):
         pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
         axs[1].axhline(0, color="grey")
         plt.show()
-        print("Return on maximum market risk: {0}".format(pnl / (risks.values.max() + 1e-10)))
-        print("Return on total market risk:   {0}".format(pnl / (risks.values.sum() + 1e-10)))
-        print("Return on total positions:     {0}".format(pnl / (total_positions + 1e-10)))
-        print("Sharpe ratio:                  {0}".format(pnl / (pnls.std() + 1e-10)))
-        print("Final P/L:                     {0}".format(pnl))
-        print("Maximum absolute drawdown:     {0}".format(max_abs_drawdown(pnls)))
-        print("Maximum market risk:           {0}".format(risks.values.max()))
-        print("Final balances:")
+        print(f"Return on maximum market risk: {pnl / (risks.values.max() + 1e-10)}")
+        print(f"Return on maximum drawdown:    {pnl / (max_drawdown + 1e-10)}")
+        print(f"Return on total market risk:   {pnl / (risks.values.sum() + 1e-10)}")
+        print(f"Return on total positions:     {pnl / (total_positions + 1e-10)}")
+        print(f"Sharpe ratio:                  {pnl / (pnls.std() + 1e-10)}")
+        print(f"Final P/L:                     {pnl}")
+        print(f"Maximum market risk:           {risks.values.max()}")
+        print(f"Maximum drawdown:              {max_drawdown}")
+        print(f"Final balances:")
         print(results["balances"].iloc[-1])
 
     return pnl / (risks.values.max() + 1e-10)
