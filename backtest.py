@@ -4,6 +4,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 import research.util.credentials as creds
+from research.analysis import analyze
 
 
 def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
@@ -114,7 +115,7 @@ def spark_job(sc, input_path, working_dir):
     from trader.signal_aggregator import SignalAggregator
 
     def inside_job(strategy, executor, **kwargs):
-        data = pd.read_hdf(input_path)
+        data = pd.read_hdf(input_path).tail(50)
         thread_manager = ThreadManager()
         dummy_exchange = DummyExchange(thread_manager, data, {})
         execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
@@ -124,11 +125,11 @@ def spark_job(sc, input_path, working_dir):
         aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH]})
         strat = strategy(**kwargs)
 
-        return_value = []
+        fair_history = []
+        balance_history = []
 
         def main():
-            ticks = 0
-            for row in data[:1]:
+            for row in data:
                 dummy_exchange.step_time()
                 dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
                 signals = aggregator.step(dummy_data)
@@ -137,12 +138,16 @@ def spark_job(sc, input_path, working_dir):
                     dummy_data["price"], [1e100 for _ in dummy_data["price"]]
                 )
                 executor.tick_fairs(fairs)
-                return_value.append((ticks, dummy_exchange.balances, fairs))
-                ticks += 1
+                fair_history.append(fairs)
+                balance_history.append(dummy_exchange.balances.copy())
 
         thread_manager.attach("main", main, should_terminate=True)
         thread_manager.run()
-        return return_value
+        return {
+            "data": data,
+            "fairs": pd.DataFrame(fair_history, index=data.index),
+            "balances": pd.DataFrame(balance_history, index=data.index),
+        }
 
     param_spaces = {
         "strategy": [Kalman],
@@ -154,7 +159,6 @@ def spark_job(sc, input_path, working_dir):
         "maxlag": range(120, 121, 1),
     }
     return aggregate(sc, inside_job, param_spaces, parallelism=2)
-    # return optimize(sc, BasicGridSearch, inside_job, param_spaces, parallelism=2)
 
 
 def backtest():
@@ -193,54 +197,5 @@ def backtest():
     return value
 
 
-# balances = ticks x currency, each row is (tick, {currency: balance}, Gaussian fairs)
-# test_data = ticks of data
-# Pass to analyze a dictionary of {'data': ['price', 'volume'], 'balances': []]
-def analyze(test_data, balances):
-    return_value = []
-    for i, row in enumerate(balances):
-        bal = dict(row[1])  # defaultdict { btc: 2., usdt: 245, eth: 0.0}
-        prices = test_data[i]
-        quote_currency = prices.index[0].partition("_")[2]
-        prices.loc[quote_currency] = (1.0, 0.0)
-        prices = prices.rename(index=lambda pair: pair.partition("_")[0])
-        bal = {repr(key): bal[key] for key in bal}
-        balance_values = prices.loc[bal.keys()]["price"] * pd.Series(bal)
-        pnl = balance_values.sum()
-
-    # TODO
-    # # Market risk
-    # (pmms, pmm_weights) = principal_market_movements(price_data)
-    # balances_ = (
-    #     results["balances"]
-    #     .drop(columns=[quote_currency])
-    #     .rename(columns=lambda c: "{}_{}".format(c, quote_currency))
-    # )
-    # component_risks = np.abs(balances_ @ pmms.T)
-    # risks = component_risks @ pmm_weights
-
-    # total_positions = np.abs(balance_values.drop(columns=[quote_currency]).values).sum()
-
-    # if plot:
-    #     fig, axs = plt.subplots(1, 2, figsize=(16, 4))
-    #     balance_values.plot(ax=axs[0])
-    #     pd.DataFrame(pnls, columns=["P/L"]).plot(ax=axs[0])
-    #     pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
-    #     axs[1].axhline(0, color="grey")
-    #     plt.show()
-    #     print("Return on maximum market risk: {0}".format(pnl / (risks.values.max() + 1e-10)))
-    #     print("Return on total market risk:   {0}".format(pnl / (risks.values.sum() + 1e-10)))
-    #     print("Return on total positions:     {0}".format(pnl / (total_positions + 1e-10)))
-    #     print("Sharpe ratio:                  {0}".format(pnl / (pnls.std() + 1e-10)))
-    #     print("Final P/L:                     {0}".format(pnl))
-    #     print("Maximum absolute drawdown:     {0}".format(max_abs_drawdown(pnls)))
-    #     print("Maximum market risk:           {0}".format(risks.values.max()))
-    #     print("Final balances:")
-    #     print(results["balances"].iloc[-1])
-
-    # return pnl / (risks.values.max() + 1e-10)
-
-
 results = backtest()[0]
-data = pd.read_hdf("research/data/1min.h5")
-analyze(data, results)
+print(analyze(results, plot=False, backtest=True))

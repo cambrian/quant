@@ -14,10 +14,20 @@ from websocket import create_connection
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BTC, BTC_USDT, DUMMY, ETH, ETH_USDT,
-                                   LTC_USDT, USD, USDT, XRP, XRP_USDT,
-                                   not_implemented)
-from trader.util.types import (Direction, ExchangePair, Order, OrderBook)
+from trader.util.constants import (
+    BTC,
+    BTC_USDT,
+    DUMMY,
+    ETH,
+    ETH_USDT,
+    LTC_USDT,
+    USD,
+    USDT,
+    XRP,
+    XRP_USDT,
+    not_implemented,
+)
+from trader.util.types import Direction, ExchangePair, Order, OrderBook
 
 
 # TODO (remove this when the Exchange interface is stable and changes are complete)
@@ -36,13 +46,14 @@ class DummyExchange(Exchange):
         self.__latest_books = {}
         self.__prices = {pair: (0, 0) for pair in self.__supported_pairs}
         self.__balances = defaultdict(float)
-        self.__balances[BTC] = 2.43478623
-        self.__balances[USDT] = 245.17003318
+        self.__balances[BTC] = 2.43
+        self.__balances[ETH] = 3.0
+        self.__balances[USDT] = 244
         self.translate = {
-            'BTC-USDT': "BTC_USDT",
-            'ETH-USDT': "ETH_USDT",
-            'XRP-USDT': "XRP_USDT",
-            'LTC-USDT': "LTC_USDT",
+            "BTC-USDT": "BTC_USDT",
+            "ETH-USDT": "ETH_USDT",
+            "XRP-USDT": "XRP_USDT",
+            "LTC-USDT": "LTC_USDT",
         }
         self.__order_id = 0
 
