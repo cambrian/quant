@@ -97,7 +97,7 @@ def analyze(results, plot=True, backtest=False):
             "max_market_risk": maximum_market_risk,
             "max_drawdown": maximum_absolute_drawdown,
             "return_on_max_market_risk": return_maximum_market_risk,
-            "return_on_max_drawdown": pnl / maximum_absolute_drawdown,
+            "return_on_max_drawdown": pnl / (maximum_absolute_drawdown + 1e-10),
             "return_on_total_positon": return_on_total_positions,
             "sharpe_ratio": sharpe_ratio,
         }

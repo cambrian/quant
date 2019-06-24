@@ -4,7 +4,6 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 import research.util.credentials as creds
-from research.analysis import analyze
 
 
 def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
@@ -98,7 +97,7 @@ def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
 # print(td.iloc[-1]["pv"])
 
 
-def spark_job(sc, input_path, working_dir):
+def backtest_spark_job(sc, input_path, working_dir):
     """
     Your entire job must go within the function definition (including imports).
 
@@ -175,19 +174,7 @@ def backtest():
     os.environ["PYSPARK_PYTHON"] = "python3"
     os.environ["JAVA_HOME"] = "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home"
 
-    # if len(sys.argv) < 2:
-    #     print("Script argument expected.")
-    #     sys.exit(1)
-
-    # if len(sys.argv) < 3:
-    #     input_path = "/dev/null"
-    # else:
-    #     input_path = sys.argv[2]
-
-    # Extract job name and job function from script file.
-    # name = os.path.splitext(os.path.basename(sys.argv[1]))[0]
-    # job = getattr(SourceFileLoader(name, sys.argv[1]).load_module(name), "job")
-    job = spark_job
+    job = backtest_spark_job
 
     # Run the job locally.
     sc = SparkContext("local", "backtest")
@@ -197,5 +184,44 @@ def backtest():
     return value
 
 
+def analyze_spark_job(sc, results):
+    """
+    Your entire job must go within the function definition (including imports).
+    """
+    from research.util.optimizer import aggregate
+
+    def inside_job():
+        from research.analysis import analyze
+
+        return analyze(results, plot=False, backtest=True)
+
+    param_spaces = {}
+    return aggregate(sc, inside_job, param_spaces, parallelism=2)
+
+
+def analyze(results):
+    # NOTE: Keep me at the top. (Sets up the module environment to run this script.)
+    import scripts.setup  # isort:skip, pylint: disable=import-error
+
+    import os
+    import sys
+    from importlib.machinery import SourceFileLoader
+
+    from pyspark import SparkContext
+
+    # Assumes you have JDK 1.8 as installed in the setup script.
+    os.environ["PYSPARK_PYTHON"] = "python3"
+    os.environ["JAVA_HOME"] = "/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home"
+
+    job = analyze_spark_job
+
+    # Run the job locally.
+    sc = SparkContext("local", "backtest")
+    value = job(sc, results)
+    sc.stop()
+
+    return value
+
+
 results = backtest()[0]
-print(analyze(results, plot=False, backtest=True))
+print(analyze(results))
