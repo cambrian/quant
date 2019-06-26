@@ -4,6 +4,8 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+from trader.util.types import Currency
+
 # number of ticks to sum for price movements in risk calculation
 RISK_WINDOW = 10
 
@@ -34,15 +36,15 @@ def max_abs_drawdown(pnls):
     return max_drawdown
 
 
-def analyze(results, plot=True):
+def analyze(results, plot=True, backtest=False):
     """Analyzes P/L and various risk metrics for the given run results.
     Plots balances (with P/L) and market risk over time.
 
     Note: RoRs are per-tick. They are NOT comparable across time scales."""
     # Balance values
     price_data = results["data"].apply(lambda x: x["price"])
-    quote_currency = (price_data.columns[0].exchange_id, price_data.columns[0].quote)
-    prices_ = price_data.rename(columns=lambda pair: (pair.exchange_id, pair.base))
+    quote_currency = Currency(price_data.columns[0].partition("_")[2])
+    prices_ = price_data.rename(columns=lambda pair: pair.partition("_")[0])
     prices_[quote_currency] = 1
     balance_values = results["balances"] * prices_
 
@@ -77,5 +79,24 @@ def analyze(results, plot=True):
         print(f"Maximum drawdown:              {max_drawdown}")
         print(f"Final balances:")
         print(results["balances"].iloc[-1])
+    if backtest:
+        return_maximum_market_risk = pnl / (risks.values.max() + 1e-10)
+        return_on_total_market_risk = pnl / (risks.values.sum() + 1e-10)
+        return_on_total_positions = pnl / (total_positions + 1e-10)
+        sharpe_ratio = pnl / (pnls.std() + 1e-10)
+        final_pnl = pnl
+        maximum_absolute_drawdown = max_abs_drawdown(pnls)
+        maximum_market_risk = risks.values.max()
+
+        return {
+            "balances_usd": balances_,
+            "pnl": final_pnl,
+            "max_market_risk": maximum_market_risk,
+            "max_drawdown": maximum_absolute_drawdown,
+            "return_on_max_market_risk": return_maximum_market_risk,
+            "return_on_max_drawdown": pnl / (maximum_absolute_drawdown + 1e-10),
+            "return_on_total_positon": return_on_total_positions,
+            "sharpe_ratio": sharpe_ratio,
+        }
 
     return pnl / (risks.values.max() + 1e-10)
