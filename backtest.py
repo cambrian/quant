@@ -104,7 +104,7 @@ def backtest_spark_job(sc, input_path, working_dir):
     TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
     """
     from trader.exchange import DummyExchange
-    from trader.util.constants import BTC_USDT, ETH_USDT, BTC, ETH
+    from trader.util.constants import BTC_USDT, ETH_USDT, XRP_USDT, BTC, ETH, XRP
     from trader.util.thread import ThreadManager
     from research.util.optimizer import BasicGridSearch, aggregate
     from trader.util.gaussian import Gaussian
@@ -114,14 +114,14 @@ def backtest_spark_job(sc, input_path, working_dir):
     from trader.signal_aggregator import SignalAggregator
 
     def inside_job(strategy, executor, **kwargs):
-        data = pd.read_hdf(input_path).tail(50)
+        data = pd.read_hdf(input_path)
         thread_manager = ThreadManager()
         dummy_exchange = DummyExchange(thread_manager, data, {})
-        execution_strategy = ExecutionStrategy(size=10, min_edge=0.002, min_edge_to_close=0.0005)
+        execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
         executor = executor(
-            thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT]}, execution_strategy
+            thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT, XRP_USDT]}, execution_strategy
         )
-        aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH]})
+        aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH, XRP]})
         strat = strategy(**kwargs)
 
         fair_history = []
@@ -130,7 +130,7 @@ def backtest_spark_job(sc, input_path, working_dir):
         def main():
             for row in data:
                 dummy_exchange.step_time()
-                dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT], "1m")
+                dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT, XRP_USDT], "1m")
                 signals = aggregator.step(dummy_data)
                 kalman_fairs = strat.tick(dummy_data, signals)
                 fairs = kalman_fairs & Gaussian(
