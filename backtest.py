@@ -104,7 +104,7 @@ def backtest_spark_job(sc, input_path, working_dir):
     TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
     """
     from trader.exchange import DummyExchange
-    from trader.util.constants import BTC_USDT, ETH_USDT, XRP_USDT, BTC, ETH, XRP
+    from trader.util.constants import BTC_USDT, ETH_USDT, XRP_USDT, BTC, ETH, XRP, BINANCE
     from trader.util.thread import ThreadManager
     from research.util.optimizer import BasicGridSearch, aggregate
     from trader.util.gaussian import Gaussian
@@ -114,23 +114,25 @@ def backtest_spark_job(sc, input_path, working_dir):
     from trader.signal_aggregator import SignalAggregator
 
     def inside_job(strategy, executor, **kwargs):
-        data = pd.read_hdf(input_path)
+        data = pd.read_hdf(input_path).resample("15Min").first().tail(20)
         thread_manager = ThreadManager()
-        dummy_exchange = DummyExchange(thread_manager, data, {})
-        execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
-        executor = executor(
-            thread_manager, {dummy_exchange: [BTC_USDT, ETH_USDT, XRP_USDT]}, execution_strategy
+        dummy_exchange = DummyExchange(
+            thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
         )
+        pairs = [BTC_USDT, ETH_USDT, XRP_USDT]
+        execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
+        executor = executor(thread_manager, {dummy_exchange: pairs}, execution_strategy)
         aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH, XRP]})
         strat = strategy(**kwargs)
 
         fair_history = []
-        balance_history = []
+        position_history = []
 
         def main():
             for row in data:
-                dummy_exchange.step_time()
-                dummy_data = dummy_exchange.prices([BTC_USDT, ETH_USDT, XRP_USDT], "1m")
+                if not dummy_exchange.step_time():
+                    break
+                dummy_data = dummy_exchange.frame(pairs)
                 signals = aggregator.step(dummy_data)
                 kalman_fairs = strat.tick(dummy_data, signals)
                 fairs = kalman_fairs & Gaussian(
@@ -138,14 +140,15 @@ def backtest_spark_job(sc, input_path, working_dir):
                 )
                 executor.tick_fairs(fairs)
                 fair_history.append(fairs)
-                balance_history.append(dummy_exchange.balances.copy())
+                position_history.append(dummy_exchange.positions.copy())
 
         thread_manager.attach("main", main, should_terminate=True)
         thread_manager.run()
         return {
             "data": data,
             "fairs": pd.DataFrame(fair_history, index=data.index),
-            "balances": pd.DataFrame(balance_history, index=data.index),
+            # Should be called 'positions' but analysis.py must also change
+            "balances": pd.DataFrame(position_history, index=data.index),
         }
 
     param_spaces = {
@@ -224,4 +227,8 @@ def analyze(results):
 
 
 results = backtest()[0]
+price_data = results["data"].apply(lambda x: x["price"])
+for row in price_data.columns:
+    if row.base not in results["balances"]:
+        results["balances"][row.base] = 0.0
 print(analyze(results))
