@@ -78,7 +78,7 @@ class Kalman(Strategy):
         if self.coint_f is None:
             self.coint_f = pd.DataFrame(1, index=signals.index, columns=inputs.index)
 
-        # The moving average is already trend-compenstated, so we remove trend from the data.
+        # The moving average is already trend-compensated, so we remove trend from the data.
         price_history = remove_trend(price_history)
 
         # calculate p values for pair cointegration
@@ -107,13 +107,14 @@ class Kalman(Strategy):
         correlated_slopes = r.mul(stddev, axis=1).div(stddev[signals.index], axis=0)
         sqrt_volume = np.sqrt(moving_signal_volumes)
         volume_f = np.max(sqrt_volume) / sqrt_volume
-        f = self.coint_f.mul(volume_f, axis=0)
 
         delta = signals["price"] - moving_prices[signals.index]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
         delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :].var()
         correlated_delta_vars = np.square(correlated_slopes).mul(delta_vars[signals.index], axis=0)
-        fair_delta_vars = f * correlated_delta_vars + (1 - r2) * delta_vars
+        fair_delta_vars = (correlated_delta_vars + (1 - r2) * self.coint_f * delta_vars).mul(
+            volume_f, axis=0
+        )
         fair_deltas = [
             Gaussian(fair_delta_means.loc[i], fair_delta_vars.loc[i]) for i in signals.index
         ]
@@ -124,7 +125,9 @@ class Kalman(Strategy):
         fair_step_means = correlated_slopes.mul(step, axis=0)
         step_vars = diffs.var()
         correlated_step_vars = np.square(correlated_slopes).mul(step_vars[signals.index], axis=0)
-        fair_step_vars = f * correlated_step_vars + (1 - r2) * step_vars
+        fair_step_vars = (correlated_step_vars + (1 - r2) * self.coint_f * step_vars).mul(
+            volume_f, axis=0
+        )
         fair_steps = [
             Gaussian(fair_step_means.loc[i], fair_step_vars.loc[i]) for i in signals.index
         ]

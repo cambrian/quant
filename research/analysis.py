@@ -61,11 +61,11 @@ def analyze(results, plot=True):
     max_drawdown = max_abs_drawdown(pnls)
 
     if plot:
-        fig, axs = plt.subplots(1, 2, figsize=(16, 4))
-        balance_values.plot(ax=axs[0])
-        pd.DataFrame(pnls, columns=["P/L"]).plot(ax=axs[0])
-        pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
-        axs[1].axhline(0, color="grey")
+        fig, axs = plt.subplots(figsize=(16, 4))
+        balance_values.plot(ax=axs)
+        pd.DataFrame(pnls, columns=["P/L"]).plot(ax=axs)
+        # pd.DataFrame(risks, columns=["Market Risk"]).plot(ax=axs[1])
+        axs.axhline(0, color="grey")
         plt.show()
         print(f"Return on maximum market risk: {pnl / (risks.values.max() + 1e-10)}")
         print(f"Return on maximum drawdown:    {pnl / (max_drawdown + 1e-10)}")

@@ -14,10 +14,17 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
-                               Order, OrderBook, Side, TradingPair)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import (
+    BookLevel,
+    Currency,
+    ExchangePair,
+    OpenOrder,
+    Order,
+    OrderBook,
+    Side,
+    TradingPair,
+)
 
 
 class Bitfinex(Exchange):
@@ -220,7 +227,7 @@ class Bitfinex(Exchange):
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
             Log.info("restarting WS for exchange {}".format(self.id))
-            time.sleep(1)
+            time.sleep(3)
             self.__track_positions()
 
         ws = WebSocketApp(
