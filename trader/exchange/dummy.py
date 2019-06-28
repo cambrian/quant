@@ -4,7 +4,8 @@ from queue import Queue
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
 from trader.util.constants import not_implemented
-from trader.util.types import BookLevel, ExchangePair, OpenOrder, OrderBook, Side
+from trader.util.types import (BookLevel, ExchangePair, OpenOrder, OrderBook,
+                               Side)
 
 
 def dummy_exchanges(thread_manager, data):
