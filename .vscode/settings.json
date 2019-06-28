@@ -32,6 +32,6 @@
     "python.linting.pylintArgs": [
         "--disable=bad-continuation,dangerous-default-value,too-many-branches,too-many-arguments,too-many-locals,too-many-instance-attributes,too-few-public-methods,missing-docstring,redefined-outer-name,redefined-builtin,protected-access",
         "--enable=unused-import",
-        "--good-names=f,i,j,k,x,y,z,a,b,c,t,u,v,r,s,xs,id,fn,ep,df,r2,ws,A,Q,U,V"
+        "--good-names=a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,xs,id,fn,ep,df,r2,ws,A,Q,U,V"
     ]
 }

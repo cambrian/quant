@@ -7,7 +7,7 @@ from statsmodels.tsa.stattools import coint
 
 from trader.strategy.base import Strategy
 from trader.util import Gaussian
-from trader.util.stats import Ema, HoltEma
+from trader.util.stats import Ema, Emv, HoltEmav
 
 
 def bhattacharyya_multi(a, b):
@@ -42,13 +42,14 @@ class Kalman(Strategy):
     """
 
     def __init__(
-        self, window_size, movement_half_life, trend_half_life, cointegration_period, maxlag
+        self, window_size, movement_hl, trend_hl, variance_hl, cointegration_period, maxlag
     ):
         self.price_history = None
         self.window_size = window_size
-        self.movement_half_life = movement_half_life
-        self.moving_prices = HoltEma(movement_half_life, trend_half_life)
-        self.moving_signal_volumes = Ema(window_size / 2)
+        self.movement_hl = movement_hl
+        self.moving_prices = HoltEmav(movement_hl, trend_hl, variance_hl)
+        self.moving_signal_volumes = Ema(variance_hl)
+        self.moving_variances_from_prev_fair = Emv(variance_hl)
         self.cointegration_period = cointegration_period
         self.maxlag = maxlag
         self.prev_fair = None
@@ -99,9 +100,7 @@ class Kalman(Strategy):
                         self.coint_f.loc[i, j] = 1 + p * p * p * 15625
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
-        diffs = price_history.diff()[1:]
-        var = price_history.var()
-        stddev = np.sqrt(var) + 1e-100
+        stddev = price_history.std() + 1e-100
         r = price_history.corr().loc[signals.index]
         r2 = r * r
         correlated_slopes = r.mul(stddev, axis=1).div(stddev[signals.index], axis=0)
@@ -110,7 +109,7 @@ class Kalman(Strategy):
 
         delta = signals["price"] - moving_prices[signals.index]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
-        delta_vars = diffs.rolling(self.movement_half_life).sum()[self.movement_half_life :].var()
+        delta_vars = self.moving_prices.variance
         correlated_delta_vars = np.square(correlated_slopes).mul(delta_vars[signals.index], axis=0)
         fair_delta_vars = (correlated_delta_vars + (1 - r2) * self.coint_f * delta_vars).mul(
             volume_f, axis=0
@@ -121,9 +120,9 @@ class Kalman(Strategy):
         fair_delta = intersect_with_disagreement(fair_deltas)
         absolute_fair = fair_delta + moving_prices
 
-        step = signals["price"] - (self.prev_fair.mean + self.moving_prices.trend)[signals.index]
-        fair_step_means = correlated_slopes.mul(step, axis=0)
-        step_vars = diffs.var()
+        step = inputs["price"] - (self.prev_fair.mean + self.moving_prices.trend)
+        step_vars = self.moving_variances_from_prev_fair.step(step)
+        fair_step_means = correlated_slopes.mul(step[signals.index], axis=0)
         correlated_step_vars = np.square(correlated_slopes).mul(step_vars[signals.index], axis=0)
         fair_step_vars = (correlated_step_vars + (1 - r2) * self.coint_f * step_vars).mul(
             volume_f, axis=0
