@@ -7,10 +7,22 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
-                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
-                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
-                                   XRP_USD, XRP_USDT)
+from trader.util.constants import (
+    BCH_USD,
+    BINANCE,
+    BSV_USD,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USD,
+    EOS_USDT,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USD,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USD,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -33,11 +45,11 @@ def main():
         window_size=window_size,
         movement_hl=90,
         trend_hl=3000,
-        variance_hl=2880,
+        mse_hl=2880,
         cointegration_period=60,
         maxlag=120,
     )
-    execution_strategy = ExecutionStrategy(1000, 2880, 3, 10, -1, 0.002, 0.0005)
+    execution_strategy = ExecutionStrategy(1000, 2880, 1, 3, -1, 0.002, 0.0005)
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
     with open("keys/bitfinex.json") as bitfinex_key_file:
         bitfinex_keys = json.load(bitfinex_key_file)
@@ -64,11 +76,11 @@ def dummy_main():
         window_size=window_size,
         movement_hl=6,
         trend_hl=256,
-        variance_hl=192,
+        mse_hl=192,
         cointegration_period=32,
         maxlag=8,
     )
-    execution_strategy = ExecutionStrategy(10, 192, 1, 3, -0.5, 0.002, 0.0005)
+    execution_strategy = ExecutionStrategy(10, 192, 1, 3, -1, 0.002, 0.0005)
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
 
     data_min = pd.read_hdf("research/data/1min.h5")

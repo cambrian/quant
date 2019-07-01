@@ -7,7 +7,7 @@ from statsmodels.tsa.stattools import coint
 
 from trader.strategy.base import Strategy
 from trader.util import Gaussian
-from trader.util.stats import Ema, Emv, HoltEmav
+from trader.util.stats import Ema, Emse, HoltEma
 
 
 def bhattacharyya_multi(a, b):
@@ -41,20 +41,21 @@ class Kalman(Strategy):
     likelihood of cointegration.
     """
 
-    def __init__(
-        self, window_size, movement_hl, trend_hl, variance_hl, cointegration_period, maxlag
-    ):
+    def __init__(self, window_size, movement_hl, trend_hl, mse_hl, cointegration_period, maxlag):
         self.price_history = None
         self.window_size = window_size
         self.movement_hl = movement_hl
-        self.moving_prices = HoltEmav(movement_hl, trend_hl, variance_hl)
-        self.moving_signal_volumes = Ema(variance_hl)
-        self.moving_variances_from_prev_fair = Emv(variance_hl)
+        self.moving_prices = HoltEma(movement_hl, trend_hl, mse_hl)
+        self.moving_signal_volumes = Ema(mse_hl)
+        self.moving_mse_from_prev_fair = Emse(mse_hl)
+        self.moving_variances = Emse(window_size / 2)
         self.cointegration_period = cointegration_period
         self.maxlag = maxlag
         self.prev_fair = None
         self.sample_counter = 0
         self.coint_f = None
+        self.r = None
+        self.r2 = None
 
     # the fair combination step assumes that all signals are i.i.d. They are not (and obviously not in the case
     # of funds). Is this a problem?
@@ -62,6 +63,8 @@ class Kalman(Strategy):
         inputs = pd.concat([frame, signals])
         if self.price_history is None:
             self.price_history = RingBuffer(self.window_size, dtype=(np.float64, len(inputs.index)))
+            # duplicate the first value so we can compute the most recent movement without needing checks
+            self.price_history.append(inputs["price"])
 
         self.price_history.append(inputs["price"])
 
@@ -69,6 +72,9 @@ class Kalman(Strategy):
 
         moving_prices = self.moving_prices.step(inputs["price"])
         moving_signal_volumes = self.moving_signal_volumes.step(signals["volume"])
+
+        movement = price_history.iloc[-1] - price_history.iloc[-2]
+        self.moving_variances.step(movement)
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return Gaussian(pd.Series([]), [])
@@ -98,20 +104,20 @@ class Kalman(Strategy):
                         )[1]
                         # .04 -> 2, .05 -> ~3, .1 -> 15.625
                         self.coint_f.loc[i, j] = 1 + p * p * p * 15625
+            self.r = price_history.corr().loc[signals.index]
+            self.r2 = self.r ** 2
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
-        stddev = price_history.std() + 1e-100
-        r = price_history.corr().loc[signals.index]
-        r2 = r * r
-        correlated_slopes = r.mul(stddev, axis=1).div(stddev[signals.index], axis=0)
+        stddev = self.moving_variances.stderr
+        correlated_slopes = self.r.mul(stddev, axis=1).div(stddev[signals.index], axis=0)
         sqrt_volume = np.sqrt(moving_signal_volumes)
         volume_f = np.max(sqrt_volume) / sqrt_volume
 
         delta = signals["price"] - moving_prices[signals.index]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
-        delta_vars = self.moving_prices.variance
+        delta_vars = self.moving_prices.mse
         correlated_delta_vars = np.square(correlated_slopes).mul(delta_vars[signals.index], axis=0)
-        fair_delta_vars = (correlated_delta_vars + (1 - r2) * self.coint_f * delta_vars).mul(
+        fair_delta_vars = (correlated_delta_vars + (1 - self.r2) * self.coint_f * delta_vars).mul(
             volume_f, axis=0
         )
         fair_deltas = [
@@ -121,10 +127,10 @@ class Kalman(Strategy):
         absolute_fair = fair_delta + moving_prices
 
         step = inputs["price"] - (self.prev_fair.mean + self.moving_prices.trend)
-        step_vars = self.moving_variances_from_prev_fair.step(step)
+        step_vars = self.moving_mse_from_prev_fair.step(step)
         fair_step_means = correlated_slopes.mul(step[signals.index], axis=0)
         correlated_step_vars = np.square(correlated_slopes).mul(step_vars[signals.index], axis=0)
-        fair_step_vars = (correlated_step_vars + (1 - r2) * self.coint_f * step_vars).mul(
+        fair_step_vars = (correlated_step_vars + (1 - self.r2) * self.coint_f * step_vars).mul(
             volume_f, axis=0
         )
         fair_steps = [

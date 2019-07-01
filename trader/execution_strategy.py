@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from trader.util.stats import Emv, HoltEma
+from trader.util.stats import Emse, HoltEma
 
 
 class ExecutionStrategy:
@@ -17,7 +17,7 @@ class ExecutionStrategy:
     ):
         self.size = size
         self.trend_estimator = HoltEma(trend_hl, accel_hl)
-        self.mvmt_variance = Emv(variance_hl)
+        self.mvmt_variance = Emse(variance_hl)
         self.prev_mids = None
         self.trend_cutoff = trend_cutoff
         self.min_edge_to_enter = min_edge_to_enter
@@ -48,7 +48,8 @@ class ExecutionStrategy:
             return pd.Series(0, index=mids.index)
 
         z_edge = (fairs.mean - mids) / fairs.stddev
-        z_trend = trend / self.mvmt_variance.stddev
+        z_trend = trend / self.mvmt_variance.stderr
+        print(z_trend)
         target_position_values = z_edge * self.size
         pair_positions = positions[[(ep.exchange_id, ep.base) for ep in mids.index]].set_axis(
             mids.index, inplace=False
