@@ -114,15 +114,15 @@ def backtest_spark_job(sc, input_path, working_dir):
     from trader.signal_aggregator import SignalAggregator
 
     def inside_job(strategy, executor, **kwargs):
-        data = pd.read_hdf(input_path).resample("15Min").first().tail(20)
+        data = pd.read_hdf(input_path).resample("15Min").first()
         thread_manager = ThreadManager()
         dummy_exchange = DummyExchange(
             thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
         )
         pairs = [BTC_USDT, ETH_USDT, XRP_USDT]
-        execution_strategy = ExecutionStrategy(size=1000, min_edge=0.002, min_edge_to_close=0.0005)
+        execution_strategy = ExecutionStrategy(10, 192, 1, 3, -0.5, 0.002, 0.0005)
         executor = executor(thread_manager, {dummy_exchange: pairs}, execution_strategy)
-        aggregator = SignalAggregator(7500, {"total_market": [BTC, ETH, XRP]})
+        aggregator = SignalAggregator(500, {"total_market": [BTC, ETH, XRP]})
         strat = strategy(**kwargs)
 
         fair_history = []
@@ -154,11 +154,12 @@ def backtest_spark_job(sc, input_path, working_dir):
     param_spaces = {
         "strategy": [Kalman],
         "executor": [Executor],
-        "window_size": range(90, 91, 1),
-        "movement_half_life": range(90, 91, 1),
-        "trend_half_life": range(3000, 3001, 1),
-        "cointegration_period": range(60, 61, 1),
-        "maxlag": range(120, 121, 1),
+        "window_size": range(500, 501, 1),
+        "movement_hl": range(6, 7, 1),
+        "trend_hl": range(256, 257, 1),
+        "variance_hl": range(192, 193, 1),
+        "cointegration_period": range(32, 33, 1),
+        "maxlag": range(8, 9, 1),
     }
     return aggregate(sc, inside_job, param_spaces, parallelism=2)
 
@@ -194,9 +195,47 @@ def analyze_spark_job(sc, results):
     from research.util.optimizer import aggregate
 
     def inside_job():
-        from research.analysis import analyze
+        from research.analysis import principal_market_movements, max_abs_drawdown
+        import numpy as np
 
-        return analyze(results, plot=False, backtest=True)
+        """Analyzes P/L and various risk metrics for the given run results.
+
+        Note: RoRs are per-tick. They are NOT comparable across time scales."""
+        # Balance values
+        price_data = results["data"].apply(lambda x: x["price"])
+        quote_currency = price_data.columns[0].quote
+        prices_ = price_data.rename(columns=lambda pair: pair.base)
+        prices_[quote_currency] = 1
+        balance_values = results["balances"] * prices_
+
+        pnls = balance_values.sum(axis=1)
+        pnl = pnls.iloc[-1]
+
+        # Market risk
+        (pmms, pmm_weights) = principal_market_movements(price_data)
+        for row in price_data.columns:
+            if row not in results["balances"]:
+                results["balances"][row] = 0.0
+
+        balances_ = results["balances"][[pair.base for pair in price_data.columns]].set_axis(
+            price_data.columns, axis=1, inplace=False
+        )
+        component_risks = np.abs(balances_ @ pmms.T)
+        risks = component_risks @ pmm_weights
+
+        total_positions = np.abs(balance_values.drop(columns=[quote_currency]).values).sum()
+        max_drawdown = max_abs_drawdown(pnls)
+
+        return {
+            "balances_usd": results["balances"].iloc[-1],
+            "pnl": pnl,
+            "max_market_risk": risks.values.max(),
+            "max_drawdown": max_drawdown,
+            "return_on_max_market_risk": pnl / (risks.values.max() + 1e-10),
+            "return_on_max_drawdown": pnl / (max_drawdown + 1e-10),
+            "return_on_total_position": pnl / (total_positions + 1e-10),
+            "sharpe_ratio": pnl / (pnls.std() + 1e-10),
+        }
 
     param_spaces = {}
     return aggregate(sc, inside_job, param_spaces, parallelism=2)
