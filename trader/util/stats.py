@@ -7,7 +7,6 @@ Note: In literature on moving averages, you'll see "value" referred to as "level
 """
 
 import numpy as np
-import pandas as pd
 
 
 class Ema:
@@ -15,10 +14,14 @@ class Ema:
     Exponentially-weighted moving average.
     """
 
-    def __init__(self, half_life):
+    def __init__(self, half_life, value_0=None):
         self.__a = 0.5 ** (1 / half_life)
-        self.__value = None
-        self.__samples_needed = half_life
+        if value_0 is None:
+            self.__value = None
+            self.__samples_needed = half_life
+        else:
+            self.__value = value_0
+            self.__samples_needed = 0
 
     @property
     def a(self):
@@ -45,10 +48,14 @@ class Emse:
     Exponentially-weighted moving mean squared-erroer.
     """
 
-    def __init__(self, half_life):
-        self.__a = 1 - 0.5 ** (1 / half_life)
-        self.__mse = 0
-        self.__samples_needed = half_life
+    def __init__(self, half_life, mse_0=None):
+        self.__a = 0.5 ** (1 / half_life)
+        if mse_0 is None:
+            self.__mse = 0
+            self.__samples_needed = half_life
+        else:
+            self.__mse = mse_0
+            self.__samples_needed = 0
 
     @property
     def mse(self):
@@ -59,7 +66,7 @@ class Emse:
         return np.sqrt(self.__mse)
 
     def step(self, e):
-        self.__mse = (1 - self.__a) * (self.__mse + self.__a * e ** 2)
+        self.__mse = self.__a * (self.__mse + (1 - self.__a) * e ** 2)
         self.__samples_needed = max(0, self.__samples_needed - 1)
         return self.__mse
 
@@ -76,9 +83,9 @@ class HoltEma:
     """
 
     def __init__(self, value_half_life, trend_half_life, mse_half_life=None):
-        self.__a = 1 - 0.5 ** (1 / value_half_life)
-        self.__b = 1 - 0.5 ** (1 / trend_half_life)
-        self.__c = 1 - 0.5 ** (1 / mse_half_life) if not mse_half_life is None else None
+        self.__a = 0.5 ** (1 / value_half_life)
+        self.__b = 0.5 ** (1 / trend_half_life)
+        self.__c = 0.5 ** (1 / mse_half_life) if not mse_half_life is None else None
         self.__value = None
         self.__trend = 0
         self.__mse = 0 if not mse_half_life is None else None
@@ -104,11 +111,11 @@ class HoltEma:
         if self.__value is None:
             self.__value = x
         value_old = self.__value
-        d = x - (self.__value + self.__trend)
-        self.__value += self.__a * d
-        self.__trend += self.__b * (self.__value - value_old - self.__trend)
+        self.__value = self.__a * (self.__value + self.__trend) + (1 - self.__a) * x
+        self.__trend = self.__b * self.__trend + (1 - self.__b) * (self.__value - value_old)
         if not self.__mse is None:
-            self.__mse = (1 - self.__c) * (self.__mse + self.__c * d ** 2)
+            err = x - (self.__value + self.__trend)
+            self.__mse = self.__c * (self.__mse + (1 - self.__c) * err ** 2)
         self.__samples_needed = max(0, self.__samples_needed - 1)
         return self.__value
 

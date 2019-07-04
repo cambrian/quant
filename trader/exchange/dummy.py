@@ -20,13 +20,11 @@ class DummyExchange(Exchange):
     data may contain pairs for other base exchanges but they will be ignored.
     """
 
-    def __init__(
-        self, thread_manager, base_exchange_id, data, fees={"maker": 0.001, "taker": 0.002}
-    ):
+    def __init__(self, thread_manager, id, data, fees={"maker": 0.001, "taker": 0.002}):
         super().__init__(thread_manager)
         self.__data = data
-        self.__base_exchange_id = base_exchange_id
-        self.__supported_pairs = [ep.pair for ep in data.iloc[0].index]
+        self.__id = id
+        self.__supported_pairs = [ep.pair for ep in data.columns.unique(0)]
         # `time` is not private to allow manual adjustment.
         self.time = -1
         self.__fees = fees
@@ -35,14 +33,14 @@ class DummyExchange(Exchange):
         self.__latest_books = {}
         self.__positions = defaultdict(float)
         self.__order_id = 0
-
-    @property
-    def base_exchange_id(self):
-        return self.__base_exchange_id
+        for pair in self.__supported_pairs:
+            pair_feed, runner = Feed.of(self.__book_generator(pair))
+            self._thread_manager.attach("dummy-{}-book".format(pair), runner)
+            self.__book_feeds[pair] = pair_feed
 
     @property
     def id(self):
-        return self.__base_exchange_id + "(dummy)"
+        return self.__id
 
     @staticmethod
     def encode_trading_pair(pair):
@@ -60,8 +58,8 @@ class DummyExchange(Exchange):
         if self.time >= len(self.__data.index):
             return False
         frame = self.__data.iloc[self.time]
-        for ep, (price, _) in frame.iterrows():
-            if ep.exchange_id != self.base_exchange_id:
+        for ep, price in frame.xs("price", level=1).iteritems():
+            if ep.exchange_id != self.id:
                 continue
             ep = ExchangePair(self.id, ep.pair)
             dummy_book = OrderBook(ep, [BookLevel(price, 1)], [BookLevel(price, 1)])
@@ -73,12 +71,7 @@ class DummyExchange(Exchange):
     def book_feed(self, pair):
         if pair not in self.__supported_pairs:
             raise ExchangeError("pair not supported by " + self.id)
-        if pair in self.__book_feeds:
-            return self.__book_feeds[pair]
-        pair_feed, runner = Feed.of(self.__book_generator(pair))
-        self._thread_manager.attach("dummy-{}-book".format(pair), runner)
-        self.__book_feeds[pair] = pair_feed
-        return pair_feed
+        return self.__book_feeds[pair]
 
     def __book_generator(self, pair):
         while True:
@@ -86,9 +79,8 @@ class DummyExchange(Exchange):
             yield book
 
     def frame(self, pairs):
-        eps = [ExchangePair(self.base_exchange_id, pair) for pair in pairs]
-        frame = self.__data.iloc[self.time].loc[eps]
-        return frame.set_axis([ExchangePair(self.id, pair) for pair in pairs], inplace=False)
+        eps = [ExchangePair(self.id, pair) for pair in pairs]
+        return self.__data.iloc[self.time][eps]
 
     def get_warmup_data(self, pairs, duration, resolution):
         return []

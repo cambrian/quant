@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from trader.util import Log
 from trader.util.stats import Emse, HoltEma
 
 
@@ -14,14 +15,28 @@ class ExecutionStrategy:
         trend_cutoff,
         min_edge_to_enter,
         min_edge_to_close,
+        warmup_data,
     ):
         self.size = size
+        # Does it make sense to replace with something else? (like % of takes that are buys)
         self.trend_estimator = HoltEma(trend_hl, accel_hl)
-        self.mvmt_variance = Emse(variance_hl)
-        self.prev_mids = None
         self.trend_cutoff = trend_cutoff
         self.min_edge_to_enter = min_edge_to_enter
         self.min_edge_to_close = min_edge_to_close
+
+        warmup_mvmts = warmup_data.xs("price", axis=1, level=1).diff()[1:]
+        mse = (warmup_mvmts ** 2).mean()
+        self.mvmt_variance = Emse(variance_hl, mse)
+        for _, mvmt in warmup_mvmts.iloc[-4 * accel_hl :].iterrows():
+            self.trend_estimator.step(mvmt)
+
+        self.prev_mids = warmup_data.xs("price", axis=1, level=1).iloc[-1]
+
+        if not self.mvmt_variance.ready:
+            Log.warn(
+                "Insufficient warmup data for execution strategy. \
+                    Will warm up (slowly) in real time. "
+            )
 
     def tick(self, positions, bids, asks, fairs, fees):
         """Takes fair as Gaussian, positions in base currency.

@@ -14,17 +14,10 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
-from trader.util.types import (
-    BookLevel,
-    Currency,
-    ExchangePair,
-    OpenOrder,
-    Order,
-    OrderBook,
-    Side,
-    TradingPair,
-)
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
+from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
+                               Order, OrderBook, Side, TradingPair)
 
 
 class Bitfinex(Exchange):
@@ -70,10 +63,11 @@ class Bitfinex(Exchange):
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
-        self.__frame = pd.DataFrame(
-            0.0,
-            index=list(map(lambda x: ExchangePair(self.id, x), pairs)),
-            columns=["price", "volume"],
+        self.__frame = pd.Series(
+            0.0, # setting the initial value to 0 is important for volume tracking to work properly
+            index=pd.MultiIndex.from_product(
+                [[ExchangePair(self.id, x) for x in pairs], ["price", "volume"]]
+            ),
         )
 
         for pair in pairs:
@@ -270,16 +264,17 @@ class Bitfinex(Exchange):
             rows = len(data[pairs[0]])
 
         # Prep data for strategy consumption
-        prepped = pd.Series()
+        prepped = []
+        times = []
         for i in range(0, len(data[pairs[0]])):
             frame = {}
             for pair in pairs:
                 elem = data[pair][i]
-                frame[ExchangePair(self.id, pair)] = (elem[2], elem[5])
-            frame = pd.DataFrame.from_dict(frame, orient="index", columns=["price", "volume"])
-            time = datetime.fromtimestamp(data[pairs[0]][i][0] / 1000)
-            prepped[time] = frame
-        prepped = prepped.iloc[::-1]
+                frame[ExchangePair(self.id, pair), "price"] = elem[2]
+                frame[ExchangePair(self.id, pair), "volume"] = elem[5]
+            prepped.append(pd.Series(frame))
+            times.append(datetime.fromtimestamp(data[pairs[0]][i][0] / 1000))
+        prepped = pd.DataFrame(prepped, index=times).iloc[::-1]
         return prepped
 
     def add_order(self, order):

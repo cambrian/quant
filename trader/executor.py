@@ -58,13 +58,13 @@ class Executor:
         this explicit or don't require it.
         """
         if self.__latest_fairs is None:
-            Log.warn("Attempted to trade but latest_fairs is None.")
+            Log.warn("Attempted to trade but executor has not received any fairs.")
             return
 
         # component warmup may not be synchronized
         for ep in self.__latest_fairs.mean.index:
-            if self.__latest_books[ep] is None:
-                Log.warn("No book data for exchange pair:", ep)
+            if not ep in self.__latest_books:
+                Log.warn("Attempted to trade but executor has no book data for exchange pair:", ep)
                 return
 
         if wait_for_other_trade:
