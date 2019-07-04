@@ -1,3 +1,4 @@
+import subprocess
 from urllib.parse import quote_plus
 
 import pandas as pd
@@ -97,7 +98,7 @@ def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
 # print(td.iloc[-1]["pv"])
 
 
-def backtest_spark_job(sc, input_path, working_dir):
+def backtest_spark_job(input_path, sc):
     """
     Your entire job must go within the function definition (including imports).
 
@@ -157,7 +158,7 @@ def backtest_spark_job(sc, input_path, working_dir):
         "window_size": range(500, 501, 1),
         "movement_hl": range(6, 7, 1),
         "trend_hl": range(256, 257, 1),
-        "variance_hl": range(192, 193, 1),
+        "mse_hl": range(192, 193, 1),
         "cointegration_period": range(32, 33, 1),
         "maxlag": range(8, 9, 1),
     }
@@ -265,9 +266,11 @@ def analyze(results):
     return value
 
 
-results = backtest()[0]
-price_data = results["data"].apply(lambda x: x["price"])
-for row in price_data.columns:
-    if row.base not in results["balances"]:
-        results["balances"][row.base] = 0.0
-print(analyze(results))
+# results = backtest()[0]
+# price_data = results["data"].apply(lambda x: x["price"])
+# for row in price_data.columns:
+#     if row.base not in results["balances"]:
+#         results["balances"][row.base] = 0.0
+# print(analyze(results))
+
+# subprocess.call(["./deploy-local.sh scripts/remote/"])
