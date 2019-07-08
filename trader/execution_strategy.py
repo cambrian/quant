@@ -64,7 +64,6 @@ class ExecutionStrategy:
 
         z_edge = (fairs.mean - mids) / fairs.stddev
         z_trend = trend / self.mvmt_variance.stderr
-        print(z_trend)
         target_position_values = z_edge * self.size
         pair_positions = positions[[(ep.exchange_id, ep.base) for ep in mids.index]].set_axis(
             mids.index, inplace=False
