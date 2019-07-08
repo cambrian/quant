@@ -1,17 +1,3 @@
-import subprocess
-from urllib.parse import quote_plus
-
-import numpy as np
-import pandas as pd
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sqlalchemy import create_engine
-
-import research.util.credentials as creds
-
-RISK_WINDOW = 10
-
-
 def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
     """
     Pulls test data from Postgres, in the form of a `DataFrame` of `DataFrame`s, for given exchanges
@@ -129,12 +115,17 @@ def backtest_spark_job(input_path, sc):
     from trader.executor import Executor
     from trader.execution_strategy import ExecutionStrategy
     from trader.signal_aggregator import SignalAggregator
+    import numpy as np
+    import pandas as pd
+    from sqlalchemy import create_engine
+
+    import research.util.credentials as creds
 
     def inside_job(strategy, executor, **kwargs):
         data = pd.read_hdf(input_path).resample("15Min").first()
-        window_size = 500
+        window_size = 50
         warmup_data = data.iloc[:window_size]
-        data = data.iloc[window_size:]
+        data = data.iloc[window_size : window_size * 2]
         thread_manager = ThreadManager()
         dummy_exchange = DummyExchange(
             thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
@@ -210,37 +201,62 @@ def backtest():
     return value
 
 
-def principal_market_movements(prices):
-    """Returns principal vectors for 1-stddev market movements, plus explained variance ratios"""
-    # Fit PCA to scaled (mean 0, variance 1) matrix of single-tick price differences
-    pca = PCA(n_components=0.97)
-    scaler = StandardScaler()
-    price_deltas = prices.diff().iloc[1:].rolling(RISK_WINDOW).sum().iloc[RISK_WINDOW:]
-    price_deltas_scaled = scaler.fit_transform(price_deltas)
-    pca.fit(price_deltas_scaled)
-    pcs = pd.DataFrame(scaler.inverse_transform(pca.components_), columns=price_deltas.columns)
-    return (pcs, pca.explained_variance_ratio_)
-
-
-def max_abs_drawdown(pnls):
-    """Maximum peak-to-trough distance before a new peak is attained. The usual metric, expressed
-    as a fraction of peak value, does not make sense in the infinite-leverage context."""
-    max_drawdown = 0
-    peak = -np.inf
-    for pnl in pnls:
-        if pnl > peak:
-            peak = pnl
-        drawdown = peak - pnl
-        if drawdown > max_drawdown:
-            max_drawdown = drawdown
-    return max_drawdown
-
-
 def analyze_spark_job(sc, results):
     """
     Your entire job must go within the function definition (including imports).
     """
-    from research.util.optimizer import aggregate
+    from trader.exchange import DummyExchange
+    from trader.util.constants import (
+        BTC_USDT,
+        ETH_USDT,
+        XRP_USDT,
+        LTC_USDT,
+        NEO_USDT,
+        EOS_USDT,
+        BTC,
+        ETH,
+        XRP,
+        BINANCE,
+    )
+    from trader.util.thread import ThreadManager
+    from research.util.optimizer import BasicGridSearch, aggregate
+    from trader.util.gaussian import Gaussian
+    from trader.strategy import Kalman
+    from trader.executor import Executor
+    from trader.execution_strategy import ExecutionStrategy
+    from trader.signal_aggregator import SignalAggregator
+    import numpy as np
+    import pandas as pd
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    from sqlalchemy import create_engine
+
+    import research.util.credentials as creds
+
+    def principal_market_movements(prices):
+        """Returns principal vectors for 1-stddev market movements, plus explained variance ratios"""
+        # Fit PCA to scaled (mean 0, variance 1) matrix of single-tick price differences
+        pca = PCA(n_components=0.97)
+        RISK_WINDOW = 10
+        scaler = StandardScaler()
+        price_deltas = prices.diff().iloc[1:].rolling(RISK_WINDOW).sum().iloc[RISK_WINDOW:]
+        price_deltas_scaled = scaler.fit_transform(price_deltas)
+        pca.fit(price_deltas_scaled)
+        pcs = pd.DataFrame(scaler.inverse_transform(pca.components_), columns=price_deltas.columns)
+        return (pcs, pca.explained_variance_ratio_)
+
+    def max_abs_drawdown(pnls):
+        """Maximum peak-to-trough distance before a new peak is attained. The usual metric, expressed
+        as a fraction of peak value, does not make sense in the infinite-leverage context."""
+        max_drawdown = 0
+        peak = -np.inf
+        for pnl in pnls:
+            if pnl > peak:
+                peak = pnl
+            drawdown = peak - pnl
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+        return max_drawdown
 
     def inside_job():
         import numpy as np
