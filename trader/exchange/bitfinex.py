@@ -64,7 +64,7 @@ class Bitfinex(Exchange):
         # TODO: Maybe start this in a lazy way?
         self.__ws_client.start()
         self.__frame = pd.Series(
-            0.0, # setting the initial value to 0 is important for volume tracking to work properly
+            0.0,  # setting the initial value to 0 is important for volume tracking to work properly
             index=pd.MultiIndex.from_product(
                 [[ExchangePair(self.id, x) for x in pairs], ["price", "volume"]]
             ),
@@ -143,13 +143,12 @@ class Bitfinex(Exchange):
 
             yield self.__frame
 
-    # TODO: return only pairs? If this is a feature we want
-    def frame(self, _pairs):
+    def frame(self, pairs):
         """
-        Returns frame for tracked pairs.
+        Returns frame for requested pairs.
         """
         frame = self.__frame.copy()
-        self.__frame["volume"] = 0
+        self.__frame.loc[pd.IndexSlice[[ExchangePair(self.id, p) for p in pairs], "volume"]] = 0
         return frame
 
     def positions_feed(self):
@@ -275,6 +274,8 @@ class Bitfinex(Exchange):
             prepped.append(pd.Series(frame))
             times.append(datetime.fromtimestamp(data[pairs[0]][i][0] / 1000))
         prepped = pd.DataFrame(prepped, index=times).iloc[::-1]
+
+        # TODO: also set last trade prices?
         return prepped
 
     def add_order(self, order):

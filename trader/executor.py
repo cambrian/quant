@@ -72,7 +72,6 @@ class Executor:
         elif not self.__trade_lock.acquire(blocking=False):
             Log.debug("Other thread trading.")
             return
-        Log.info("Trading.")
 
         bids = pd.Series(index=self.__latest_fairs.mean.index)
         asks = pd.Series(index=self.__latest_fairs.mean.index)
