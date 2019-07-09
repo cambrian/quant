@@ -76,6 +76,7 @@ def job(sc, input_path, working_dir):
                 "fairs": pd.DataFrame(fair_history, index=data.index),
                 # Should be called 'positions' but analysis.py must also change
                 "balances": pd.DataFrame(position_history, index=data.index),
+                "params": kwargs,
             }
 
         param_spaces = {
@@ -154,6 +155,7 @@ def job(sc, input_path, working_dir):
             max_drawdown = max_abs_drawdown(pnls)
 
             return {
+                "params": results["params"],
                 "balances_usd": results["balances"].iloc[-1],
                 "pnl": pnl,
                 "max_market_risk": risks.values.max(),
@@ -167,7 +169,7 @@ def job(sc, input_path, working_dir):
         param_spaces = {}
         return process_aggregate(sc, inside_job, param_spaces, parallelism=2, results=results)
 
-    results = backtest_spark_job("/home/hadoop/quant/research/data/1min.h5", sc)
+    results = backtest_spark_job("research/data/1min.h5", sc)
     for attempt in results:
         price_data = attempt["data"].xs("price", axis=1, level=1)
         for row in price_data.columns:
