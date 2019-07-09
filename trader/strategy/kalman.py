@@ -109,7 +109,7 @@ class Kalman(Strategy):
 
         # The moving average is already trend-compenstated, so we remove trend from the data.
         # TODO: remove?
-        price_history = remove_trend(price_history)
+        # price_history = remove_trend(price_history)
 
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
