@@ -1,3 +1,22 @@
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sqlalchemy import create_engine
+
+import research.util.credentials as creds
+from research.util.optimizer import BasicGridSearch, aggregate
+from trader.exchange import DummyExchange
+from trader.execution_strategy import ExecutionStrategy
+from trader.executor import Executor
+from trader.signal_aggregator import SignalAggregator
+from trader.strategy import Kalman
+from trader.util.constants import (BINANCE, BTC, BTC_USDT, EOS_USDT, ETH,
+                                   ETH_USDT, LTC_USDT, NEO_USDT, XRP, XRP_USDT)
+from trader.util.gaussian import Gaussian
+from trader.util.thread import ThreadManager
+
+
 def prepare_test_data(exchange_pairs, begin_time, end_time, tick_size_in_min):
     """
     Pulls test data from Postgres, in the form of a `DataFrame` of `DataFrame`s, for given exchanges
@@ -95,32 +114,6 @@ def backtest_spark_job(input_path, sc):
 
     TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
     """
-    from trader.exchange import DummyExchange
-    from trader.util.constants import (
-        BTC_USDT,
-        ETH_USDT,
-        XRP_USDT,
-        LTC_USDT,
-        NEO_USDT,
-        EOS_USDT,
-        BTC,
-        ETH,
-        XRP,
-        BINANCE,
-    )
-    from trader.util.thread import ThreadManager
-    from research.util.optimizer import BasicGridSearch, aggregate
-    from trader.util.gaussian import Gaussian
-    from trader.strategy import Kalman
-    from trader.executor import Executor
-    from trader.execution_strategy import ExecutionStrategy
-    from trader.signal_aggregator import SignalAggregator
-    import numpy as np
-    import pandas as pd
-    from sqlalchemy import create_engine
-
-    import research.util.credentials as creds
-
     def inside_job(strategy, executor, **kwargs):
         data = pd.read_hdf(input_path).resample("15Min").first()
         window_size = 50
@@ -205,33 +198,6 @@ def analyze_spark_job(sc, results):
     """
     Your entire job must go within the function definition (including imports).
     """
-    from trader.exchange import DummyExchange
-    from trader.util.constants import (
-        BTC_USDT,
-        ETH_USDT,
-        XRP_USDT,
-        LTC_USDT,
-        NEO_USDT,
-        EOS_USDT,
-        BTC,
-        ETH,
-        XRP,
-        BINANCE,
-    )
-    from trader.util.thread import ThreadManager
-    from research.util.optimizer import BasicGridSearch, aggregate
-    from trader.util.gaussian import Gaussian
-    from trader.strategy import Kalman
-    from trader.executor import Executor
-    from trader.execution_strategy import ExecutionStrategy
-    from trader.signal_aggregator import SignalAggregator
-    import numpy as np
-    import pandas as pd
-    from sklearn.decomposition import PCA
-    from sklearn.preprocessing import StandardScaler
-    from sqlalchemy import create_engine
-
-    import research.util.credentials as creds
 
     def principal_market_movements(prices):
         """Returns principal vectors for 1-stddev market movements, plus explained variance ratios"""
