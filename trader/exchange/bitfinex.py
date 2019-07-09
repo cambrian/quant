@@ -14,10 +14,17 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
-                               Order, OrderBook, Side, TradingPair)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import (
+    BookLevel,
+    Currency,
+    ExchangePair,
+    OpenOrder,
+    Order,
+    OrderBook,
+    Side,
+    TradingPair,
+)
 
 
 class Bitfinex(Exchange):

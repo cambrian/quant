@@ -53,11 +53,8 @@ class Exchange(ABC):
 
     @abstractmethod
     def frame(self, pairs):
-        """Queries prices and volumes for the given pairs. Reads the latest trade prices and
-        volumes from the exchange object.
-
-        Args:
-            pairs (list): A list of pairs to query.
+        """Get latest trade prices and cumulative volumes since the previous call to `frame` for
+        the given pairs.
 
         Returns:
             DataFrame: A Pandas dataframe of prices and volumes indexed by the pairs.

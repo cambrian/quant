@@ -8,10 +8,22 @@ from trader import ExecutionStrategy, Executor, SignalAggregator
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
-                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
-                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
-                                   XRP_USD, XRP_USDT)
+from trader.util.constants import (
+    BCH_USD,
+    BINANCE,
+    BSV_USD,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USD,
+    EOS_USDT,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USD,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USD,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -39,20 +51,19 @@ def main():
         window_size=window_size,
         movement_hl=90,
         trend_hl=3000,
-        mse_hl=2880,
+        mse_hl=1440,
         cointegration_period=60,
         maxlag=120,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 2880, 1, 3, -1, 0.002, 0.0005, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 1440, 1, 3, -0, 0.002, 0.0005, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
     while beat.loop():
         Log.info("Beat")
         bfx_frame = bitfinex.frame(pairs)
-        print(bfx_frame)
         signals = aggregator.step(bfx_frame)
         kalman_fairs = kalman_strategy.tick(bfx_frame, signals)
         fairs = kalman_fairs & Gaussian(
