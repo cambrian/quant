@@ -35,8 +35,10 @@ class ExecutionStrategy:
         if not self.mvmt_variance.ready:
             Log.warn(
                 "Insufficient warmup data for execution strategy. \
-                    Will warm up (slowly) in real time. "
+                    Will warm up (slowly) in real time."
             )
+        else:
+            Log.info("Execution strategy initialized and warm.")
 
     def tick(self, positions, bids, asks, fairs, fees):
         """Takes fair as Gaussian, positions in base currency.

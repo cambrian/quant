@@ -83,7 +83,9 @@ class Kalman(Strategy):
         self.coint_f = pd.DataFrame(1, index=signal_prices.columns, columns=all_prices.columns)
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
-            Log.warn("Insufficient warmup data. Strategy will warm up (slowly) in real time.")
+            Log.warn("Insufficient warmup data. Price model will warm up (slowly) in real time.")
+        else:
+            Log.info("Price model initialized and warm.")
 
     # the fair combination step assumes that all signals are i.i.d. They are not (and obviously not in the case
     # of funds). Is this a problem?
@@ -107,7 +109,7 @@ class Kalman(Strategy):
 
         # The moving average is already trend-compenstated, so we remove trend from the data.
         # TODO: remove?
-        price_history = remove_trend(price_history)
+        # price_history = remove_trend(price_history)
 
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
