@@ -35,11 +35,10 @@ def job(sc, input_path, working_dir):
         TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
         """
 
-        def inside_job(strategy, executor, **kwargs):
+        def inside_job(strategy, executor, window_size, **kwargs):
             data = pd.read_hdf(input_path).resample("15Min").first()
-            window_size = 500
             warmup_data = data.iloc[:window_size]
-            data = data.iloc[window_size :]
+            data = data.iloc[window_size:]
             thread_manager = ThreadManager()
             dummy_exchange = DummyExchange(
                 thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
@@ -49,7 +48,12 @@ def job(sc, input_path, working_dir):
             executor = executor(thread_manager, {dummy_exchange: pairs}, execution_strategy)
             aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
             warmup_signals = warmup_data.apply(aggregator.step, axis=1)
-            strat = strategy(**kwargs, warmup_signals=warmup_signals, warmup_data=warmup_data)
+            strat = strategy(
+                window_size=window_size,
+                **kwargs,
+                warmup_signals=warmup_signals,
+                warmup_data=warmup_data
+            )
 
             fair_history = []
             position_history = []
@@ -169,7 +173,7 @@ def job(sc, input_path, working_dir):
         param_spaces = {}
         return process_aggregate(sc, inside_job, param_spaces, parallelism=2, results=results)
 
-    results = backtest_spark_job("research/data/1min.h5", sc)
+    results = backtest_spark_job("/home/hadoop/quant/research/data/1min.h5", sc)
     for attempt in results:
         price_data = attempt["data"].xs("price", axis=1, level=1)
         for row in price_data.columns:
