@@ -37,9 +37,9 @@ def job(sc, input_path, working_dir):
 
         def inside_job(strategy, executor, **kwargs):
             data = pd.read_hdf(input_path).resample("15Min").first()
-            window_size = 50
+            window_size = 500
             warmup_data = data.iloc[:window_size]
-            data = data.iloc[window_size : window_size * 2]
+            data = data.iloc[window_size :]
             thread_manager = ThreadManager()
             dummy_exchange = DummyExchange(
                 thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
