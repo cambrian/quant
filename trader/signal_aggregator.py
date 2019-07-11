@@ -9,17 +9,6 @@ CIRCULATING_SUPPLY = pd.Series(
     {BTC: 18e6, ETH: 106e6, XRP: 42e9, BCH: 18e6, EOS: 913e6, LTC: 62e6, NEO: 65e6, BSV: 18e6}
 )
 
-# TODO: actually convert quotes, not just volume
-# think about how to do this. what if a quote_usd pair does not exist on a :particular exchange?
-def convert_quotes_to_usd(frame):
-    frame = frame.copy()
-    # .values call necessary because assigning to indexslices is buggy
-    # see https://github.com/pandas-dev/pandas/issues/10440
-    frame.loc[pd.IndexSlice[:, "volume"]] = (
-        frame.xs("volume", level=1) * frame.xs("price", level=1)
-    ).values
-    return frame
-
 
 def aggregate_currency_quotes(moving_volumes, frame):
     """
@@ -63,7 +52,7 @@ def compute_baskets(basket_specs, aggregates):
 class SignalAggregator:
     """
     Adds cap-weighted baskets to frame.
-    TODO: also convert non-USD quotes to USD, add aggregated currency prices
+    Frame should already be in usd.
     """
 
     def __init__(self, volume_half_life, baskets):
@@ -71,7 +60,6 @@ class SignalAggregator:
         self.__baskets = baskets
 
     def step(self, frame):
-        frame = convert_quotes_to_usd(frame)
         moving_volumes = self.__moving_volumes.step(frame.xs("volume", level=1))
         aggregates = aggregate_currency_quotes(moving_volumes, frame)
         baskets = compute_baskets(self.__baskets, aggregates)

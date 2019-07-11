@@ -4,7 +4,7 @@ import time
 import pandas as pd
 
 import trader.strategy as strategy
-from trader import ExecutionStrategy, Executor, SignalAggregator
+from trader import ExecutionStrategy, Executor, SignalAggregator, UsdConverter
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
@@ -43,7 +43,9 @@ def main():
     warmup_data = bitfinex.get_warmup_data(pairs, window_size, "1m")
 
     Log.info("Prepping warmup data.")
+    converter = UsdConverter()
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
+    warmup_data = warmup_data.apply(converter.step, axis=1)
     warmup_signals = warmup_data.apply(aggregator.step, axis=1)
 
     Log.info("Initializing components.")
@@ -57,17 +59,18 @@ def main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 1440, 1, 3, -0, 0.002, 0.0005, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 1440, 10, 30, -0, 0.002, 0.0005, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
     while beat.loop():
         Log.info("Beat")
         bfx_frame = bitfinex.frame(pairs)
-        signals = aggregator.step(bfx_frame)
-        kalman_fairs = kalman_strategy.tick(bfx_frame, signals)
+        frame_usd = converter.step(bfx_frame)
+        signals = aggregator.step(frame_usd)
+        kalman_fairs = kalman_strategy.tick(frame_usd, signals)
         fairs = kalman_fairs & Gaussian(
-            bfx_frame.xs("price", level=1), [1e100 for _ in bfx_frame.xs("price", level=1).index]
+            frame_usd.xs("price", level=1), [1e100 for _ in frame_usd.xs("price", level=1).index]
         )
         Log.info("fairs", fairs)
         executor.tick_fairs(fairs)
@@ -80,10 +83,12 @@ def dummy_main():
     data = data.resample("15Min").first()
     window_size = 500
 
+    converter = UsdConverter()
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
     Log.info("Processing warmup data.")
     warmup_data = data.iloc[:window_size]
     data = data.iloc[window_size:]
+    warmup_data = warmup_data.apply(converter.step, axis=1)
     warmup_signals = warmup_data.apply(aggregator.step, axis=1)
 
     Log.info("Initializing components.")
@@ -106,11 +111,12 @@ def dummy_main():
     while True:
         if not dummy_exchange.step_time():
             break
-        dummy_data = dummy_exchange.frame(pairs)
-        signals = aggregator.step(dummy_data)
-        kalman_fairs = kalman_strategy.tick(dummy_data, signals)
+        frame = dummy_exchange.frame(pairs)
+        frame_usd = converter.step(frame)
+        signals = aggregator.step(frame_usd)
+        kalman_fairs = kalman_strategy.tick(frame_usd, signals)
         fairs = kalman_fairs & Gaussian(
-            dummy_data.xs("price", level=1), [1e100 for _ in dummy_data.xs("price", level=1).index]
+            frame_usd.xs("price", level=1), [1e100 for _ in frame_usd.xs("price", level=1).index]
         )
         Log.info("fairs", fairs)
         executor.tick_fairs(fairs)

@@ -61,26 +61,34 @@ class Kalman(Strategy):
         self.r = None
         self.r2 = None
         # TODO: do some checks for length/pairs of warmup signals/outputs
-        signal_prices = warmup_signals.xs("price", axis=1, level=1)
-        data_prices = warmup_data.xs("price", axis=1, level=1)
-        all_prices = pd.concat([signal_prices, data_prices], axis=1)
-        self.price_history = RingBuffer(
-            self.window_size, dtype=(np.float64, len(all_prices.columns))
+        prices = pd.concat(
+            [warmup_signals.xs("price", axis=1, level=1), warmup_data.xs("price", axis=1, level=1)],
+            axis=1,
+            sort=False,
         )
-        self.price_history.extend(all_prices.values)
-
-        for _, prices in all_prices.iloc[-trend_hl * 4 :].iterrows():
-            self.moving_prices.step(prices)
-
-        self.moving_signal_volumes = Ema(
-            mse_hl, warmup_signals.xs("volume", axis=1, level=1).mean()
+        volumes = pd.concat(
+            [
+                warmup_signals.xs("volume", axis=1, level=1),
+                warmup_data.xs("volume", axis=1, level=1),
+            ],
+            axis=1,
+            sort=False,
         )
+        self.price_history = RingBuffer(self.window_size, dtype=(np.float64, len(prices.columns)))
+        self.price_history.extend(prices.values)
 
-        self.moving_variances = Emse(window_size / 2, (all_prices.diff()[1:] ** 2).mean())
+        for _, p in prices.iloc[-trend_hl * 4 :].iterrows():
+            self.moving_prices.step(p)
 
-        self.prev_fair = Gaussian(self.moving_prices.value, [1e100 for _ in all_prices.columns])
+        self.moving_volumes = Ema(mse_hl, volumes.mean())
 
-        self.coint_f = pd.DataFrame(1, index=signal_prices.columns, columns=all_prices.columns)
+        self.moving_variances = Emse(window_size / 2, (prices.diff()[1:] ** 2).mean())
+
+        self.prev_fair = Gaussian(self.moving_prices.value, [1e100 for _ in prices.columns])
+
+        self.coint_f = pd.DataFrame(
+            1, index=warmup_signals.columns.unique(0), columns=prices.columns
+        )
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             Log.warn("Insufficient warmup data. Price model will warm up (slowly) in real time.")
@@ -91,7 +99,10 @@ class Kalman(Strategy):
     # of funds). Is this a problem?
     def tick(self, frame, signals):
         prices = pd.concat([signals.xs("price", level=1), frame.xs("price", level=1)], sort=False)
-        input_names = prices.index.unique(0)
+        volumes = pd.concat(
+            [signals.xs("volume", level=1), frame.xs("volume", level=1)], sort=False
+        )
+        input_names = prices.index
         signal_names = signals.index.unique(0)
 
         self.price_history.append(prices)
@@ -99,7 +110,7 @@ class Kalman(Strategy):
         price_history = pd.DataFrame(self.price_history, columns=input_names)
 
         moving_prices = self.moving_prices.step(prices)
-        moving_signal_volumes = self.moving_signal_volumes.step(signals.xs("volume", level=1))
+        moving_volumes = self.moving_volumes.step(volumes)
 
         movement = price_history.iloc[-1] - price_history.iloc[-2]
         self.moving_variances.step(movement)
@@ -135,9 +146,14 @@ class Kalman(Strategy):
 
         stddev = self.moving_variances.stderr
         correlated_slopes = self.r.mul(stddev, axis=1).div(stddev[signal_names], axis=0)
-        sqrt_volume = np.sqrt(moving_signal_volumes)
+        log_volume = np.log1p(moving_volumes)
         # ideally use mkt cap instead of volume?
-        volume_f = np.max(sqrt_volume) / sqrt_volume
+        volume_f = pd.DataFrame(
+            log_volume[np.newaxis, :] - log_volume[signal_names][:, np.newaxis],
+            index=signal_names,
+            columns=input_names,
+        )
+        volume_f = volume_f * (volume_f > 0) + 1
 
         delta = signals.xs("price", level=1) - moving_prices[signal_names]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)
