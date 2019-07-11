@@ -38,7 +38,7 @@ def job(sc, input_path, working_dir):
         def inside_job(strategy, executor, window_size, **kwargs):
             data = pd.read_hdf(input_path).resample("15Min").first()
             warmup_data = data.iloc[:window_size]
-            data = data.iloc[window_size:]
+            data = data.iloc[window_size : window_size * 2]
             thread_manager = ThreadManager()
             dummy_exchange = DummyExchange(
                 thread_manager, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
@@ -86,14 +86,14 @@ def job(sc, input_path, working_dir):
         param_spaces = {
             "strategy": [Kalman],
             "executor": [Executor],
-            "window_size": range(500, 502, 1),
+            "window_size": range(50, 52, 1),
             "movement_hl": range(6, 7, 1),
             "trend_hl": range(256, 257, 1),
             "mse_hl": range(192, 193, 1),
             "cointegration_period": range(32, 33, 1),
             "maxlag": range(8, 9, 1),
         }
-        return aggregate(sc, inside_job, param_spaces, parallelism=2)
+        return aggregate(sc, inside_job, param_spaces, parallelism=1)
 
     def analyze_spark_job(sc, results):
         """
@@ -171,7 +171,7 @@ def job(sc, input_path, working_dir):
             }
 
         param_spaces = {}
-        return process_aggregate(sc, inside_job, param_spaces, parallelism=2, results=results)
+        return process_aggregate(sc, inside_job, param_spaces, parallelism=1, results=results)
 
     results = backtest_spark_job("/home/hadoop/quant/research/data/1min.h5", sc)
     for attempt in results:
