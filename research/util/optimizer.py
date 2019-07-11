@@ -111,7 +111,7 @@ def optimize(sc, strategy, runner, param_spaces, parallelism, **kwargs):
     return optimizer.best_params()
 
 
-def aggregate(sc, runner, param_spaces, **kwargs):
+def aggregate(sc, runner, param_spaces, parallelism, **kwargs):
     def sim(kwargs):
         return runner(**kwargs)
 
