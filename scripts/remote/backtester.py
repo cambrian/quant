@@ -28,15 +28,15 @@ def job(sc, input_path, working_dir):
     from trader.util.gaussian import Gaussian
     from trader.util.thread import ThreadManager
 
-    def backtest_spark_job(input_path, sc):
+    def backtest_spark_job(sc):
         """
         Your entire job must go within the function definition (including imports).
 
         TODO: integrate with prepare_test_data to pull from DB instead of HDF from disk
         """
 
-        def inside_job(strategy, executor, window_size, **kwargs):
-            data = pd.read_hdf(input_path)  # .resample("15Min").first()
+        def inside_job(strategy, executor, data, window_size, **kwargs):
+            data_resolution, data = data
             warmup_data = data.iloc[:window_size]
             data = data.iloc[window_size:]
             thread_manager = ThreadManager()
@@ -75,6 +75,7 @@ def job(sc, input_path, working_dir):
 
             thread_manager.attach("main", main, should_terminate=True)
             thread_manager.run()
+            kwargs["data_resolution"] = data_resolution
             return {
                 "data": data,
                 "fairs": pd.DataFrame(fair_history, index=data.index),
@@ -86,6 +87,7 @@ def job(sc, input_path, working_dir):
         param_spaces = {
             "strategy": [Kalman],
             "executor": [Executor],
+            "data": [("1 Min Data", pd.read_hdf("research/data/1min.h5"))],
             "window_size": [500],  # range(50, 52, 1),
             "movement_hl": [90],  # range(6, 7, 1),
             "trend_hl": [3000],  # range(256, 257, 1),
@@ -173,7 +175,7 @@ def job(sc, input_path, working_dir):
         param_spaces = {}
         return process_aggregate(sc, inside_job, param_spaces, parallelism=2, results=results)
 
-    results = backtest_spark_job("/home/hadoop/quant/research/data/1min.h5", sc)
+    results = backtest_spark_job(sc)
     for attempt in results:
         price_data = attempt["data"].xs("price", axis=1, level=1)
         for row in price_data.columns:
