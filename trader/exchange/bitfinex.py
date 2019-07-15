@@ -14,17 +14,10 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
-from trader.util.types import (
-    BookLevel,
-    Currency,
-    ExchangePair,
-    OpenOrder,
-    Order,
-    OrderBook,
-    Side,
-    TradingPair,
-)
+from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
+                                   XRP, XRP_USD)
+from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
+                               Order, OrderBook, Side, TradingPair)
 
 
 class Bitfinex(Exchange):
@@ -299,7 +292,13 @@ class Bitfinex(Exchange):
             "type": self.__order_types[order.order_type],
             "is_postonly": order.maker_only,
         }
-        response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        try:
+            response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        except TypeError as err:
+            Log.debug("Bitfinex _post type error: {}".format(err))
+        except Exception as err:
+            Log.debug("Swallowing unexpected error: {}".format(err))
+            return None
         # TODO: don't ignore error responses
         Log.debug("Bitfinex-order-response", response)
         if "id" in response:
