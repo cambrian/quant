@@ -7,7 +7,7 @@ from statsmodels.tsa.stattools import coint
 
 from trader.strategy.base import Strategy
 from trader.util import Gaussian, Log
-from trader.util.stats import Ema, Emse, HoltEma
+from trader.util.stats import Ema, Emse, HoltEma, TrendEstimator
 
 
 def bhattacharyya_multi(a, b):
@@ -82,7 +82,9 @@ class Kalman(Strategy):
 
         self.moving_volumes = Ema(mse_hl, volumes.mean())
 
-        self.moving_variances = Emse(window_size / 2, (prices.diff()[1:] ** 2).mean())
+        self.moving_variances = TrendEstimator(
+            Emse(window_size / 2, (prices.diff()[1:] ** 2).mean()), prices.iloc[-1]
+        )
 
         self.prev_fair = Gaussian(self.moving_prices.value, [1e100 for _ in prices.columns])
 
@@ -111,9 +113,7 @@ class Kalman(Strategy):
 
         moving_prices = self.moving_prices.step(prices)
         moving_volumes = self.moving_volumes.step(volumes)
-
-        movement = price_history.iloc[-1] - price_history.iloc[-2]
-        self.moving_variances.step(movement)
+        stddev = np.sqrt(self.moving_variances.step(prices))
 
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return Gaussian(pd.Series([]), [])
@@ -144,7 +144,6 @@ class Kalman(Strategy):
 
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
-        stddev = self.moving_variances.stderr
         correlated_slopes = self.r.mul(stddev, axis=1).div(stddev[signal_names], axis=0)
         log_volume = np.log1p(moving_volumes)
         # ideally use mkt cap instead of volume?
@@ -153,7 +152,7 @@ class Kalman(Strategy):
             index=signal_names,
             columns=input_names,
         )
-        volume_f = volume_f * (volume_f > 0) + 1
+        volume_f = (volume_f * (volume_f > 0) + 1) ** 2
 
         delta = signals.xs("price", level=1) - moving_prices[signal_names]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)

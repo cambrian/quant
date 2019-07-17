@@ -122,3 +122,24 @@ class HoltEma:
     @property
     def ready(self):
         return self.__samples_needed == 0
+
+
+class TrendEstimator:
+    def __init__(self, estimator, init=None):
+        self.estimator = estimator
+        self.__prev = init
+
+    @property
+    def prev(self):
+        return self.__prev
+
+    @property
+    def ready(self):
+        return self.estimator.ready
+
+    def step(self, x):
+        if self.__prev is None:
+            self.__prev = x
+        diff = x - self.__prev
+        self.__prev = x
+        return self.estimator.step(diff)

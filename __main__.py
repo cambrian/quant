@@ -59,7 +59,7 @@ def main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 1440, 10, 30, -0, 0.002, 0.0005, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 2, 4, 10, 20, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
