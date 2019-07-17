@@ -51,8 +51,11 @@ class ExecutionStrategy:
         )
         proposed_orders = target_position_values / fairs.mean - pair_positions
         profitable = np.sign(proposed_orders) * pct_edge > 2 * fees
-        trending_correctly = (trend * np.sign(pct_edge) > 0) & (fair_trend * np.sign(pct_edge) > 0)
-        profitable_orders = proposed_orders * profitable * trending_correctly
+        trending_correctly = trend * np.sign(pct_edge) > 0
+        fair_trending_correctly = fair_trend * np.sign(pct_edge) > 0
+        profitable_orders = (
+            proposed_orders * profitable * trending_correctly * fair_trending_correctly
+        )
 
         unprofitable_position = np.sign(pair_positions) * pct_edge < 0
         position_closing_orders = (
