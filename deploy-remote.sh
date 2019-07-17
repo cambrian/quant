@@ -12,7 +12,7 @@ export AWS_ACCESS_KEY_ID=AKIA3CMPUXHLHXWY23PM
 export AWS_SECRET_ACCESS_KEY=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
 
 # Archive current master of `quant` as a dependency.
-git archive --output quant.zip master
+git archive --output quant.zip HEAD
 
 # Generate complete job runner.
 python3 job.py $1
