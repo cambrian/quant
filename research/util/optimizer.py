@@ -115,7 +115,7 @@ def aggregate(sc, runner, param_spaces, parallelism, **kwargs):
     def sim(kwargs):
         return runner(**kwargs)
 
-    rdd = sc.parallelize(_dict_product(param_spaces))#, parallelism)
+    rdd = sc.parallelize(_dict_product(param_spaces), parallelism)
     res = rdd.map(sim).collect()
     return res
 
@@ -124,6 +124,6 @@ def process_aggregate(sc, runner, param_spaces, parallelism, results, **kwargs):
     def sim(kwargs):
         return runner(results=kwargs)
 
-    rdd = sc.parallelize(results)#, parallelism)
+    rdd = sc.parallelize(results, parallelism)
     res = rdd.map(sim).collect()
     return res
