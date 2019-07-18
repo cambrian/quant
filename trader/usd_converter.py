@@ -2,7 +2,7 @@ import pandas as pd
 
 
 # TODO: actually convert quotes, not just volume
-# think about how to do this. what if a quote_usd pair does not exist on a :particular exchange?
+# think about how to do this. what if a quote_usd pair does not exist on a particular exchange?
 def convert_quotes_to_usd(frame):
     frame = frame.copy()
     # .values call necessary because assigning to indexslices is buggy
