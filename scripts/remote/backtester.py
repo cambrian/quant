@@ -176,9 +176,5 @@ def job(sc, input_path, working_dir):
         return process_aggregate(sc, inside_job, param_spaces, parallelism=2, results=results)
 
     results = backtest_spark_job(sc)
-    for attempt in results:
-        price_data = attempt["data"].xs("price", axis=1, level=1)
-        for row in price_data.columns:
-            if row.base not in attempt["balances"]:
-                attempt["balances"][row.base] = 0.0
-    return analyze_spark_job(sc, results)
+    res = analyze_spark_job(sc, results)
+    return res
