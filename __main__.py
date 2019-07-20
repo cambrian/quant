@@ -1,12 +1,10 @@
 import json
-import time
 
 import pandas as pd
 
 import trader.strategy as strategy
 from trader import ExecutionStrategy, Executor, SignalAggregator, UsdConverter
 from trader.exchange import Bitfinex, DummyExchange
-from trader.metrics import Metrics
 from trader.util import Gaussian, Log
 from trader.util.constants import (
     BCH_USD,
@@ -53,13 +51,11 @@ def main():
         window_size=window_size,
         movement_hl=1440 * 3,
         trend_hl=window_size,
-        mse_hl=1440 * 3,
         cointegration_period=720,
-        maxlag=0,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 1, 3, 5, 15, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 45, 135, 60, 180, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
@@ -94,15 +90,13 @@ def dummy_main():
     Log.info("Initializing components.")
     kalman_strategy = strategy.Kalman(
         window_size=window_size,
-        movement_hl=6,
+        movement_hl=288,
         trend_hl=256,
-        mse_hl=192,
-        cointegration_period=32,
-        maxlag=8,
+        cointegration_period=96,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(10, 192, 1, 3, -1, 0.002, 0.0005, warmup_data)
+    execution_strategy = ExecutionStrategy(10, 3, 9, 4, 12, warmup_data)
 
     dummy_exchange = DummyExchange(
         THREAD_MANAGER, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}

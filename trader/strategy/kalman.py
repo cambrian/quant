@@ -42,21 +42,12 @@ class Kalman(Strategy):
     """
 
     def __init__(
-        self,
-        window_size,
-        movement_hl,
-        trend_hl,
-        mse_hl,
-        cointegration_period,
-        maxlag,
-        warmup_signals,
-        warmup_data,
+        self, window_size, movement_hl, trend_hl, cointegration_period, warmup_signals, warmup_data
     ):
         self.window_size = window_size
-        self.moving_prices = HoltEma(movement_hl, trend_hl, mse_hl)
-        self.moving_err_from_prev_fair = Emse(mse_hl)
+        self.moving_prices = HoltEma(movement_hl, trend_hl, trend_hl)
+        self.moving_err_from_prev_fair = Emse(trend_hl)
         self.cointegration_period = cointegration_period
-        self.maxlag = maxlag
         self.sample_counter = 0
         self.r = None
         self.r2 = None
@@ -80,7 +71,7 @@ class Kalman(Strategy):
         for _, p in prices.iloc[-trend_hl * 4 :].iterrows():
             self.moving_prices.step(p)
 
-        self.moving_volumes = Ema(mse_hl, volumes.mean())
+        self.moving_volumes = Ema(movement_hl, volumes.mean())
 
         self.moving_variances = TrendEstimator(
             Emse(window_size / 2, (prices.diff()[1:] ** 2).mean()), prices.iloc[-1]
@@ -118,10 +109,6 @@ class Kalman(Strategy):
         if len(self.price_history) < self.window_size or not self.moving_prices.ready:
             return Gaussian(pd.Series([]), [])
 
-        # The moving average is already trend-compenstated, so we remove trend from the data.
-        # TODO: remove?
-        # price_history = remove_trend(price_history)
-
         # calculate p values for pair cointegration
         if self.sample_counter == 0:
             for i in signal_names:
@@ -130,11 +117,7 @@ class Kalman(Strategy):
                     with warnings.catch_warnings():
                         warnings.filterwarnings("ignore")
                         p = coint(
-                            price_history[i],
-                            price_history[j],
-                            trend="nc",
-                            maxlag=self.maxlag,
-                            autolag=None,
+                            price_history[i], price_history[j], trend="nc", maxlag=0, autolag=None
                         )[1]
                         self.coint_f.loc[i, j] = 1 + p * 20
             self.r = price_history.corr().loc[signal_names]
