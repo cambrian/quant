@@ -132,27 +132,25 @@ class Kalman(Strategy):
                         p = coint(
                             price_history[i],
                             price_history[j],
-                            trend="ct",
+                            trend="nc",
                             maxlag=self.maxlag,
                             autolag=None,
                         )[1]
-                        self.coint_f.loc[i, j] = (
-                            1 + p * p * p * 15625
-                        )  # .04 -> 2, .05 -> ~3, .1 -> 15.625
+                        self.coint_f.loc[i, j] = 1 + p * 20
             self.r = price_history.corr().loc[signal_names]
             self.r2 = self.r ** 2
 
         self.sample_counter = (self.sample_counter - 1) % self.cointegration_period
 
         correlated_slopes = self.r.mul(stddev, axis=1).div(stddev[signal_names], axis=0)
-        log_volume = np.log1p(moving_volumes)
         # ideally use mkt cap instead of volume?
+        log_volume = np.log1p(moving_volumes)
         volume_f = pd.DataFrame(
             log_volume[np.newaxis, :] - log_volume[signal_names][:, np.newaxis],
             index=signal_names,
             columns=input_names,
         )
-        volume_f = (volume_f * (volume_f > 0) + 1) ** 2
+        volume_f = volume_f * (volume_f > 0) + 1
 
         delta = signals.xs("price", level=1) - moving_prices[signal_names]
         fair_delta_means = correlated_slopes.mul(delta, axis=0)

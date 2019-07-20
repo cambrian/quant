@@ -32,7 +32,7 @@ THREAD_MANAGER = ThreadManager()
 
 def main():
     pairs = [BTC_USD, ETH_USD, XRP_USD, LTC_USD, EOS_USD, BCH_USD, BSV_USD]
-    window_size = 7500
+    window_size = 9999  # biggest window that will fit in 2 api calls to candles
 
     Log.info("Connecting to exchanges.")
     with open("keys/bitfinex.json") as bitfinex_key_file:
@@ -51,15 +51,15 @@ def main():
     Log.info("Initializing components.")
     kalman_strategy = strategy.Kalman(
         window_size=window_size,
-        movement_hl=90,
-        trend_hl=3000,
-        mse_hl=1440,
-        cointegration_period=60,
-        maxlag=120,
+        movement_hl=1440 * 3,
+        trend_hl=window_size,
+        mse_hl=1440 * 3,
+        cointegration_period=720,
+        maxlag=0,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 1, 2, 10, 20, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 1, 3, 5, 15, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
