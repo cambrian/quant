@@ -55,7 +55,7 @@ def main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(500, 45, 135, 60, 180, warmup_data)
+    execution_strategy = ExecutionStrategy(500, 1, 3, 45, 135, 60, 180, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
@@ -96,7 +96,9 @@ def dummy_main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(10, 3, 9, 4, 12, warmup_data)
+    # use same params for trend and micro trend because 15min is too wide for micro trends to have
+    # effect
+    execution_strategy = ExecutionStrategy(10, 3, 9, 3, 9, 4, 12, warmup_data)
 
     dummy_exchange = DummyExchange(
         THREAD_MANAGER, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}

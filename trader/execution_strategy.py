@@ -1,19 +1,32 @@
 import numpy as np
-import pandas as pd
 
 from trader.util import Log
-from trader.util.stats import Emse, HoltEma, TrendEstimator
+from trader.util.stats import HoltEma, TrendEstimator
 
 
 class ExecutionStrategy:
-    def __init__(self, size, trend_hl, accel_hl, edge_trend_hl, edge_accel_hl, warmup_data):
+    def __init__(
+        self,
+        size,
+        micro_trend_hl,
+        micro_accel_hl,
+        trend_hl,
+        accel_hl,
+        edge_trend_hl,
+        edge_accel_hl,
+        warmup_data,
+    ):
         self.size = size
 
         warmup_prices = warmup_data.xs("price", axis=1, level=1)
         latest_prices = warmup_prices.iloc[-1]
-        # Does it make sense to replace with something else? (like % of takes that are buys)
+
+        self.micro_trend_estimator = TrendEstimator(
+            HoltEma(micro_trend_hl, micro_accel_hl), latest_prices
+        )
         self.trend_estimator = TrendEstimator(HoltEma(trend_hl, accel_hl), latest_prices)
         for _, prices in warmup_prices.iloc[-4 * accel_hl :].iterrows():
+            self.micro_trend_estimator.step(prices)
             self.trend_estimator.step(prices)
         self.edge_trend_estimator = TrendEstimator(HoltEma(edge_trend_hl, edge_accel_hl))
 
@@ -40,6 +53,7 @@ class ExecutionStrategy:
         mids = (bids + asks) / 2  # Use mid price for target position value calculations.
         prices = (fairs.mean >= mids) * asks + (fairs.mean < mids) * bids
 
+        micro_trend = self.micro_trend_estimator.step(mids)
         trend = self.trend_estimator.step(mids)
         edge_trend = self.edge_trend_estimator.step(fairs.mean / mids - 1)
 
@@ -59,7 +73,13 @@ class ExecutionStrategy:
         unprofitable_position = np.sign(pair_positions) * pct_edge < 0
         position_closing_orders = -pair_positions * (profitable_orders == 0) * unprofitable_position
 
-        reverting = edge_trend * np.sign(pct_edge) < 0
+        micro_trending_correctly = micro_trend * np.sign(pct_edge) > 0
         trending_correctly = trend * np.sign(pct_edge) > 0
+        reverting = edge_trend * np.sign(pct_edge) < 0
 
-        return (profitable_orders + position_closing_orders) * reverting * trending_correctly
+        return (
+            (profitable_orders + position_closing_orders)
+            * micro_trending_correctly
+            * trending_correctly
+            * reverting
+        )
