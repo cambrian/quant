@@ -73,13 +73,7 @@ class ExecutionStrategy:
         unprofitable_position = np.sign(pair_positions) * pct_edge < 0
         position_closing_orders = -pair_positions * (profitable_orders == 0) * unprofitable_position
 
-        micro_trending_correctly = micro_trend * np.sign(pct_edge) > 0
-        trending_correctly = trend * np.sign(pct_edge) > 0
+        trending_correctly = (trend * np.sign(pct_edge) > 0) & micro_trend * np.sign(pct_edge) > 0
         reverting = edge_trend * np.sign(pct_edge) < 0
 
-        return (
-            (profitable_orders + position_closing_orders)
-            * micro_trending_correctly
-            * trending_correctly
-            * reverting
-        )
+        return (profitable_orders + position_closing_orders) * trending_correctly * reverting
