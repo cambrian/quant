@@ -897,9 +897,3 @@ class Gaussian:
             else:
                 obj[key] = deepcopy(self.__dict__[key])
         return json.dumps(obj)
-
-
-if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
