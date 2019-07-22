@@ -1,10 +1,14 @@
 import inspect
 import sys
+from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from pprint import pformat
 
 import colorful
+import pandas as pd
+
+from trader.util.gaussian import Gaussian
 
 _colorize = colorful.Colorful()
 _colorize.use_style("solarized")
@@ -66,16 +70,28 @@ class Log:
     ):
         if level.value < Log.level_cutoff.value:
             return
-        log_message = [
-            color_level(level.name),
-            color_time(_time()),
-            color_context(context),
-            color_level(message),
-        ]
+        # log_message = [
+        #     color_level(level.name),
+        #     color_time(_time()),
+        #     color_context(context),
+        #     color_level(message),
+        # ]
+        fstr = f'{{"level": "{str(color_level(level))}", "time": "{str(color_time(_time()))}", "context": "{str(color_context(context))}", "message": "{str(color_level(message))}"'
         if not data is None:
-            log_message.append(pformat(data, compact=True))
-            # .replace("\n", "\\n").replace("\t", "\\t")
-        print("\t".join(str(x) for x in log_message), file=sys.stderr, flush=True)
+            if isinstance(data, Gaussian):
+                data = data._toJSON()
+            elif isinstance(data, pd.Series):
+                obj = deepcopy(data)
+                obj.index = obj.index.map(repr)
+                data = obj.to_json()
+                data = data.replace("'", "\\'")
+            fstr += f', "data": {data}'
+        fstr += f"}}"
+        print(fstr, file=sys.stderr, flush=True)
+        # if not data is None:
+        #     log_message.append(pformat(data, compact=True))
+        # .replace("\n", "\\n").replace("\t", "\\t")
+        # print("\t".join(str(x) for x in log_message), file=sys.stderr, flush=True)
 
     @staticmethod
     def debug(message, data=None):

@@ -1,4 +1,6 @@
 import itertools
+import json
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -867,3 +869,37 @@ class Gaussian:
 
     def __repr__(self):
         return "Gaussian:\nmean:\n{}\ncovariance:\n{}".format(self.mean, self.covariance)
+
+    def _toJSON(self):
+        """
+        >>> Gaussian(1, 1)._toJSON()
+        '{"_Gaussian__mean": [1], "_Gaussian__covariance": [[1]]}'
+        >>> Gaussian([1, 1], np.array([[1, 0], [0, 1]]))._toJSON()
+        '{"_Gaussian__mean": [1, 1], "_Gaussian__covariance": [[1, 0], [0, 1]]}'
+        >>> Gaussian(pd.Series([1, 1], index=['a', 'b']), [[1, 1], [1, 1]])._toJSON()
+        '{"_Gaussian__mean": {"\\'a\\'": 1, "\\'b\\'": 1}, "_Gaussian__covariance": {"\\'a\\'": {"\\'a\\'": 1, "\\'b\\'": 1}, "\\'b\\'": {"\\'a\\'": 1, "\\'b\\'": 1}}}'
+        >>> Gaussian(pd.Series([2]), pd.DataFrame([1]))._toJSON()
+        '{"_Gaussian__mean": {"0": 2}, "_Gaussian__covariance": {"0": {"0": 1}}}'
+        """
+        obj = {}
+        for key in self.__dict__:
+            if isinstance(self.__dict__[key], pd.Series) or isinstance(
+                self.__dict__[key], pd.DataFrame
+            ):
+                obj[key] = deepcopy(self.__dict__[key])
+                if hasattr(obj[key], "index"):
+                    obj[key].index = obj[key].index.map(lambda x: repr(x))
+                if hasattr(obj[key], "columns"):
+                    obj[key].columns = obj[key].columns.map(lambda x: repr(x))
+                obj[key] = json.loads(obj[key].to_json())
+            elif isinstance(self.__dict__[key], np.ndarray):
+                obj[key] = deepcopy(self.__dict__[key].tolist())
+            else:
+                obj[key] = deepcopy(self.__dict__[key])
+        return json.dumps(obj)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

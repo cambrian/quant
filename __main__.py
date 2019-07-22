@@ -8,22 +8,10 @@ from trader import ExecutionStrategy, Executor, SignalAggregator, UsdConverter
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (
-    BCH_USD,
-    BINANCE,
-    BSV_USD,
-    BTC_USD,
-    BTC_USDT,
-    EOS_USD,
-    EOS_USDT,
-    ETH_USD,
-    ETH_USDT,
-    LTC_USD,
-    LTC_USDT,
-    NEO_USDT,
-    XRP_USD,
-    XRP_USDT,
-)
+from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
+                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
+                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
+                                   XRP_USD, XRP_USDT)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -59,7 +47,7 @@ def main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 1, 2, 10, 20, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 2, 4, 10, 20, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
@@ -102,7 +90,7 @@ def dummy_main():
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(10, 192, 1, 3, -1, 0.002, 0.0005, warmup_data)
+    execution_strategy = ExecutionStrategy(1000, 2, 4, 10, 20, warmup_data)
 
     dummy_exchange = DummyExchange(
         THREAD_MANAGER, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
@@ -126,6 +114,6 @@ def dummy_main():
 #     Log.info("final positions", executor.)
 
 
-THREAD_MANAGER.attach("main", main, should_terminate=True)
-# THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
+# THREAD_MANAGER.attach("main", main, should_terminate=True)
+THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
 THREAD_MANAGER.run()
