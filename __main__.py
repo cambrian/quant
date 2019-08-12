@@ -8,10 +8,22 @@ from trader import ExecutionStrategy, Executor, SignalAggregator, UsdConverter
 from trader.exchange import Bitfinex, DummyExchange
 from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
-                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
-                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
-                                   XRP_USD, XRP_USDT)
+from trader.util.constants import (
+    BCH_USD,
+    BINANCE,
+    BSV_USD,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USD,
+    EOS_USDT,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USD,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USD,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -75,7 +87,7 @@ def dummy_main():
     aggregator = SignalAggregator(window_size, {"total_market": [p.base for p in pairs]})
     Log.info("Processing warmup data.")
     warmup_data = data.iloc[:window_size]
-    data = data.iloc[window_size:]
+    data = data.iloc[window_size : window_size * 2]
     warmup_data = warmup_data.apply(converter.step, axis=1)
     warmup_signals = warmup_data.apply(aggregator.step, axis=1)
 
@@ -107,6 +119,7 @@ def dummy_main():
             frame_usd.xs("price", level=1), [1e100 for _ in frame_usd.xs("price", level=1).index]
         )
         Log.info("fairs", fairs)
+        Log.info("market", frame)
         executor.tick_fairs(fairs)
     # TODO: analysis stuff
 

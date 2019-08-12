@@ -84,7 +84,7 @@ class Log:
                 obj = deepcopy(data)
                 obj.index = obj.index.map(repr)
                 data = obj.to_json()
-                data = data.replace("'", "\\'")
+                data = data.replace("'", "")
             fstr += f', "data": {data}'
         fstr += f"}}"
         print(fstr, file=sys.stderr, flush=True)

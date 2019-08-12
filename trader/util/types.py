@@ -355,15 +355,7 @@ class Order:
         self.__status = status
 
     def __repr__(self):
-        return "Order({}, {}, {}, {}, {}, price={}, size={})".format(
-            self.__id,
-            self.__exchange_pair,
-            self.__side,
-            self.__order_type,
-            self.__status,
-            self.__price,
-            self.__size,
-        )
+        return f'{{"type": "Order", "id": {self.__id}, "exchange_pair": "{self.__exchange_pair}", "side": "{self.__side}", "order_type": "{self.__order_type}", "status": "{self.__status}", "price": {self.__price}, "size": {self.__size}}}'
 
 
 class OpenOrder(Order):
