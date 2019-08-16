@@ -27,3 +27,4 @@ statsmodels>=0.9.0
 tables>=3.5.1
 tqdm>=4.31.1
 websocket-client>=0.56.0
+git+https://github.com/bitfinexcom/bitfinex-api-py.git@master

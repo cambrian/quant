@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -9,6 +10,7 @@ from queue import Queue
 
 import numpy as np
 import pandas as pd
+from bfxapi import Client
 from bitfinex import ClientV1, ClientV2, WssClient
 from websocket import WebSocketApp
 
@@ -42,6 +44,44 @@ class Bitfinex(Exchange):
         super().__init__(thread_manager)
         self.__api_key = keys["key"]
         self.__api_secret = keys["secret"]
+        # TODO: Look deeper into best way to manage this
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self.__bfx = Client(self.__api_key, self.__api_secret, manageOrderBooks=True)
+        self.__order_book_queues = {}  # { Pair -> (msg_queue, order_book)}
+        self.__trade_queues = {}  # { Pair -> msg_queue }
+
+        for pair in pairs:
+            self.__order_book_queues[pair] = (Queue(), OrderBook(ExchangePair(self.id, pair)))
+            self.__trade_queues[pair] = Queue()
+
+        @self.__bfx.ws.on("error")
+        def log_error(err):
+            Log.warn("Error {}".format(err))
+
+        @self.__bfx.ws.on("order_book_update")
+        def log_update(data):
+            self.__order_book_queues[self.decode_trading_pair(data["symbol"])][0].put(data["data"])
+
+        @self.__bfx.ws.on("order_book_snapshot")
+        def log_snapshot(data):
+            msg_queue, order_book = self.__order_book_queues[
+                self.decode_trading_pair(data["symbol"])
+            ]
+            with msg_queue.mutex:
+                msg_queue.queue.clear()
+            order_book.clear()
+            for update in data["data"]:
+                msg_queue.put(update)
+
+        @self.__bfx.ws.on("new_trade")
+        def parse_executed(data):
+            self.__trade_queues[self.decode_trading_pair(data["symbol"])].put(data)
+
+        @self.__bfx.ws.on("position_snapshot")
+        def log_position(data):
+            print("POSITION {}".format(data))
+
         self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret, 2.0)
         self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
         self.__ws_client = WssClient(self.__api_key, self.__api_secret)
@@ -70,13 +110,35 @@ class Bitfinex(Exchange):
             ),
         )
 
-        for pair in pairs:
-            pair_feed_book, runner_book = Feed.of(self.__generate_book_feed(pair))
-            self._thread_manager.attach(f"bitfinex-{pair}-book", runner_book)
-            self.__book_feeds[pair] = pair_feed_book
-            pair_feed_trade, runner_trade = Feed.of(self.__generate_trade_feed(pair))
-            self._thread_manager.attach(f"bitfinex-{pair}-trade", runner_trade)
-            self.__trade_feeds[pair] = pair_feed_trade
+        async def start():
+            for pair in pairs:
+                await self.__bfx.ws.subscribe("book", self.encode_trading_pair(pair))
+                await self.__bfx.ws.subscribe("trades", self.encode_trading_pair(pair))
+                pair_feed_book, runner_book = Feed.of(
+                    self.__generate_book_feed(pair, self.__order_book_queues[pair])
+                )
+                self._thread_manager.attach(f"bitfinex-{pair}-book", runner_book)
+                self.__book_feeds[pair] = pair_feed_book
+                pair_feed_trade, runner_trade = Feed.of(
+                    self.__generate_trade_feed(pair, self.__trade_queues[pair])
+                )
+                self._thread_manager.attach(f"bitfinex-{pair}-trade", runner_trade)
+                self.__trade_feeds[pair] = pair_feed_trade
+
+        self.__bfx.ws.on("connected", start)
+        self.__bfx.ws.run()
+
+        # for pair in pairs:
+        #     pair_feed_book, runner_book = Feed.of(
+        #         self.__generate_book_feed(pair, self.__order_book_queues[pair])
+        #     )
+        #     self._thread_manager.attach(f"bitfinex-{pair}-book", runner_book)
+        #     self.__book_feeds[pair] = pair_feed_book
+        #     pair_feed_trade, runner_trade = Feed.of(
+        #         self.__generate_trade_feed(pair, self.__trade_queues[pair])
+        #     )
+        #     self._thread_manager.attach(f"bitfinex-{pair}-trade", runner_trade)
+        #     self.__trade_feeds[pair] = pair_feed_trade
 
     @property
     def id(self):
@@ -97,50 +159,20 @@ class Bitfinex(Exchange):
             raise ExchangeError("pair not supported by this Bitfinex client")
         return self.__book_feeds[pair]
 
-    def __generate_book_feed(self, pair):
-        msg_queue = Queue()
-
-        self.__ws_client.subscribe_to_orderbook(
-            Bitfinex.encode_trading_pair(pair), precision="P0", callback=msg_queue.put
-        )
-
-        order_book = OrderBook(ExchangePair(self.id, pair))
-
-        def handle_update(order_book, update):
+    def __generate_book_feed(self, pair, order_book_queue):
+        msg_queue, order_book = order_book_queue
+        while True:
+            update = msg_queue.get()
             side = Side.BUY if update[2] > 0 else Side.SELL
             size = abs(update[2]) if update[1] != 0 else 0
             order_book.update(side, BookLevel(update[0], size))
-
-        while True:
-            msg = msg_queue.get()
-            # Ignore status/subscription dicts, heartbeats
-            if not isinstance(msg, list) or msg[1] == "hb":
-                continue
-            # see https://docs.bitfinex.com/v2/reference#ws-public-order-books for spec.
-            if len(msg) == 2 and isinstance(msg[1][0], list):
-                order_book.clear()
-                for update in msg[1]:
-                    handle_update(order_book, update)
-            else:
-                handle_update(order_book, msg[1])
             yield order_book
 
-    def __generate_trade_feed(self, pair):
-        msg_queue = Queue()
-
-        self.__ws_client.subscribe_to_trades(
-            Bitfinex.encode_trading_pair(pair), callback=msg_queue.put
-        )
-
+    def __generate_trade_feed(self, pair, msg_queue):
         while True:
-            msg = msg_queue.get()
-            # We only track 'te' trade executions (ignoring "tu" trade updates)
-            # see https://docs.bitfinex.com/v2/reference for spec.
-            if not isinstance(msg, list) or msg[1] != "te":
-                continue
-            self.__frame.loc[ExchangePair(self.id, pair), "price"] = float(msg[2][3])
-            self.__frame.loc[ExchangePair(self.id, pair), "volume"] += abs(float(msg[2][2]))
-
+            update = msg_queue.get()
+            self.__frame.loc[ExchangePair(self.id, pair), "price"] = float(update["price"])
+            self.__frame.loc[ExchangePair(self.id, pair), "volume"] += abs(float(update["amount"]))
             yield self.__frame
 
     def frame(self, pairs):
@@ -165,6 +197,8 @@ class Bitfinex(Exchange):
                 currency = pair.base
                 positions[currency] = 0.0
             self.__positions_queue.put(deepcopy(positions))
+
+        # TODO track positions
 
         def on_open(ws):
             nonce = int(time.time() * 1000000)
@@ -292,21 +326,21 @@ class Bitfinex(Exchange):
             "type": self.__order_types[order.order_type],
             "is_postonly": order.maker_only,
         }
-        try:
-            response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
-        except TypeError as err:
-            Log.warn("Bitfinex _post type error: {}".format(err))
-        except Exception as err:
-            Log.warn("Swallowing unexpected error: {}".format(err))
-            return None
-        Log.debug("Bitfinex-order-response", response)
-        if "id" in response:
-            order = OpenOrder(order, response["id"])
-            if not response["is_live"]:
-                order.update_status(Order.Status.REJECTED)
-            elif not response["is_cancelled"]:
-                order.update_status(Order.Status.CANCELLED)
-            return order
+        # try:
+        #     response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
+        # except TypeError as err:
+        #     Log.warn("Bitfinex _post type error: {}".format(err))
+        # except Exception as err:
+        #     Log.warn("Swallowing unexpected error: {}".format(err))
+        #     return None
+        # Log.debug("Bitfinex-order-response", response)
+        # if "id" in response:
+        #     order = OpenOrder(order, response["id"])
+        #     if not response["is_live"]:
+        #         order.update_status(Order.Status.REJECTED)
+        #     elif not response["is_cancelled"]:
+        #         order.update_status(Order.Status.CANCELLED)
+        #     return order
         return None
 
     def cancel_order(self, order_id):
