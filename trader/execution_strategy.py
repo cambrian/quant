@@ -1,26 +1,42 @@
 import numpy as np
-import pandas as pd
 
 from trader.util import Log
-from trader.util.stats import Emse, HoltEma, TrendEstimator
+from trader.util.stats import HoltEma, TrendEstimator
 
 
 class ExecutionStrategy:
-    def __init__(self, size, trend_hl, accel_hl, fair_trend_hl, fair_accel_hl, warmup_data):
+    def __init__(
+        self,
+        size,
+        micro_trend_hl,
+        micro_accel_hl,
+        trend_hl,
+        accel_hl,
+        edge_trend_hl,
+        edge_accel_hl,
+        warmup_data,
+    ):
         self.size = size
 
         warmup_prices = warmup_data.xs("price", axis=1, level=1)
         latest_prices = warmup_prices.iloc[-1]
-        # Does it make sense to replace with something else? (like % of takes that are buys)
-        self.trend_estimator = TrendEstimator(HoltEma(trend_hl, accel_hl), latest_prices)
-        self.fair_trend_estimator = TrendEstimator(
-            HoltEma(fair_trend_hl, fair_accel_hl), latest_prices
-        )
-        for _, prices in warmup_prices.iloc[-4 * fair_accel_hl :].iterrows():
-            self.trend_estimator.step(prices)
-            self.fair_trend_estimator.step(prices)  # should this be different?
 
-        Log.info("Execution strategy initialized and warm.")
+        self.micro_trend_estimator = TrendEstimator(
+            HoltEma(micro_trend_hl, micro_accel_hl), latest_prices
+        )
+        self.trend_estimator = TrendEstimator(HoltEma(trend_hl, accel_hl), latest_prices)
+        for _, prices in warmup_prices.iloc[-4 * accel_hl :].iterrows():
+            self.micro_trend_estimator.step(prices)
+            self.trend_estimator.step(prices)
+        self.edge_trend_estimator = TrendEstimator(HoltEma(edge_trend_hl, edge_accel_hl))
+
+        if not self.trend_estimator.ready:
+            Log.warn(
+                "Execution strategy initialized but had insufficient warmup data. Will \
+                warm up slowly in real time."
+            )
+        else:
+            Log.info("Execution strategy initialized and warm.")
 
     def tick(self, positions, bids, asks, fairs, fees):
         """Takes fair as Gaussian, positions in base currency.
@@ -37,8 +53,9 @@ class ExecutionStrategy:
         mids = (bids + asks) / 2  # Use mid price for target position value calculations.
         prices = (fairs.mean >= mids) * asks + (fairs.mean < mids) * bids
 
+        micro_trend = self.micro_trend_estimator.step(mids)
         trend = self.trend_estimator.step(mids)
-        fair_trend = self.fair_trend_estimator.step(fairs.mean)
+        edge_trend = self.edge_trend_estimator.step(fairs.mean / mids - 1)
 
         z_edge = (fairs.mean - prices) / fairs.stddev
         pct_edge = fairs.mean / prices - 1
@@ -51,15 +68,12 @@ class ExecutionStrategy:
         )
         proposed_orders = target_position_values / fairs.mean - pair_positions
         profitable = np.sign(proposed_orders) * pct_edge > 2 * fees
-        trending_correctly = trend * np.sign(pct_edge) > 0
-        fair_trending_correctly = fair_trend * np.sign(pct_edge) > 0
-        profitable_orders = (
-            proposed_orders * profitable * trending_correctly * fair_trending_correctly
-        )
+        profitable_orders = proposed_orders * profitable
 
         unprofitable_position = np.sign(pair_positions) * pct_edge < 0
-        position_closing_orders = (
-            -pair_positions * (profitable_orders == 0) * unprofitable_position * trending_correctly
-        )
+        position_closing_orders = -pair_positions * (profitable_orders == 0) * unprofitable_position
 
-        return profitable_orders + position_closing_orders
+        trending_correctly = (trend * np.sign(pct_edge) > 0) & (micro_trend * np.sign(pct_edge) > 0)
+        reverting = edge_trend * np.sign(pct_edge) < 0
+
+        return (profitable_orders + position_closing_orders) * trending_correctly * reverting

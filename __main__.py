@@ -1,17 +1,27 @@
 import json
-import time
 
 import pandas as pd
 
 import trader.strategy as strategy
 from trader import ExecutionStrategy, Executor, SignalAggregator, UsdConverter
 from trader.exchange import Bitfinex, DummyExchange
-from trader.metrics import Metrics
 from trader.util import Gaussian, Log
-from trader.util.constants import (BCH_USD, BINANCE, BSV_USD, BTC_USD,
-                                   BTC_USDT, EOS_USD, EOS_USDT, ETH_USD,
-                                   ETH_USDT, LTC_USD, LTC_USDT, NEO_USDT,
-                                   XRP_USD, XRP_USDT)
+from trader.util.constants import (
+    BCH_USD,
+    BINANCE,
+    BSV_USD,
+    BTC_USD,
+    BTC_USDT,
+    EOS_USD,
+    EOS_USDT,
+    ETH_USD,
+    ETH_USDT,
+    LTC_USD,
+    LTC_USDT,
+    NEO_USDT,
+    XRP_USD,
+    XRP_USDT,
+)
 from trader.util.thread import Beat, ThreadManager
 
 # should this be a global that lives in trader.util.thread?
@@ -20,7 +30,7 @@ THREAD_MANAGER = ThreadManager()
 
 def main():
     pairs = [BTC_USD, ETH_USD, XRP_USD, LTC_USD, EOS_USD, BCH_USD, BSV_USD]
-    window_size = 7500
+    window_size = 9999  # biggest window that will fit in 2 api calls to candles
 
     Log.info("Connecting to exchanges.")
     with open("keys/bitfinex.json") as bitfinex_key_file:
@@ -39,15 +49,13 @@ def main():
     Log.info("Initializing components.")
     kalman_strategy = strategy.Kalman(
         window_size=window_size,
-        movement_hl=90,
-        trend_hl=3000,
-        mse_hl=1440,
-        cointegration_period=60,
-        maxlag=120,
+        movement_hl=1440 * 3,
+        trend_hl=window_size,
+        cointegration_period=720,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 2, 4, 10, 20, warmup_data)
+    execution_strategy = ExecutionStrategy(500, 1, 3, 45, 135, 60, 180, warmup_data)
     executor = Executor(THREAD_MANAGER, {bitfinex: pairs}, execution_strategy)
 
     beat = Beat(60000)
@@ -82,15 +90,15 @@ def dummy_main():
     Log.info("Initializing components.")
     kalman_strategy = strategy.Kalman(
         window_size=window_size,
-        movement_hl=6,
+        movement_hl=288,
         trend_hl=256,
-        mse_hl=192,
-        cointegration_period=32,
-        maxlag=8,
+        cointegration_period=96,
         warmup_signals=warmup_signals,
         warmup_data=warmup_data,
     )
-    execution_strategy = ExecutionStrategy(1000, 2, 4, 10, 20, warmup_data)
+    # use same params for trend and micro trend because 15min is too wide for micro trends to have
+    # effect
+    execution_strategy = ExecutionStrategy(10, 3, 9, 3, 9, 4, 12, warmup_data)
 
     dummy_exchange = DummyExchange(
         THREAD_MANAGER, BINANCE, data, {"maker": 0.00075, "taker": 0.00075}
