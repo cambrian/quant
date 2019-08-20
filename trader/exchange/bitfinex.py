@@ -11,15 +11,23 @@ from queue import Queue
 import numpy as np
 import pandas as pd
 from bfxapi import Client
+from bfxapi import Order as BfxOrder
 from bitfinex import ClientV1, ClientV2, WssClient
 from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
-                               Order, OrderBook, Side, TradingPair)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import (
+    BookLevel,
+    Currency,
+    ExchangePair,
+    OpenOrder,
+    Order,
+    OrderBook,
+    Side,
+    TradingPair,
+)
 
 
 class Bitfinex(Exchange):
@@ -61,12 +69,14 @@ class Bitfinex(Exchange):
 
         @self.__bfx.ws.on("order_book_update")
         def log_update(data):
-            self.__order_book_queues[self.decode_trading_pair(data["symbol"])][0].put(data["data"])
+            self.__order_book_queues[Bitfinex.decode_trading_pair(data["symbol"])][0].put(
+                data["data"]
+            )
 
         @self.__bfx.ws.on("order_book_snapshot")
         def log_snapshot(data):
             msg_queue, order_book = self.__order_book_queues[
-                self.decode_trading_pair(data["symbol"])
+                Bitfinex.decode_trading_pair(data["symbol"])
             ]
             with msg_queue.mutex:
                 msg_queue.queue.clear()
@@ -76,23 +86,18 @@ class Bitfinex(Exchange):
 
         @self.__bfx.ws.on("new_trade")
         def parse_executed(data):
-            self.__trade_queues[self.decode_trading_pair(data["symbol"])].put(data)
+            self.__trade_queues[Bitfinex.decode_trading_pair(data["symbol"])].put(data)
 
         @self.__bfx.ws.on("position_snapshot")
         def log_position(data):
             print("POSITION {}".format(data))
 
-        self.__bfxv1 = ClientV1(self.__api_key, self.__api_secret, 2.0)
-        self.__bfxv2 = ClientV2(self.__api_key, self.__api_secret)
-        self.__ws_client = WssClient(self.__api_key, self.__api_secret)
-        self.__ws_client.authenticate(lambda x: None)
-        self.__ws_client.daemon = True
         self.__pairs = pairs
         self.__order_types = {
-            Order.Type.MARKET: "market",
-            Order.Type.LIMIT: "limit",
-            Order.Type.IOC: "immediate-or-cancel",
-            Order.Type.FOK: "fill-or-kill",
+            Order.Type.MARKET: "MARKET",
+            Order.Type.LIMIT: "LIMIT",
+            Order.Type.IOC: "IOC",
+            Order.Type.FOK: "FOK",
         }
         self.__book_feeds = {}
         self.__trade_feeds = {}
@@ -102,7 +107,6 @@ class Bitfinex(Exchange):
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
-        self.__ws_client.start()
         self.__frame = pd.Series(
             0.0,  # setting the initial value to 0 is important for volume tracking to work properly
             index=pd.MultiIndex.from_product(
@@ -112,8 +116,8 @@ class Bitfinex(Exchange):
 
         async def start():
             for pair in pairs:
-                await self.__bfx.ws.subscribe("book", self.encode_trading_pair(pair))
-                await self.__bfx.ws.subscribe("trades", self.encode_trading_pair(pair))
+                await self.__bfx.ws.subscribe("book", Bitfinex.encode_trading_pair(pair))
+                await self.__bfx.ws.subscribe("trades", Bitfinex.encode_trading_pair(pair))
                 pair_feed_book, runner_book = Feed.of(
                     self.__generate_book_feed(pair, self.__order_book_queues[pair])
                 )
@@ -277,24 +281,31 @@ class Bitfinex(Exchange):
         return self.__fees
 
     def get_warmup_data(self, pairs, duration, resolution):
-        rows = 0
-        data = {}
-        last_time = None
+        async def helper(bfx, pairs, duration):
+            rows = 0
+            data = {}
+            last_time = None
+            while rows < duration:
+                for pair in pairs:
+                    bfx_pair = Bitfinex.encode_trading_pair(pair)
+                    limit = min(duration - rows, 5000)
+                    now = int(round(time.time() * 1000))
+                    if last_time is None:
+                        data[pair] = await bfx.rest.get_public_candles(
+                            bfx_pair, 0, now, limit=limit
+                        )
+                    else:
+                        limit = min(limit + 1, 5000)
+                        candles = await bfx.rest.get_public_candles(
+                            bfx_pair, 0, last_time, limit=limit
+                        )
+                        data[pair] += candles[1:]
+                last_time = data[pairs[0]][-1][0]
+                rows = len(data[pairs[0]])
+            return data
 
-        # Collect data from bitfinex API
-        while rows < duration:
-            for pair in pairs:
-                bfx_pair = Bitfinex.encode_trading_pair(pair)
-                limit = min(duration - rows, 5000)
-                if last_time is None:
-                    data[pair] = self.__bfxv2.candles(resolution, bfx_pair, "hist", limit=limit)
-                else:
-                    limit = min(limit + 1, 5000)
-                    data[pair] += self.__bfxv2.candles(
-                        resolution, bfx_pair, "hist", limit=limit, end=last_time
-                    )[1:]
-            last_time = data[pairs[0]][-1][0]
-            rows = len(data[pairs[0]])
+        t = asyncio.ensure_future(helper(self.__bfx, pairs, duration))
+        data = asyncio.get_event_loop().run_until_complete(t)
 
         # Prep data for strategy consumption
         prepped = []
@@ -314,40 +325,26 @@ class Bitfinex(Exchange):
 
     def add_order(self, order):
         assert order.exchange_id == self.id
-        payload = {
-            "request": "/v1/order/new",
-            "nonce": self.__bfxv1._nonce(),
-            # Bitfinex v1 API expects "BTCUSD", v2 API expects "tBTCUSD":
-            "symbol": Bitfinex.encode_trading_pair(order.pair)[1:],
-            "amount": str(order.size),
-            "price": str(order.price),
-            "exchange": "bitfinex",
-            "side": order.side.name.lower(),
-            "type": self.__order_types[order.order_type],
-            "is_postonly": order.maker_only,
-        }
-        # try:
-        #     response = self.__bfxv1._post("/order/new", payload=payload, verify=True)
-        # except TypeError as err:
-        #     Log.warn("Bitfinex _post type error: {}".format(err))
-        # except Exception as err:
-        #     Log.warn("Swallowing unexpected error: {}".format(err))
-        #     return None
-        # Log.debug("Bitfinex-order-response", response)
-        # if "id" in response:
-        #     order = OpenOrder(order, response["id"])
-        #     if not response["is_live"]:
-        #         order.update_status(Order.Status.REJECTED)
-        #     elif not response["is_cancelled"]:
-        #         order.update_status(Order.Status.CANCELLED)
-        #     return order
-        return None
+
+        async def helper(order):
+            amount = order.size if order.side is Order.BUY else -1 * order.size
+            res = await self.__bfx.ws.submit_order(
+                Bitfinex.encode_trading_pair(order.pair),
+                order.price,
+                amount,
+                self.__order_types[order.order_type],
+            )
+
+        t = asyncio.ensure_future(helper(order))
+        data = asyncio.get_event_loop().run_until_complete(t)
 
     def cancel_order(self, order_id):
-        return self.__bfxv1.delete_order(order_id)
-
-    def order_status(self, order_id):
-        return self.__bfxv1.status_order(order_id)
+        self.__bfx.ws.cancel_all_orders()
 
     def get_open_positions(self):
-        return self.__bfxv1.active_orders()
+        async def helper():
+            positions = await self.__bfx.rest.get_active_positions()
+            return positions
+
+        t = asyncio.ensure_future(helper())
+        return asyncio.get_event_loop().run_until_complete(t)
