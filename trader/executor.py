@@ -103,7 +103,7 @@ class Executor:
             order = Order(
                 self.__next_order_id(), exchange_pair, side, Order.Type.IOC, price, abs(order_size)
             )
-            exchange.add_order(order)  # TODO: require this to be async?
+            # exchange.add_order(order)  # TODO: require this to be async?
             Log.info("sent order", order)
         self.__trade_lock.release()
 

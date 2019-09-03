@@ -73,6 +73,8 @@ def main():
             frame_usd.xs("price", level=1), [1e100 for _ in frame_usd.xs("price", level=1).index]
         )
         Log.info("fairs", fairs)
+        Log.info("market", bfx_frame)
+        Log.info("balances", bitfinex.balances)
         executor.tick_fairs(fairs)
 
 
@@ -127,6 +129,6 @@ def dummy_main():
 #     Log.info("final positions", executor.)
 
 
-# THREAD_MANAGER.attach("main", main, should_terminate=True)
-THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
+THREAD_MANAGER.attach("main", main, should_terminate=True)
+# THREAD_MANAGER.attach("dummy_main", dummy_main, should_terminate=True)
 THREAD_MANAGER.run()

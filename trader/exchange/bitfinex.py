@@ -14,10 +14,17 @@ from websocket import WebSocketApp
 
 from trader.exchange.base import Exchange, ExchangeError
 from trader.util import Feed, Log
-from trader.util.constants import (BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD,
-                                   XRP, XRP_USD)
-from trader.util.types import (BookLevel, Currency, ExchangePair, OpenOrder,
-                               Order, OrderBook, Side, TradingPair)
+from trader.util.constants import BITFINEX, BTC, BTC_USD, ETH, ETH_USD, USD, XRP, XRP_USD
+from trader.util.types import (
+    BookLevel,
+    Currency,
+    ExchangePair,
+    OpenOrder,
+    Order,
+    OrderBook,
+    Side,
+    TradingPair,
+)
 
 
 class Bitfinex(Exchange):
@@ -58,7 +65,7 @@ class Bitfinex(Exchange):
         self.__trade_feeds = {}
         self.__positions_queue = Queue()
         self.__positions_feed = self.positions_feed()
-        thread_manager.attach("bitfinex-positions-queue", self.__track_positions)
+        thread_manager.attach("bitfinex-positions-queue", self.manage_position_tracking)
         # TODO: Can this be dynamically loaded? (For other exchanges too.)
         self.__fees = {"maker": 0.001, "taker": 0.002}
         # TODO: Maybe start this in a lazy way?
@@ -158,6 +165,11 @@ class Bitfinex(Exchange):
             self.__positions_feed = positions_feed
         return self.__positions_feed
 
+    # Thread fn to maintain a position tracking WS
+    def manage_position_tracking(self):
+        while True:
+            self.__track_positions()
+
     def __track_positions(self):
         if not hasattr(self, "__positions_feed") or self.__positions_feed is None:
             positions = defaultdict(float)
@@ -215,16 +227,16 @@ class Bitfinex(Exchange):
         # TODO: should probably abort
         def on_error(ws, error):
             Log.warn("WS error within __track_positions for exchange {}: {}".format(self.id, error))
+            ws.close()
 
-        # TODO: refactor to not be recursive (bc of stack growth)
         def on_close(ws):
             Log.warn("WS closed unexpectedly for exchange {}".format(self.id))
             Log.info("restarting WS for exchange {}".format(self.id))
             time.sleep(3)
-            self.__track_positions()
+            return
 
         ws = WebSocketApp(
-            "wss://api.bitfinex.com/ws/",
+            "wss://api.bitfinex.com/ws/2",
             on_message=on_message,
             on_error=on_error,
             on_close=on_close,
@@ -237,6 +249,10 @@ class Bitfinex(Exchange):
         if self.__positions_feed is None:
             return self.positions_feed().latest
         return self.__positions_feed.latest
+
+    @property
+    def balances(self):
+        return self.__bfxv2.wallets_balance()
 
     @property
     def fees(self):
